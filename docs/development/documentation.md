@@ -1,18 +1,17 @@
 ---
 id: development-documentation
 kind: authority
-status: active
 owner: engineering
 summary: Defines MetalDocs documentation placement, naming, lifecycle, agent routing, review, and pull-request governance.
 ---
 
 # Documentation and agent-context governance
 
-> Candidate authority. Promote `status` to `current` only after independent review, operator ratification, and merge.
+> Candidate authority. It becomes current only after independent review, operator ratification, temporary-work cleanup, required checks, and merge of PR #132.
 
 ## Purpose
 
-Keep the live repository small, navigable, and unambiguous for humans and agents without losing accepted product, architecture, operational, or verification truth.
+Keep the live repository small, navigable, and unambiguous for humans and agents without losing accepted product, architecture, operational, verification, or provenance truth.
 
 ## Current decision
 
@@ -20,13 +19,14 @@ Keep the live repository small, navigable, and unambiguous for humans and agents
 ONE docs/ ROOT
 + SEMANTIC STABLE FILENAMES
 + TASK-ORIENTED INDEX
-+ EXPLICIT NAVIGATION
++ EXPLICIT NAVIGATION MANIFEST
 + SHORT AGENT BOOTSTRAP
 + ONE TEMPORARY PROPOSAL
 + ONE TEMPORARY AI DIALOGUE
 + ONE PR PER RATIFIABLE GATE
-+ GIT AS THE ONLY ARCHIVE
-+ ALLOWLIST-BASED LEGACY DELETION
++ GIT AS THE ARCHIVE
++ COMPLETE DISPOSITION BEFORE DELETION
++ GATE-SUBJECT PRESERVATION
 - wiki/
 - docs/superpowers/
 - stage/date/version filenames
@@ -36,7 +36,7 @@ ONE docs/ ROOT
 - duplicated status and authority
 ```
 
-Method outcome: **RESTRUCTURE NOW**. Updating isolated indexes would preserve the defect class: current truth, active work, and historical archive would still compete in one tree.
+Method outcome: **RESTRUCTURE NOW**. Repairing isolated indexes would preserve the defect class: current truth, active work, and historical archive would still compete in the same live tree.
 
 ## Documentation root
 
@@ -57,17 +57,9 @@ mkdocs.yml
 
 Third-party-managed documentation may remain under `vendor/` or `third_party/`; it is not MetalDocs authority.
 
-The final live tree does not retain:
+The final live tree does not retain `wiki/`, `docs/superpowers/`, `docs/operator/`, repository-local archive/tombstone trees, or completed candidate/review/adjudication artifacts. Deletion happens only after every current consumer and verification subject has been explicitly disposed.
 
-```text
-wiki/
-docs/superpowers/
-docs/operator/
-archive/legacy/tombstone documentation trees
-completed candidates/reviews/adjudications
-```
-
-Git history and closed pull requests preserve provenance.
+Git history and closed pull requests preserve historical process and deleted content. History-pinned security allowlists may continue to reference deleted historical paths when the security control still consumes those fingerprints.
 
 ## Naming and metadata
 
@@ -77,9 +69,10 @@ Durable filenames use lowercase kebab-case and describe stable subjects:
 product/contract.md
 architecture/persistence.md
 operations/runbooks/restore.md
+reference/problem-codes.md
 ```
 
-They do not carry dates, R10/T-stage codes, versions, `final/new/old`, `candidate/corrected`, `review/adjudication`, `amendment/tombstone`, or `legacy/historical`. Explicit exceptions are limited to numbered ADRs, dated incidents, and release notes where the number or date is part of the document identity.
+They do not carry dates, R10/T-stage codes, versions, `final/new/old`, `candidate/corrected`, `review/adjudication`, `amendment/tombstone`, or `legacy/historical`. Exceptions are limited to identifiers whose number/date is part of the durable subject, including numbered ADRs, dated incidents, and release notes.
 
 Every maintained Markdown page under `docs/` has unique frontmatter:
 
@@ -87,49 +80,62 @@ Every maintained Markdown page under `docs/` has unique frontmatter:
 ---
 id: architecture-persistence
 kind: authority
-status: current
 owner: architecture
 summary: Defines the target relational model, constraints, and concurrency rules.
 ---
 ```
 
-Closed values:
+Closed `kind` values are:
 
 ```text
-kind: authority | guide | reference | work
-status: current | active
+authority
+work
 ```
 
-A replacement repairs links and deletes the previous page. A compatibility stub requires a real external consumer or unchangeable tool.
+`authority` means a maintained durable page whose subject is current for its declared purpose. `work` means temporary non-authoritative material inside a Draft PR. Ratification is represented by promotion into the durable tree and decision provenance, not by a second status field.
+
+Generated durable pages use the same frontmatter, emitted by their generator. A generated page is never hand-edited to satisfy metadata rules.
+
+A replacement repairs live consumers and deletes the previous page. A compatibility stub requires a demonstrated external consumer or tool that cannot be repaired in the same gate.
 
 ## Authority and navigation
 
 One meaning has one current authority.
 
 - `docs/index.md` maps reader intent to the owning page; it does not repeat decisions.
-- `mkdocs.yml` lists every publishable durable page exactly once and excludes `docs/work/`.
 - `docs/status.md` is the sole current stage and implementation-gate authority.
 - `docs/decisions/index.md` records compact decision identity, status, authority link, provenance, and reopen trigger without duplicating decision prose.
-- README, AGENTS, indexes, PR bodies, and work files point to authorities instead of copying them.
+- `mkdocs.yml` is the explicit durable navigation manifest. Publishing is not required by this profile; build-oriented MkDocs keys are compatibility for future publication, not current product obligations.
+- `docs/work/` is never published.
+
+Large governed collections may be reachable through one indexed collection page instead of listing every member directly in `mkdocs.yml`. This applies to ADRs, generated references, database table dictionaries, and similar bounded collections. Every durable page must remain reachable from the navigation graph.
+
+Machine-consumed documentation has explicit homes, including:
+
+```text
+docs/decisions/adr-NNNN-<slug>.md
+docs/reference/database/<subject>.md
+docs/reference/problem-codes.md
+docs/reference/requirement-traceability.md
+```
+
+Module-debt or equivalent registers survive only if their current gate survives; otherwise the gate and its subject are retired together.
 
 ## Agent context
 
-Root `AGENTS.md` contains only:
+Root `AGENTS.md` is a bounded bootstrap. It contains repository purpose, navigation entrypoints, build/test/verify commands, stable Git/security rules, and pointers to durable repository engineering law and current-system orientation.
+
+Durable homes are:
 
 ```text
-repository purpose
-docs/index.md entrypoint
-docs/status.md pointer when stage matters
-docs/work/current/index.md pointer when active work exists
-task-specific authority lookup
-build/test/verify commands
-stable Git/security rules
-canonical Method and Fable pointers
+docs/development/engineering-rules.md
+  repository-specific prerequisite stops, mismatch rules, safety and Git constraints
+
+docs/reference/current-system.md
+  current implementation orientation needed to work safely before target transition
 ```
 
-It does not copy architecture, stage summaries, decision ledgers, review history, or prompts.
-
-Routine orientation:
+Routine orientation is:
 
 ```text
 AGENTS.md
@@ -139,9 +145,9 @@ AGENTS.md
 → current code evidence only for concrete claims
 ```
 
-Nested `AGENTS.md` files require repeated evidence of path-specific needs. `CLAUDE.md` remains a minimal pointer to root `AGENTS.md` and owns no independent meaning.
+`AGENTS.md` does not copy architecture, stage summaries, decision ledgers, review history, or task prompts. Nested `AGENTS.md` files require repeated evidence of genuinely path-specific needs. `CLAUDE.md` remains a minimal pointer to root `AGENTS.md` and owns no independent product or architecture meaning.
 
-Material engineering decisions apply `developmentconexus-ops/conexus-methodology/METHOD.md`. Repository and product authority remain local; external practices are evidence, not product requirements.
+Material engineering decisions apply `developmentconexus-ops/conexus-methodology/METHOD.md`. The canonical Fable workflow is referenced from the organization methodology rather than copied into a local skill. Each Conexus repository owns its own product and architecture truth and implements enforcement on its own verification spine.
 
 ## Active work and AI dialogue
 
@@ -159,25 +165,17 @@ Rules:
 - one active proposal per coherent gate;
 - proposal and plan are edited in place;
 - no permanent corrected-candidate, review-request, delta-review, adjudication, or tombstone files;
-- `ai-dialog.md` appears only for the final independent review;
-- Fable review, Lead adjudication, bounded Round 2, and operator decision remain in that one file;
+- `ai-dialog.md` appears only for final independent review;
+- Fable review, Lead adjudication, bounded Round 2, and operator decision stay in that one file;
 - Round 2 occurs only when a material contradiction survives;
-- all temporary work files are deleted before the PR becomes merge-ready.
+- `docs/work/**` may exist only while the pull request is Draft;
+- all temporary work files are deleted before the PR is marked ready for review.
 
-Fable handoff contains only repository, branch, PR, expected HEAD, and pointers to `AGENTS.md`, `proposal.md`, and `ai-dialog.md`. The canonical workflow lives in `developmentconexus-ops/conexus-methodology/README.md`; it is not copied into a local skill.
+CI must run the work-file guard on `ready_for_review` as well as ordinary PR synchronization, so changing PR state cannot bypass the rule.
 
 ## Pull-request lifecycle
 
-One coherent ratifiable gate uses:
-
-```text
-one branch
-one Draft PR
-one active proposal
-one final independent review
-one operator decision
-one squash merge
-```
+One coherent ratifiable gate uses one branch, one Draft PR, one active proposal, one final independent review, one operator decision, and one squash merge.
 
 Flow:
 
@@ -188,29 +186,73 @@ branch from current main
 → final Fable challenge
 → Lead adjudication
 → operator ratification
-→ promote durable docs
+→ promote durable docs and provenance
 → delete temporary work files
 → required checks green
+→ mark ready
 → squash merge
 → next gate starts from updated main
 ```
 
-A stage may be split only into independently coherent, ratifiable, merge-safe gates—not by conversation or review round. Stage/provenance identifiers belong in PR metadata and decision provenance, not durable filenames.
+A stage may be split only into independently coherent, ratifiable, merge-safe gates—not by conversation or review round. A pushed shared branch is not rebased/force-pushed merely to refresh its base; merge the updated base or use a new clean branch according to repository Git policy.
+
+The PR that promotes a durable authority also records its decision provenance. Until `docs/decisions/index.md` exists, the durable page itself records the promoting PR/review/operator decision; G1 moves that provenance into the compact registry without deleting it from Git history.
 
 ## Deletion and retention
 
-A document survives only when all are true:
+Deletion is driven by a complete census, not a hand-written root allowlist.
+
+Before removing documentation, enumerate the tracked documentation estate and give every path exactly one disposition:
+
+```text
+KEEP → <target path>
+MERGE → <target authority>
+GENERATED → <generator + target path>
+DELETE → <reason and proof no current consumer remains>
+```
+
+An undispositioned path is a stop condition.
+
+A durable document survives only when all are true:
 
 1. A named current consumer exists.
 2. It has unique current meaning.
-3. Its authority class is explicit.
-4. It is reachable from navigation.
+3. Its authority role is explicit.
+4. It is reachable from navigation or an indexed governed collection.
 5. Its owner is named.
 6. Its lifecycle or deletion trigger is clear.
 
-Otherwise: **delete it from the live tree**.
+Items 1, 2, and 6 require review-time engineering judgment; items 3–5 are mechanically checkable.
 
-Current-runtime references or runbooks may survive while the running implementation still consumes them. They must state that consumer and deletion trigger; they do not become target architecture authority. No local archive is created.
+Current-runtime references and runbooks may survive while the running implementation still consumes them. They must name that consumer and deletion trigger; they do not become target architecture authority.
+
+### Gate-subject invariant
+
+No verification gate's declared documentation subject may be deleted unless that gate is repointed or retired in the same pull request and its relevant negative proof is re-run.
+
+This includes PR and non-PR/nightly governance gates. A documentation rebaseline must inspect both the documentation tree and the verification registry/workflows that consume it.
+
+### Consumer classification
+
+Path repair applies to **live executable consumers**, including scripts, workflow/configuration, generators, verification tools, navigation and maintained links that resolve a documentation path at runtime or verification time.
+
+A historical/provenance citation does not require churn merely because its referenced path leaves the live tree. Examples include source comments, applied migrations, generated historical artifacts, commit-pinned security fingerprints, and other text whose purpose is provenance rather than path resolution.
+
+The consolidation must classify ambiguous hits rather than requiring zero textual occurrences of old paths.
+
+## Consolidation proof
+
+Product/R10 consolidation uses both structural mapping and normative-content checks.
+
+Required proof:
+
+1. A closed source manifest from the immutable PR #131 authority HEAD maps every accepted source authority to one or more target authorities.
+2. The source census is read with a filesystem-capable command (`grep`, `rg`, or equivalent), not `git grep` against ignored temporary files.
+3. The normative vocabulary census covers the repository's actual terms, including at least `MUST`, `SHOULD`, `MAY`, `SHALL`, `REQUIRE`, `FORBID`, `PROHIBIT`, `NEVER`, `ALWAYS`, `ONLY`, `SELECT`, `REJECT`, `BLOCKED`, and `CLOSED` where used normatively.
+4. An empty source census is failure, never parity.
+5. Any semantic contradiction found during consolidation stops the Writer; it is not silently reconciled.
+
+The grep census is supporting evidence, not a substitute for the closed source-to-target decision map and human/agent semantic parity review.
 
 ## Mechanical proof obligations
 
@@ -219,28 +261,39 @@ Repository verification must fail on:
 ```text
 wiki/ or docs/superpowers/ in the final tree
 unapproved first-party Markdown roots
-archive/legacy/tombstone directories
+archive/legacy/tombstone documentation trees
 prohibited durable filenames
 missing or invalid frontmatter
 duplicate document IDs
-broken internal links
-orphan durable pages
-pages absent from MkDocs navigation
-work pages included in published navigation
-temporary work files in a merge-ready PR
+broken maintained internal links
+orphan durable pages or collections
+work pages included in durable navigation
+docs/work/** when the PR is not Draft
 ```
 
-Every repository-authored blocking guard includes a negative fixture or an accepted classified waiver under the existing verifier rules.
+Generated pages must prove metadata through their generator. ADR/reference collections may use a governed collection index rather than one top-level nav entry per member.
+
+Every repository-authored blocking guard has a negative fixture or accepted classified waiver. Fixtures include the minimum valid repository/navigation context needed to prove the intended failure rather than merely exiting non-zero for unrelated setup errors.
+
+Local proof mirrors the actual CI ladder: verification commands use `--require-infra` where CI does, lint is run when Go verifier code changes, and non-PR/nightly governance checks affected by the documentation move are executed explicitly before merge.
 
 A consolidation is complete only when:
 
 1. every accepted authority is preserved;
-2. each retained operational page has a named current consumer;
-3. all live links and tool consumers are repaired;
-4. temporary work files are absent;
-5. the hygiene guard is proven to fire;
-6. required CI is green;
-7. superseded PRs can be closed without losing current truth.
+2. every tracked documentation path has an explicit disposition;
+3. every retained operational page has a named current consumer;
+4. every live executable consumer is repaired or retired;
+5. every affected verification-gate subject is rehomed or its gate is retired with proof;
+6. temporary work files are absent;
+7. hygiene negative fixtures demonstrate the intended rules fire;
+8. required PR, lint, security, and affected governance checks are green;
+9. superseded PRs can be closed without losing current truth.
+
+## Transitional state
+
+PR #132 defines this profile but does not yet reorganize the existing tree. Until G1 merges, existing `AGENTS.md`, `wiki/`, current verification subjects, and current runtime documentation remain operative evidence/safety rails. G1 is the named successor gate that atomically rehomes current truth, repairs consumers, activates the new navigation/verifier, and removes legacy roots.
+
+No Writer may apply the final-root deletion rules before the G1 parity and gate-subject proofs are satisfied.
 
 ## Reopen triggers
 
@@ -255,9 +308,11 @@ Reopen only on material evidence that:
 
 Preference for the former tree or hypothetical compatibility is not a reopen trigger.
 
-## Related documents
+## Provenance
 
-- `docs/work/current/proposal.md` — temporary design source during PR #132.
-- `docs/work/current/plan.md` — temporary execution plan during PR #132.
-- `developmentconexus-ops/conexus-methodology/METHOD.md` — organizational engineering method.
-- `developmentconexus-ops/conexus-methodology/README.md` — canonical Fable review workflow.
+- Gate: repository documentation profile / G0.
+- Pull request: #132.
+- Independent review: Fable review committed at PR #132 HEAD `3b8a25488e1aed5edc6c2b83d64e802b8d66c1c0`.
+- Operator ratification: pending.
+- Consolidation successor: G1 Product/R10 documentation rebaseline.
+- Canonical engineering method: `developmentconexus-ops/conexus-methodology/METHOD.md`.
