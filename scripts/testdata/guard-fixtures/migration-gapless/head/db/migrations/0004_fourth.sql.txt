@@ -1,1 +1,0 @@
--- guard fixture migration 0004 (branch-new -- does not exist on origin/main)

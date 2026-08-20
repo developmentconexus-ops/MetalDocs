@@ -1,4 +1,0 @@
-const BASE = "/api/v1/documents";
-export type DocumentDTO = components["schemas"]["Document"];
-export const listDocuments = () => BASE;
-export const getDocument = () => BASE;

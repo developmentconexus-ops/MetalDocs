@@ -1,8 +1,0 @@
-// Wrapper over the generated client. No handwritten types: every alias below
-// is an indexed access off the generated index, which is what the guard's
-// frontend-type-drift rule requires.
-const BASE = "/api/v1/templates";
-export type TemplateDTO = components["schemas"]["Template"];
-export const submitVersionForApproval = () => BASE;
-export const signoffVersion = () => BASE;
-export const putTemplateSchemas = () => BASE;

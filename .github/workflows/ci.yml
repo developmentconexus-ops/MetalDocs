@@ -1,320 +1,58 @@
 name: CI
+
 on:
   pull_request:
     branches: [main]
-
-# No trigger-level paths:. A path filter at the trigger makes the workflow not
-# run at all, which leaves a required context permanently pending and blocks
-# the merge. There is no path filter anywhere else in this file either
-# (R3, ci.yml restructure): every job below always runs; only the *work
-# inside* the `verify` and `test-integration` jobs is diff-scoped, by
-# tools/verify's own registry (Check.Paths + matchesPaths), via
-# `--changed` / `--profile=changed`. A docs-only PR still runs every job —
-# `--changed` simply selects zero checks for that job and it exits 0 saying
-# so. Nothing is skipped at the YAML level, so nothing can be skipped over.
-concurrency:
-  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+    types: [opened, synchronize, reopened, ready_for_review]
 
 permissions:
   contents: read
 
 jobs:
-  verify:
-    name: verify
-    runs-on: ubuntu-latest
-    # Every step below is either a `tools/verify` invocation (the gate) or
-    # named with a `prereq:`/`report:` prefix (not a gate). That is not
-    # decoration: audit rule A10 rejects any step inside ci.yml:required's
-    # closure that is neither, which is what keeps a second definition of
-    # "verified" from reappearing in this file.
-    steps:
-      - name: 'prereq: checkout'
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          fetch-depth: 0   # --changed diffs against origin/main; oasdiff compares against the base ref
-      - name: 'prereq: go toolchain'
-        uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5.0.2
-        with:
-          go-version-file: go.mod
-          cache: true
-      - name: 'prereq: pnpm'
-        uses: pnpm/action-setup@fe02b34f77f8bc703788d5817da081398fad5dd2 # v4.0.0
-      - name: 'prereq: node toolchain'
-        uses: actions/setup-node@0a44ba7841725637a19e28fa30b79a866c81b0a6 # v4.0.4
-        with: { node-version-file: .nvmrc, cache: pnpm, cache-dependency-path: pnpm-lock.yaml }
-      - name: 'prereq: install workspace dependencies'
-        run: pnpm install --frozen-lockfile
-      # oasdiff-breaking (registry.go) needs the oasdiff binary and a
-      # base-branch spec on disk; a Check's Argv cannot carry a templated
-      # `${{ }}` value (no shell interpolation, by design — see
-      # tools/verify/main.go's `command` invariant), so materializing the
-      # PR's base SHA stays a workflow prerequisite rather than becoming part
-      # of the check itself. Copied verbatim from this file's prior
-      # lint-contract job.
-      # Pinned, not @latest: an unpinned tool version can change what this
-      # gate accepts without a diff anywhere in this repo to review — the
-      # exact drift R5 existed to close for the Action tags in
-      # docx-renderer.yml. v1.28.0 is the latest release as of this pin
-      # (2026-08-08); bump deliberately, not implicitly.
-      - name: 'prereq: install oasdiff'
-        run: go install github.com/oasdiff/oasdiff@v1.28.0
-      # check-governance.ps1 (governance-diff-rules) diffs against
-      # origin/main, and --changed's default --base=origin/main needs the
-      # same local ref. Copied verbatim from this file's prior governance job,
-      # minus `--depth=1`: fetch-depth: 0 above already made this a complete
-      # clone (git rev-parse --is-shallow-repository is false right after
-      # checkout), and a *shallow* fetch against a complete repo still writes
-      # .git/shallow — reproduced locally: full clone -> false ->
-      # `git fetch origin main --depth=1` -> true. That flips every
-      # needsGitDepth check (governance-diff-rules has no Paths, so it is
-      # selected on every PR; req-trace and migration-gapless too) to SKIP,
-      # and --require-infra turns SKIP into FAIL, so `verify` failed on every
-      # PR before this fix. Dropping `--depth=1` keeps the fetch (still needed
-      # to populate the ref/SHA locally) without re-introducing a depth limit.
-      - name: 'prereq: fetch base ref'
-        run: git fetch origin ${{ github.base_ref }}
-      - name: 'prereq: materialize base-branch spec'
-        run: |
-          git fetch origin "${{ github.event.pull_request.base.sha }}"
-          git show "${{ github.event.pull_request.base.sha }}:api/openapi/v1/openapi.yaml" > /tmp/openapi.base.yaml
-      # Every registry check whose declared Paths the diff touches — gofmt,
-      # go vet, arch-lint, module-imports, test-conventions,
-      # contract sync/codegen/oasdiff/openapi lint, eslint,
-      # css-tokens, eigenpal-selector-pin, frontend boundary integrity,
-      # fe-build, fe-test, fe-typecheck,
-      # affected production Docker builds,
-      # docx-build/test, go-test-unit, adr-status, wiki-debt-tally,
-      # db-docs-coverage, migration-gapless, governance-diff-rules,
-      # invariant-coverage-map, gosec, govulncheck (both promoted into this
-      # job by A1.4; nightly repeats them against the live vulnerability DB),
-      # guard-fixtures (every blocking guard fed bad input, must exit
-      # non-zero), req-trace(-selftest), required-gate-selftest,
-      # verify-audit (registry.go's "Anti-drift" section — runs `verify
-      # --audit` itself, so this job's own drift against the registry is
-      # gated on every PR, not just when a human types it).
-      # A check with no declared Paths (matchesPaths' fail-closed default)
-      # always runs.
-      #
-      # --ci-job=ci.yml:verify narrows the profile to the checks that declare
-      # THIS job as their owner. The profile answers "what blocks a PR" — all
-      # of it, so a local `verify --profile=pr` is the real answer — while CI
-      # still splits that set across jobs that install different
-      # prerequisites. Without it this step also selected golangci-lint,
-      # owned by lint-go below, and failed on "golangci-lint is not on PATH".
-      # Ownership lives in the registry's CIJob field (executable now, not
-      # documentation); `verify --audit` reads the same flag, so a check that
-      # no job owns is a finding rather than a silent gap.
-      - name: verify --profile=changed
-        run: go run ./tools/verify --require-infra --profile=changed --ci-job=ci.yml:verify
-
-  # test-integration used to carry `needs: [verify]`, which staged the long
-  # suite behind the cheap checks so a red `verify` skipped it. That bought
-  # runner minutes on FAILING PRs and cost 214 seconds of wall clock on every
-  # PASSING one — and passing is the common case. Measured on run 31402055141:
-  # 17m17s total, of which 15m42s was this one serial chain. The edge is gone;
-  # the two jobs now start together.
-  #
-  # The suite itself is sharded four ways. That is not a rewrite of the suite:
-  # unit 4.6 already took it from ~50 minutes to its current band, and it
-  # measured no within-package parallelism headroom left — on the dev host's
-  # storage stack, a verdict that document scopes to that stack rather than
-  # stating as a property of Postgres (docs/superpowers/ROADMAP.md, unit 4.6:
-  # "scoped to this storage stack, not a Postgres law"). This runner is a
-  # different stack and has never been measured. What is certain either way is
-  # that the suite was sharing ONE Postgres, and what this matrix buys is more
-  # runners each with its OWN service container: four smaller suites against
-  # four uncontended databases instead of one large one against a shared one.
-  #
-  # Measured on run 31410242704, the first run in which the shards actually
-  # selected the check: 522.9s / 94.5s / 164.6s / 117.8s. 899.8s of test time
-  # across four runners, with a makespan of 522.9s.
-  #
-  # Run 31412988724 then published per-package timings, and they say the
-  # remaining imbalance is not the splitter's: apps/api/cmd/metaldocs-api is
-  # 439.9s of the suite's 864.8s — 51% of the whole thing in ONE package.
-  # Package-level sharding cannot go below its slowest package, so with real
-  # weights LPT gives 439.9 / 141.8 / 141.0 / 142.0 against a perfect split of
-  # 216.2. The weights are still worth having (they take the makespan from
-  # 522.9 to 439.9 and stop the split from being luck), but the next minute
-  # does not come from more shards — adding a fifth changes nothing. It comes
-  # from that package, whose surface_conformance suite walks every route
-  # against every role on a real database. That is test topology, a different
-  # unit from CI topology, and it is filed rather than smuggled in here.
-  #
-  # The shards partition a package set that neither this file nor the registry
-  # enumerates — `go list` resolves it on the commit under test (see
-  # tools/verify/partition.go), so a new test package joins the suite by
-  # existing. The one hand-synced pair left is `shard: [1, 2, 3, 4]` against
-  # the `/4` below, and audit rule A11 fails the build if they ever disagree:
-  # a matrix of [1, 2, 3] against `/4` would run three quarters of the suite
-  # and report green.
-  test-integration:
-    name: test-integration
-    runs-on: ubuntu-latest
-    strategy:
-      # A failing shard must not cancel its siblings: one red shard should tell
-      # you about the other three's failures in the same run, not hide them
-      # behind a cancellation and cost another 6 minutes to discover.
-      fail-fast: false
-      matrix:
-        shard: [1, 2, 3, 4]
-    # services:, the postgres user/db names and timeout-minutes: 20 below are
-    # copied verbatim from this file's prior test-integration job (itself
-    # copied from test-full.yml:full).
-    services:
-      postgres:
-        # Digest-pinned, not `postgres:16` (#87/A1 review B2): a service
-        # container is code CI executes, and a tag can be republished over
-        # different bytes with no diff here to review. Audit rule A9 covers
-        # `services:` images now, so a regression to a mutable tag is a
-        # finding rather than a habit. Digest is postgres:16 as of 2026-08-09.
-        image: postgres@sha256:95206741a5b214807675e14165369d05b93a9cf692223b616d07cca227e74b0b
-        env:
-          POSTGRES_USER: metaldocs
-          POSTGRES_PASSWORD: metaldocs
-          POSTGRES_DB: metaldocs
-        ports: ["5432:5432"]
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-    steps:
-      - name: 'prereq: checkout'
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          fetch-depth: 0   # --changed diffs against origin/main
-      - name: 'prereq: go toolchain'
-        uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5.0.2
-        with:
-          go-version-file: go.mod
-          cache: true
-      # Same fix as the `verify` job's "Fetch base ref" step above, same
-      # reason: `--depth=1` against an already-complete (fetch-depth: 0)
-      # clone writes .git/shallow, which trips go-test-integration's own
-      # needsGitDepth-adjacent consumers indirectly (a shallow tree here is
-      # still a lie about what was checked out) even though this job's own
-      # check doesn't declare needsGitDepth itself.
-      - name: 'prereq: fetch base ref'
-        run: git fetch origin ${{ github.base_ref }}
-      # --require-infra is what makes this job's green mean anything: without
-      # it, an unset METALDOCS_DATABASE_URL yields SKIP and the job exits 0
-      # over zero executed integration tests. --changed diff-scopes the
-      # 20-minute non-race suite to PRs that actually touch go-test-integration's
-      # declared Paths (go.mod, go.sum, db/, internal/, apps/, tests/) — a
-      # docs-only PR still runs this job, it just selects zero checks and
-      # exits 0 saying so.
-      #
-      # PR deliberately uses the registry's non-race integration variant. The
-      # same computed package universe is registered separately as
-      # go-test-integration-race for nightly/release, so `-race` is not silently
-      # coupled to this PR wall-clock path.
-      #
-      # -v streams the passing check's output, which for a non-verbose `go
-      # test` is exactly one "ok <package> <seconds>" line per package. That
-      # is what tools/verify/testweights.md's CI procedure reads: without it
-      # the verifier swallows the child's stdout on PASS and the only number
-      # that survives is the shard total, from which per-package weights
-      # cannot be recovered. ~40 extra log lines per shard is the price of the
-      # weights file being refreshable from any run instead of only from a
-      # developer's laptop.
-      - name: verify (go-test-integration)
-        env:
-          METALDOCS_DATABASE_URL: postgres://metaldocs:metaldocs@localhost:5432/metaldocs?sslmode=disable
-        run: go run ./tools/verify -v --require-infra --only=go-test-integration --changed --shard=${{ matrix.shard }}/4
-        timeout-minutes: 20
-
-  security:
-    name: security
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      security-events: write   # SARIF upload — reporting only; the gate is the verifier below
-    steps:
-      - name: 'prereq: checkout'
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          fetch-depth: 0   # secret-scan walks full git history; on a shallow clone it would report a green it did not earn
-      - name: 'prereq: go toolchain'
-        uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5.0.2
-        with:
-          go-version-file: go.mod
-          cache: true
-      # This job used to define its two blocking gates HERE, in YAML: gitleaks
-      # as a bare `docker run ... --exit-code 1` step and grype as
-      # `anchore/scan-action` with `fail-build: true`. Both blocked merges;
-      # neither existed in the registry, so `verify --audit` could not see
-      # them, `verify --profile=pr` did not run them, and this file was a
-      # second definition of what "verified" means (#87/A1 review B1). They
-      # are registry checks now — `secret-scan` and `vuln-scan` — and this job
-      # calls the verifier like every other job in the required closure.
-      # Audit rule A10 keeps it that way: a step here that is neither a
-      # verifier invocation nor a declared prereq:/report: is a finding.
-      #
-      # --require-infra, not best-effort: without it a missing docker daemon
-      # turns vuln-scan into a SKIP and the job exits 0 over an unrun scan.
-      # No --changed either: a security scan scoped by diff is a security scan
-      # that a PR can step around by touching nothing it declares.
-      - name: verify (secret-scan, vuln-scan)
-        run: go run ./tools/verify --require-infra --ci-job=ci.yml:security --profile=pr
-      # A fork PR's GITHUB_TOKEN is forced read-only by GitHub regardless of
-      # what `permissions:` above requests — `security-events: write` is
-      # silently downgraded, and upload-sarif 403s. Left unconditional, that
-      # 403 fails this step (and therefore the job) for every outside
-      # contributor on this public repo, for a reason that has nothing to do
-      # with whether the scan actually found anything: the verify step above
-      # already failed the job on real findings, on its own step, independent
-      # of this one. So the clause below only skips the *upload* on a fork PR
-      # — the scan itself still runs and still gates on findings for forks
-      # exactly as it does for same-repo PRs; only the Security-tab SARIF
-      # artifact is same-repo-only. `always()` because the interesting upload
-      # is the one from a run that just failed.
-      - name: 'report: upload grype SARIF'
-        uses: github/codeql-action/upload-sarif@5595ccaf912efad79be6eef63a5619ff05969be3 # v4
-        if: always() && hashFiles('.grype.sarif') != '' && github.event.pull_request.head.repo.full_name == github.repository
-        with:
-          sarif_file: .grype.sarif
-
-  lint-go:
-    name: lint-go
-    runs-on: ubuntu-latest
-    steps:
-      - name: 'prereq: checkout'
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - name: 'prereq: go toolchain'
-        uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5.0.2
-        with:
-          go-version-file: go.mod
-          cache: true
-      # golangci-lint is a registry check now (A1.1). It used to be a bare
-      # golangci-lint-action step, which meant the command CI ran existed
-      # nowhere in tools/verify: `verify --audit` could not see it, a local
-      # `verify --profile=pr` did not run it, and "verified" had two
-      # definitions. This job installs the pinned binary and then calls the
-      # verifier, the same install-then-verify shape the `verify` job already
-      # uses for oasdiff. Version pinned to the exact patch the Action's
-      # `version: v2.11` was resolving to.
-      - name: 'prereq: install golangci-lint'
-        run: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.11.4
-      # Whole-tree blocking: every finding in the configured scope fails the job.
-      - name: verify (golangci-lint)
-        run: go run ./tools/verify --require-infra --only=golangci-lint
-
   required:
-    name: required
-    if: ${{ always() }}
-    needs: [verify, test-integration, security, lint-go]
     runs-on: ubuntu-latest
-    env:
-      NEEDS_JSON: ${{ toJSON(needs) }}
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - name: Validate all CI results
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      - name: Verify architecture-first repository shape
         shell: bash
+        env:
+          PR_DRAFT: ${{ github.event.pull_request.draft }}
         run: |
           set -euo pipefail
-          if ! jq -e -f scripts/required-gate.jq <<<"$NEEDS_JSON" >/dev/null; then
-            jq -r 'to_entries[] | "\(.key)=\(.value.result // "null")"' <<<"$NEEDS_JSON"
+
+          allowed_path() {
+            [[ "$1" =~ ^(AGENTS\.md|CLAUDE\.md|README\.md|\.gitignore|\.gitattributes|\.github/.+\.ya?ml|docs/.+\.md)$ ]]
+          }
+
+          # Prove the guard can both accept the intended class and reject implementation.
+          allowed_path "docs/status.md"
+          allowed_path ".github/workflows/ci.yml"
+          if allowed_path "src/main.go"; then
+            echo "::error::clean-slate allowlist accepted executable implementation path"
+            exit 1
+          fi
+
+          invalid=0
+          while IFS= read -r path; do
+            if ! allowed_path "$path"; then
+              echo "::error file=$path::tracked path is outside the architecture-first allowlist"
+              invalid=1
+            fi
+          done < <(git ls-files)
+          test "$invalid" -eq 0
+
+          test -f AGENTS.md
+          test -f docs/index.md
+          test -f docs/status.md
+          test -f docs/development/documentation.md
+          test -f docs/development/engineering-rules.md
+          test -f docs/decisions/stage-program.md
+          test -f docs/decisions/forward-obligations.md
+          test -f docs/decisions/api-operation-census.md
+          test -f docs/reference/t8e-checkpoint.md
+
+          if [[ "$PR_DRAFT" != "true" ]] && [[ -e docs/work ]]; then
+            echo "::error::docs/work must not exist once a governance/architecture PR is Ready"
             exit 1
           fi

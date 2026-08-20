@@ -1,6 +1,0 @@
--- Guard fixture: a table with no dictionary page.
--- See scripts/testdata/guard-fixtures/README.md.
-CREATE TABLE metaldocs.fixture_undocumented (
-  id uuid PRIMARY KEY,
-  tenant_id uuid NOT NULL
-);

@@ -1,4 +1,0 @@
--- 0109_docx_v2_templates_w2_noop.sql
--- W2 templates schema was consolidated into 0101-0108 during implementation.
--- This stub satisfies the CI migration sequence and the 0110 dependency comment.
--- No schema changes.

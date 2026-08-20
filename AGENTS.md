@@ -1,111 +1,91 @@
 # MetalDocs Agent Routing
 
-## Root-Cause / Global-Maximum Engineering Gate
+## Entry point
 
-For every non-trivial bug fix, refactor, architecture change, remediation, simplification, new abstraction, new guard, repeated review finding, or cross-boundary change, read `wiki/standards/root-cause-global-maximum-method.md` before implementation.
+Read `docs/index.md` first. Read `docs/status.md` when the current stage matters. If `docs/work/current/` exists, read its `index.md` before touching the active Draft gate.
 
-Before implementation, record at least:
+Use only the smallest set of authorities required for the task. Do not reconstruct context by reading Git history, closed PRs, or removed implementation unless a current authority names that evidence as necessary.
 
-- symptom;
-- root cause;
-- target property;
-- authority and boundary;
-- local-maximum candidate;
-- global-maximum candidate;
-- chosen outcome;
-- enforcement layer;
-- proof strategy;
-- transitional exit when applicable.
+## Engineering method
 
-Do not optimize inside a known patch or workaround. Do not remove enforcement merely to reduce code. Do not add a guard when the invalid state can instead be made unrepresentable at a stronger reasonable boundary.
+For material engineering or architecture decisions, apply the canonical DevelopmentConexus Engineering Method from `developmentconexus-ops/conexus-methodology/METHOD.md`.
 
-## Boundary Routing
+Repository/product truth remains local to this repository. External documentation and prior implementation are evidence, never product authority.
 
-Use the smallest current source set that matches the task. Repository truth and wiki truth are authoritative; do not resurrect deleted `.agents/skills/` or retired `metaldocs-*` skill trees.
+## Current hard stops
 
-- Backend HTTP / OpenAPI / codegen / handler work -> `wiki/architecture/backend-api-structure.md`, `wiki/architecture/api-contract.md`, `wiki/architecture/api-design-system.md`.
-- Database / migrations / bootstrap / grants / schema ownership -> `wiki/database/index.md` plus the relevant database pages.
-- Frontend under `frontend/apps/web/` -> `wiki/architecture/frontend-structure.md` plus the owning frontend/module page.
-- Frontend API / TanStack Query / generated API types -> `wiki/architecture/frontend-structure.md` query/API sections plus generated API types.
-- Module or wiki documentation -> `wiki/standards/documentation-governance.md` plus the owning module docs.
-- New feature/module pre-design -> `.claude/skills/developing-new-work/SKILL.md`.
-- Adversarial design/plan/diff review -> `.claude/skills/adversarial-review/SKILL.md`.
-- Code relationship / impact tracing when needed -> `.claude/skills/gitnexus/gitnexus-impact-analysis/SKILL.md`.
-- Harness coordination when needed -> `.claude/skills/harness-hub/SKILL.md`.
-- QA / close-out -> `wiki/quality/qa-operating-system.md` and the relevant `wiki/quality/*-checklist.md`.
+- `docs/status.md` is the sole stage / implementation-gate authority.
+- If status says implementation is blocked, do not create application code, schemas, runtime, deployment, or dormant implementation.
+- Do not resurrect removed legacy implementation because it existed, was tested, or is easy to copy.
+- Reuse a historical mechanism only when a current authority names a current consumer and reuse is independently smaller than rewrite.
+- A material contradiction with a ratified authority is a STOP / bounded reopen, not a local patch.
+- Any embedded `wiki/...` path in a carried pre-reset authority is provenance only; current routing comes from `docs/index.md`, `docs/status.md`, and `docs/decisions/index.md`.
 
-If startup, auth/session, route truth, migrations, or runtime/spec/generated/frontend alignment is not trustworthy, treat that as a prerequisite hard stop. Repair the owning boundary and rerun the failed checkpoint before returning to feature work.
+## Remaining-stage input
 
-## MetalDocs AI Operating System
+Before a remaining T-stage, read the owning semantic authorities plus `docs/decisions/forward-obligations.md`.
 
-Use the MetalDocs operating model for all non-trivial work.
+- `PRESERVE` = proof-backed baseline evidence unless materially disproved.
+- `REOPEN` = the owning stage must decide deliberately.
+- `DEFERRED` = preserve the seam/counterexample; do not build dormant implementation.
 
-Canonical references:
+Stage ownership after T8-E is defined in `docs/decisions/stage-program.md`.
 
-- Engineering doctrine: `wiki/standards/root-cause-global-maximum-method.md`.
-- QA/close-out policy: `wiki/quality/qa-operating-system.md`.
-- Path-stable operating bridge: `wiki/references/ai-operating-system.md`.
-- Target architecture: `wiki/architecture/backend-target-architecture.md`.
-- Ordered program queue: `docs/superpowers/ROADMAP.md`.
+## Pull requests and review
 
-Truth hierarchy:
+One coherent ratifiable gate uses one branch and one Draft PR.
 
-1. **Runtime truth** — what actually runs now.
-2. **Contract truth** — OpenAPI and generated backend/frontend surfaces.
-3. **Wiki truth** — governed technical memory: module docs, debt, backlog, roadmap, ADRs.
-4. **Execution truth** — scripts, preflight checks, verification commands, and gates.
+For governed architecture work:
 
-Required mismatch classifications:
+```text
+proposal converges
+→ final independent Fable review in docs/work/current/ai-dialog.md
+→ Lead adjudication in the same file
+→ bounded Round 2 only if a material contradiction survives
+→ explicit operator decision
+→ promote durable authority
+→ delete temporary work files
+→ required checks
+→ squash merge
+```
 
-- runtime prerequisite;
-- shared contract prerequisite;
-- module-local implementation;
-- screen-local implementation;
-- wiki-memory drift;
-- workflow/tooling gap;
-- architecture contradiction;
-- defer.
+Reviewer output is evidence, not authority.
 
-Default mismatch rule:
+## Git safety
 
-1. detect the mismatch;
-2. classify it;
-3. continue only when it is local to the current task boundary;
-4. otherwise stop and surface the prerequisite or redesign first.
+- Never commit directly to `main`.
+- Do not force-push or rewrite shared history.
+- Git history and explicitly retained refs preserve provenance; do not create live-tree archive/tombstone folders.
+- Do not delete an unmerged authority branch that is the only reachable provenance ref until an equivalent immutable archival ref exists.
+- Do not merge a governance/architecture PR while temporary `docs/work/**` review artifacts remain.
 
-Critical contradiction stop rule: stop when contradictions affect route ownership/prefix, plan or prerequisite status, startup instructions, module ownership, API contract expectations, verification expectations, or when the correct fix is redesign-grade rather than local. Do not patch around a shared API redesign, cross-module auth/authz model change, storage/provider redesign, workflow semantic redesign, or other boundary-changing prerequisite.
+## Verification
 
-## Default Workflow
+The live repository is intentionally architecture-first while implementation is blocked. Run the checks defined by current repository CI and the active gate. Do not preserve or recreate old verification machinery merely to satisfy superseded implementation assumptions.
 
-1. Read `wiki/standards/root-cause-global-maximum-method.md` when the engineering gate applies.
-2. Read only the wiki/architecture docs required for the task boundary.
-3. Name the owning module(s), target invariant, authority, and boundary.
-4. Pass the relevant prerequisite gate before implementation.
-5. Implement inside the correct boundary.
-6. Run static and targeted verification for the touched slice.
-7. Perform code review and product QA using the relevant `wiki/quality/` checklist.
-8. Classify findings by root-cause family.
-9. Fix the owning family, not only the first visible symptom.
-10. Rerun targeted review, QA, and regression; broaden only when boundaries were crossed.
-11. Close only with evidence and explicit bounded defers.
-12. Sync governed wiki truth when code or contract truth changed.
+The repository ruleset requires status context `required` and resolved review conversations before merge; see `docs/development/engineering-rules.md`.
 
-For non-trivial close-out, use as applicable:
+## Context routing
 
-- `wiki/quality/screen-qa-checklist.md`;
-- `wiki/quality/backend-api-qa-checklist.md`;
-- `wiki/quality/workflow-async-qa-checklist.md`;
-- `wiki/quality/release-closeout-checklist.md`.
+| Need | Read |
+|---|---|
+| Product boundary | `docs/product/contract.md` |
+| Whole-product alignment | `docs/product/alignment.md` |
+| User/API journeys | `docs/product/journeys.md` |
+| Current API operation census | `docs/decisions/api-operation-census.md` |
+| Semantic ownership | `docs/architecture/ownership.md` |
+| Domain state | `docs/architecture/domain-model.md` |
+| Lifecycle / transactions | `docs/architecture/lifecycle.md` |
+| Authorization / Audit | `docs/architecture/authorization-and-audit.md` |
+| Exact content | `docs/architecture/content-integrity.md` |
+| Async / Search | `docs/architecture/async-and-search.md` |
+| Clean-slate technical posture | `docs/architecture/technical-baseline.md` |
+| Backend topology | `docs/architecture/backend.md` |
+| Internal contracts | `docs/architecture/interfaces.md` |
+| Persistence | `docs/architecture/persistence.md` |
+| Remaining stage definitions | `docs/decisions/stage-program.md` |
+| Cross-stage forward obligations | `docs/decisions/forward-obligations.md` |
+| Paused T8-E checkpoint | `docs/reference/t8e-checkpoint.md` |
+| Current gate | `docs/status.md`; plus `docs/work/current/index.md` only when it exists |
 
-## Engineering Behavior
-
-- Runtime truth beats documentation when they disagree; repair the stale documentation rather than coding against it.
-- Keep changes scoped to the root cause and target property. Do not refactor unrelated adjacent code.
-- Prefer one authority and one path over parallel implementations.
-- YAGNI removes speculative capability and accidental complexity; it does not remove invariants, fail-closed boundaries, or proof for reachable states.
-- Do not create a framework or custom guard unless the canonical engineering method justifies that enforcement layer.
-- `implemented`, `fixed`, `done`, `green`, and `looks good` are not closure states by themselves. Record commands, outcomes, review disposition, QA evidence, and bounded defers.
-
-## Context7
-
-Use Context7 MCP for current documentation when work depends on a library, framework, SDK, API, CLI tool, or cloud service. Prefer it over remembered syntax. Do not invoke it for ordinary business-logic debugging, repository-local refactoring, or code review that does not depend on external API behavior.
+`CLAUDE.md` has no independent authority.

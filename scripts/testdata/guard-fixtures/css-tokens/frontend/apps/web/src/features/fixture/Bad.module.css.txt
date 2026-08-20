@@ -1,6 +1,0 @@
-/* Deliberately raw hex instead of var(--token). See ../../../../../README.md
-   at scripts/testdata/guard-fixtures/README.md. */
-.panel {
-  color: #ff0000;
-  background: #0a0a0a;
-}

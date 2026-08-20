@@ -1,5 +1,0 @@
-/* Guard fixture: one :global override and one !important, against a pin that
-   expects 22 and 28. See scripts/testdata/guard-fixtures/README.md. */
-:global(.ep-root [data-testid="fixture"]) {
-  color: red !important;
-}

@@ -1,2 +1,0 @@
--- guard fixture migration 0003 (branch-new). 0002 is deliberately absent --
--- TRUE POSITIVE (gapless sequence): a gap in the migration sequence.

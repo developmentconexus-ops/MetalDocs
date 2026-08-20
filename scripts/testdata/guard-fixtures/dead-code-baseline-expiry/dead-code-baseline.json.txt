@@ -1,6 +1,0 @@
-{
-  "files": [
-    "src/fixture/Dead.ts"
-  ],
-  "exports": []
-}

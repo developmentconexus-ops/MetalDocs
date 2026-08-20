@@ -1,4 +1,0 @@
-# placeholder
-
-The dictionary directory must exist for the guard to reach its coverage
-comparison. This page documents no table on purpose.

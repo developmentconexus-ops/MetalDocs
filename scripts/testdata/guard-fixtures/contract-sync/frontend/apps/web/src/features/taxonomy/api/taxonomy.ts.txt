@@ -1,3 +1,0 @@
-export const listProfiles = () => api.GET("/taxonomy/profiles", {});
-export const listAreas = () => api.GET("/taxonomy/areas", {});
-export const listFamilies = () => api.GET("/taxonomy/families", {});

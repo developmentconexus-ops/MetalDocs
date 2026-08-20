@@ -1,9 +1,0 @@
-# fixture — tech-debt register
-
-Guard fixture: one open major item against a doc that states zero.
-See scripts/testdata/guard-fixtures/README.md.
-
-## T-001 — fixture debt item
-
-- **Severity:** major
-- **Notes:** missing-ADR

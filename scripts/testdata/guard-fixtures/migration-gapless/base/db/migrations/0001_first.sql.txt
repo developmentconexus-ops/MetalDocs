@@ -1,1 +1,0 @@
--- guard fixture migration 0001 (already applied -- exists on origin/main)

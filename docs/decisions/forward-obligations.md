@@ -1,0 +1,100 @@
+---
+id: forward-obligations
+kind: authority
+owner: architecture
+summary: Preserves the unresolved, deferred, and proof-backed future obligations that remaining stages must consciously consume without restoring legacy implementation.
+---
+
+# Forward decision obligations
+
+This page is the compact durable successor to the pre-reset Rebaseline Decision Registry **only for decisions that still carry forward work or constraints**.
+
+It deliberately does **not** copy the old registry's `CURRENT` rows: current truth lives in the semantic Product/T1→T8-D authorities. It deliberately does **not** copy `SUPERSEDED` rows: superseded implementation has been removed and receives no inheritance right.
+
+Source provenance: PR #131, `wiki/architecture/rebaseline-decision-registry.md`, commit `d8b1c6d31e704e9552a14faa7764c634a29b081d`.
+
+## Consumption law
+
+Before every remaining architecture stage:
+
+```text
+read current owning authorities
+→ consume PRESERVE obligations as baseline evidence unless materially disproved
+→ deliberately decide the stage-relevant REOPEN obligations
+→ keep DEFERRED obligations as future seams/counterexamples only
+→ never create dormant implementation for a deferred capability
+```
+
+A later ratified authority wins over an older forward-obligation wording and must update this page when it closes or materially refines that obligation.
+
+## PRESERVE — 21
+
+- **AUTH-02 — PRESERVE** — Keycloak remains selected V1 AuthN provider evidence unless concrete deployment evidence reopens it; it stays replaceable behind an anti-corruption seam.
+- **AUTH-06 — PRESERVE** — No atomic MetalDocs↔identity-provider transaction; provider effects remain post-commit/reconciled when explicitly required.
+- **ORG-08 — PRESERVE** — Area retirement/inactivity blocks future use as appropriate while preserving existing references/history.
+- **CNT-14 — PRESERVE** — EigenPal may remain selected DOCX adapter/provider evidence; it never owns semantic truth.
+- **ASY-04 — PRESERVE** — Use one PostgreSQL-backed durable-job mechanism; River remains selected/reference implementation and replaceable without changing semantic meaning.
+- **LP-02 — PRESERVE** — Future Group audience resolution must freeze concrete Users so membership drift never rewrites a historical denominator.
+- **LP-03 — PRESERVE** — Future acknowledgement requires an explicit AcknowledgementRecord; view/download never silently equals acknowledgement.
+- **FUT-04 — PRESERVE** — A future Dossier link never grants access.
+- **FUT-05 — PRESERVE** — LegalHold business preservation is not ObjectLock/provider physical enforcement.
+- **FUT-06 — PRESERVE** — Do not build a generic Record/BPM/object platform without changed requirements.
+- **MIG-05 — PRESERVE** — Plan/dry-run, deterministic outcomes, reconciliation, idempotency, and atomic semantic import units remain strong cutover evidence if a real migration appears.
+- **MIG-06 — PRESERVE** — `CURRENT_STATE` / `FULL_HISTORY` remain migration-mode evidence only; actual source completeness decides any future mode set.
+- **DB-01 — PRESERVE** — One PostgreSQL product-state database remains the technical default absent a real distributed trust/scale boundary.
+- **DB-02 — PRESERVE** — One database namespace remains a mechanism default; database namespace is not semantic ownership.
+- **DB-03 — PRESERVE** — Use opaque UUID technical IDs; business/provider identities never become primary-key authority.
+- **DB-04 — PRESERVE** — Use `TIMESTAMPTZ` for trusted business instants.
+- **DB-05 — PRESERVE** — Prefer typed FKs and closed unions; avoid universal polymorphic business relations except genuinely generic semantics.
+- **DB-06 — PRESERVE** — Cross-owner FKs do not mutate another owner's state through `CASCADE`/`SET NULL`; `RESTRICT`/`NO ACTION` is the safe default.
+- **DB-07 — PRESERVE** — JSONB is not an unmodeled-state escape hatch; use it only for bounded snapshots/provenance where variability is semantically justified.
+- **DB-10 — PRESERVE** — One local transaction may compose multiple semantic owners when one invariant/business transition requires it.
+- **SEC-01 — PRESERVE** — Platform/operator/system principals receive no implicit company-content access; maintenance trust surfaces must be explicit and non-serving.
+
+## REOPEN — 4
+
+- **DOC-12 — REOPEN** — Numbering capability/non-reuse is current; any still-open exact numbering grammar must be decided deliberately by the owning contract/admin design rather than inherited from legacy.
+- **CNT-03 — REOPEN** — EditorSession is not a correctness dependency; a bounded editor lease may be added only if concrete UX/integration evidence requires it.
+- **AUD-06 — REOPEN** — No claim of indefinite/statutory Audit retention exists; a future Records/compliance requirement must define retention, pruning, and checkpoint semantics.
+- **MIG-10 — REOPEN** — Detailed imported target families are not frozen; any future migration derives the smallest truthful shape from actual source evidence.
+
+## DEFERRED — 27
+
+- **AUTH-07 — DEFERRED** — Fresh-auth/eSignature evidence has no named Launch consumer; Authentication remains the future owner if promoted.
+- **GOV-09 — DEFERRED** — Fresh-auth per governance Step.
+- **GOV-10 — DEFERRED** — Due dates, SLA, and escalation.
+- **GOV-11 — DEFERRED** — Generic reassign/overseer/delegation; current Launch uses only bounded explicit exits.
+- **DOC-10 — DEFERRED** — DocumentType category/taxonomy platform.
+- **DOC-11 — DEFERRED** — Editable Dictionary/System Value platform.
+- **CNT-12 — DEFERRED** — Structured TemplateSpec platform.
+- **CNT-13 — DEFERRED** — DRAFT EditorialComment platform; SubmissionFeedback remains the current governed feedback concept.
+- **CNT-15 — DEFERRED** — Realtime Yjs/CRDT; the seam remains WorkingContent concurrency.
+- **REL-04 — DEFERRED** — Scheduled/future-dated Release.
+- **OBS-05 — DEFERRED** — Separate obsolescence route; current Launch reuses the DocumentType governance route.
+- **OBS-06 — DEFERRED** — Reactivation of an OBSOLETE document.
+- **ASY-02 — DEFERRED** — Notifications remain a delivery-projection concept only; no Launch inbox/email/push machinery without a concrete consumer.
+- **AUD-05 — DEFERRED** — Generic Audit export permission/capability.
+- **STO-09 — DEFERRED** — Application-layer Company DEK/crypto-erasure is not a default absent a named target-data/assurance requirement.
+- **STO-19 — DEFERRED** — Whole-Submission canonical JCS/composite digest until a named signing/export/non-repudiation consumer exists.
+- **LP-01 — DEFERRED** — Distribution / Read & Acknowledge attaches to Release + User/Group and never becomes AuthZ/effectivity authority.
+- **LP-04 — DEFERRED** — Periodic Review attaches to stable Document + exact current EFFECTIVE Revision; due/overdue never silently changes effectivity.
+- **LP-05 — DEFERRED** — Detailed PeriodicReviewPolicy/Record schema and outcomes.
+- **FUT-01 — DEFERRED** — Dossier is documentary context, never content owner/access grant; stable Document is the seam.
+- **FUT-02 — DEFERRED** — Evidence may own its own exact descriptor + managed-content handle with an independent lifecycle; no Artifact owner is required.
+- **FUT-03 — DEFERRED** — Retention/Hold/Disposition stay separate from document lifecycle/provider storage; expiry does not imply delete.
+- **MIG-08 — DEFERRED** — Governed Subject Export may derive future manifests/digests from semantic descriptors without provider identity becoming product truth.
+- **MIG-09 — DEFERRED** — External Repository IMPORT/PUBLISH remains future and reuses exact-content copy/admission seams without making external object IDs MetalDocs identity.
+- **SEC-04 — DEFERRED** — Pooled/shared multi-customer tenancy is not Launch; stable Company identity preserves the seam.
+- **SEC-05 — DEFERRED** — Customer-company lifecycle/portability deletion/export is not Launch.
+- **SEC-06 — DEFERRED** — Generic eDiscovery/PKI/TSA/HSM/signature/quarantine platform absent a concrete requirement.
+
+## Count proof
+
+```text
+PRESERVE  21
+REOPEN     4
+DEFERRED  27
+TOTAL     52
+```
+
+These are the only old registry rows preserved as a cross-stage forward-obligation set. Current semantic decisions remain in their owning authorities; superseded legacy decisions remain deleted.
