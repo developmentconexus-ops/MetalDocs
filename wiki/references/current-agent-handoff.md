@@ -1,7 +1,7 @@
 # Current Agent Handoff
 
 > **Last verified:** 2026-08-20  
-> **Status:** ACTIVE — **T1→T8-C CLOSED / OPERATOR-RATIFIED; T8-D ACTIVE / BOTH FABLE PASSES COMPLETE / FINAL LEAD ADJUDICATION MATERIALIZED / FINAL OPERATOR RATIFICATION NEXT; T8-E→T12 NOT OPEN; IMPLEMENTATION BLOCKED**  
+> **Status:** ACTIVE — **T1→T8-D CLOSED / OPERATOR-RATIFIED; T8-E ACTIVE / EXECUTABLE WIRE CONTRACT; T8-F→T12 NOT OPEN; IMPLEMENTATION BLOCKED**  
 > **Branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131
 
 ## Fresh-session route
@@ -13,26 +13,26 @@ Read in this order:
 3. this file
 4. `wiki/architecture/r10-technical-architecture.md` — sole status/next-action router
 5. Product Contract REV001 + Whole-Product GCR + 4+1 ownership
-6. T1→T8-C durable authorities
-7. Decision Registry + amendments through T8-C
+6. T1→T8-D durable authorities
+7. Decision Registry + amendments through T8-D
 8. `wiki/architecture/r10-post-t6-implementation-readiness-program.md`
 9. `wiki/architecture/r10-technical-realization-reconciliation-baseline.md`
-10. T8-D staging chain below
-11. current schema/migrations/SQL/code only for a concrete evidence/reuse claim
+10. `docs/superpowers/analysis/2026-08-20-r10-t8e-executable-wire-contract-bootstrap.md`
+11. current OpenAPI/generated/runtime/frontend code only when a concrete T8-E evidence/reuse claim needs it
 
-Current implementation proves what exists, not what survives. Staging/reviewer artifacts are not authority.
+Do not route target design through superseded/historical architecture or T8-D staging tombstones.
 
 ## Current checkpoint
 
 ```text
 Product Contract                         REV001 / OPERATOR-APPROVED
 Whole-Product GCR / 4+1 ownership       CLOSED / OPERATOR-APPROVED
-T1→T8-C                                  CLOSED / OPERATOR-RATIFIED
-Decision Registry                        CURRENT + amendments through T8-C
+T1→T8-D                                  CLOSED / OPERATOR-RATIFIED
+Decision Registry                        CURRENT + amendments through T8-D
+Post-T6 Stage-Decomposition GCR          OPERATOR-RATIFIED
 TRRB                                     CLOSED / OPERATOR-RATIFIED / PROMOTED
 
-T8-D                                     ACTIVE / FINAL OPERATOR RATIFICATION NEXT
-T8-E                                     NOT OPEN
+T8-E                                     ACTIVE / EXECUTABLE WIRE CONTRACT
 T8-F                                     NOT OPEN
 T8-G                                     NOT OPEN
 T8-H                                     NOT OPEN
@@ -43,35 +43,55 @@ T12                                      NOT OPEN
 implementation                           BLOCKED
 ```
 
-## Binding execution/reference law
+## Binding execution law
 
 > **No Writer task may contain a material architecture decision that should have been decided before execution.**
 
-For material technical decisions:
+## Reference-backed decision law
 
 ```text
 MetalDocs semantic/product authority
 → DevelopmentConexus Engineering Method
 → current repository evidence
-→ primary/current standards + exact pinned library evidence
+→ primary/current standards and official tool/library documentation
+→ relevant reference patterns as falsification evidence
 → credible alternatives + Global Maximum
 → proof/adversarial review
 → operator ratification
 ```
 
-Reference evidence informs mechanism feasibility; it never creates Product requirements.
+External practice never creates Product requirements.
 
-## Durable baseline through T8-C
+## T7 — CLOSED
 
-T8-A:
+```text
+NO HISTORICAL BUSINESS MIGRATION REQUIRED FOR LAUNCH
+```
+
+Current business DB/content/history is DEV/test/throwaway and creates no historical-business compatibility entitlement.
+
+## T8-A — CLOSED
+
+Durable authority:
+
+`wiki/architecture/r10-t8a-technical-authority-legacy-disposition.md`
+
+Ratified law:
 
 ```text
 CLEAN-SLATE PHYSICAL TARGET FREEDOM
 + SELECTIVE PROOF-BACKED MECHANISM REUSE
 - LEGACY SHAPE INHERITANCE
+- FULL-GREENFIELD PURITY RESET WITHOUT EVIDENCE
 ```
 
-T8-B:
+## T8-B — CLOSED
+
+Durable authority:
+
+`wiki/architecture/r10-t8b-backend-module-package-topology.md`
+
+Ratified law:
 
 ```text
 ONE GO MODULE
@@ -80,98 +100,50 @@ ONE GO MODULE
 + STATELESS APPLICATION LEAF ORCHESTRATION
 + ONE SEMANTIC INBOUND DOOR THROUGH APPLICATION
 + NON-SEMANTIC PLATFORM MECHANISMS
++ WIRING-ONLY COMPOSITION ROOT
 + CLOSED-WORLD / DEFAULT-DENY FIRST-PARTY DEPENDENCY GRAPH
 ```
 
-Semantic homes remain exactly:
+Semantic homes remain exactly Authentication / Organization / Authorization / Controlled Documents / Audit.
 
-```text
-Authentication
-Organization
-Authorization
-Controlled Documents
-Audit
-```
+## T8-C — CLOSED
 
-T8-C:
+Durable authority:
+
+`wiki/architecture/r10-t8c-internal-communication-contracts.md`
+
+Ratified law:
 
 ```text
 AUTHORITY-ALIGNED HYBRID CONTRACT MODEL
 ```
 
-Key T8-C laws consumed by final T8-D staging:
+Key carry-forward laws:
 
 ```text
-database/sql transaction family
-PostgreSQL READ COMMITTED posture
-application owns txscope lifecycle
-owner-private SQL only; no owner imports/cross-owner SQL
-same-Scope required Audit
-Authorization final ALLOW/default-DENY
-ProtectedSecuritySubjectIn serializes enabled User against offboarding
-owner VersionToken + WorkingContent generation OCC
-GROUP snapshot freezes in same Scope; empty stays empty
-ManagedContent create-once + AdmissionClaims + two-phase GC
-required OfficialRendition River intent shares semantic commit
-same-key idempotency race must not poison Scope
-ReplaySnapshot self-contained / PII-free / snapshot-only
+database/sql-family Scope
+application owns local transaction lifecycle
+owner-private SQL only
+same-Scope Audit
+Authorization sole final ALLOW/default-DENY
+protected Organization eligibility semantics
+owner VersionToken
+ManagedContent/AdmissionClaims/River named seams
+self-contained PII-free ReplaySnapshot
+no generic EventBus/UnitOfWork/ServiceLocator/policy language
 ```
 
-## T8-D staging chain
+## T8-D — CLOSED / PROMOTED
 
-```text
-original candidate
-  docs/superpowers/analysis/2026-08-19-r10-t8d-persistence-realization-global-maximum-candidate.md
+Durable authority:
 
-Round-1 independent Fable review
-  docs/superpowers/analysis/2026-08-19-r10-t8d-persistence-realization-independent-fable-review.md
+`wiki/architecture/r10-t8d-persistence-realization.md`
 
-adjudicated corrected candidate
-  docs/superpowers/analysis/2026-08-19-r10-t8d-persistence-realization-adjudicated-corrected-candidate.md
+Registry amendment:
 
-bounded Round-2 Fable delta review
-  docs/superpowers/analysis/2026-08-19-r10-t8d-persistence-realization-corrected-candidate-fable-delta-review.md
+`wiki/architecture/rebaseline-decision-registry-t8d-amendment.md`
 
-FINAL LEAD ADJUDICATION / ACTIVE RATIFICATION INPUT
-  docs/superpowers/analysis/2026-08-20-r10-t8d-persistence-realization-final-lead-adjudication.md
-```
-
-Effective final staging candidate:
-
-```text
-original candidate
-+ adjudicated corrected overlay
-+ final Lead adjudication overlay
-```
-
-## Review convergence
-
-```text
-Round 1:
-  APPROVE WITH MATERIAL FIXES
-  BLOCKER 2 / MAJOR 11 / LOW 10
-  Global Maximum CONFIRMED
-
-Round 2:
-  APPROVE CORRECTED DELTA WITH MATERIAL FIXES
-  BLOCKER 0 / MAJOR 7 / LOW 6
-  BOTH Round-1 blockers CLOSED
-  Global Maximum CONFIRMED
-  upstream reopen NO
-  stage trespass NO
-  third review round NOT REQUIRED
-
-Final Lead:
-  7/7 Round-2 MAJORs adjudicated/closed in staging
-  6/6 Round-2 LOWs adjudicated/closed in staging
-  surviving material contradiction 0
-```
-
-No T1→T7, T8-B or T8-C reopen is proposed.
-
-## Final selected T8-D posture
-
-Global Maximum:
+Ratified Global Maximum:
 
 ```text
 OWNER-NAMESPACED POSTGRESQL RELATIONAL CORE
@@ -188,47 +160,94 @@ OWNER-NAMESPACED POSTGRESQL RELATIONAL CORE
 - DUPLICATE CURRENT TRUTH
 ```
 
-Final adjudicated precision includes:
+Key binding persistence laws consumed by T8-E:
 
 ```text
-schemas authn / org / authz / controlled_docs / audit / platform / river
-fully-qualified owner-private SQL
-PostgreSQL-16-compatible persistence floor
-static Role/Permission; persisted RoleAssignment
-no Launch RLS/tenant substrate
-explicit BIGINT VersionToken + WorkingContent generation
-Revision.state canonical lifecycle + immutable Release evidence
-closed relational governance + structural frozen-candidate FK
-immutable managed-content descriptor + immutable malware evidence
-semantic attach FOR SHARE vs GC FOR UPDATE
-GC downstream proofs non-locking
-AdmissionClaim reserve at claim-bound OPEN allocation
-Area lifecycle serialization
-paired Idempotency Key↔Replay + HMAC fingerprint drain law
-River self-REINDEX OFF; runtime never owner
-provisioner / owner / runtime / verifier trust classes + grant parity proof
-Company singleton fail-closed no-isolation interlock; semantic company_id retained
-backup-pin acquire/release locking contract
-closed vocabulary ↔ DDL CHECK equality obligation; execution in T9
-zero semantic lifecycle triggers baseline
+schemas authn/org/authz/controlled_docs/audit/platform/river
+PostgreSQL READ COMMITTED + narrow row locks
+explicit BIGINT VersionToken / WorkingContent generation
+Revision.state + immutable Release
+no Document current-status/current-revision pointer
+closed relational governance + frozen candidate FK
+immutable semantic history through grants
+semantic descriptor truth vs immutable ManagedContent descriptor proof
+AdmissionClaim spans allocation through consume/release/expiry
+semantic content attach FOR SHARE; GC FOR UPDATE
+Idempotency Key↔Replay completed-commit invariant
+HMAC semantic fingerprint remains internal
+River under river.* / self-REINDEX OFF on PG16 / runtime non-owner
+four DB trust classes with runtime/verifier grant parity
+materialized Search OFF
 ```
 
-## Exact next action
+Independent-review convergence:
 
 ```text
-EXPLICIT OPERATOR RATIFICATION OF FINAL T8-D EFFECTIVE STAGING CANDIDATE
+Round 1: BLOCKER 2 / MAJOR 11 / LOW 10; Global Maximum CONFIRMED
+Round 2: BLOCKER 0 / MAJOR 7 / LOW 6; both blockers CLOSED
+Final Lead: every Round-2 finding closed; surviving contradiction 0
+third full review NOT REQUIRED
+operator ratified 2026-08-20
 ```
 
-Do not perform durable promotion until the operator explicitly ratifies.
+All T8-D staging/reviewer/adjudication files are historical tombstones. Use Git history only for provenance.
 
-After ratification only:
+## T8-E — ACTIVE
+
+Active bootstrap:
+
+`docs/superpowers/analysis/2026-08-20-r10-t8e-executable-wire-contract-bootstrap.md`
+
+T8-E exact question:
+
+> **What is the smallest exact OpenAPI 3.0.3 wire contract that realizes the already-ratified T6 semantic journeys and T8-D persistence/concurrency laws without inventing new state, leaking internal realization, leaving Writers to choose missing fields/enums/errors, or creating a second lifecycle/AuthZ authority?**
+
+### T8-E owns
 
 ```text
-consolidate one durable T8-D authority
-append Decision Registry T8-D amendment
-tombstone/retire T8-D staging artifacts with Git history preserved
-mark T8-D CLOSED / OPERATOR-RATIFIED / PROMOTED
-open T8-E Executable Wire Contract
+/api/v1 paths + operationIds
+request/response schemas
+fields/enums/nullability/requiredness
+success status/body/header matrix
+RFC 9457 Problem Details + problem-code vocabulary
+strong ETag/If-Match wire representation
+Idempotency-Key matrix
+cursor pagination contract
+session/CSRF application representation
+upload allocation/completion/attachment wire
+exact-byte resources
+generated Go + TypeScript boundary
+runtime OpenAPI conformance
+```
+
+### T8-E does not own
+
+```text
+semantic lifecycle/owners                    T1→T6
+persistence/constraints/locks                T8-D
+frontend realization                         T8-F
+runtime/process/deploy                       T8-G
+Golden Flow proof architecture               T9
+current→target cutover                       T10
+implementation task graph                    T11
+```
+
+### Exact next action
+
+```text
+reconstruct complete T6 semantic operation census
+→ map every operation to T8-D VersionToken/generation/idempotency/content consequences
+→ inspect current OpenAPI/generated code only as evidence
+→ classify current wire PRESERVE/REFINE/REWRITE/DELETE
+→ derive exact success schema/status/header matrix
+→ derive RFC 9457 problem-code matrix
+→ derive pagination / ETag / If-Match / Idempotency-Key matrices
+→ derive upload/exact-byte contract
+→ prove generated Go/TypeScript/runtime-conformance feasibility
+→ compare wire alternatives
+→ Method + Structural Inversion + subtractive pass
+→ independent Fable review
+→ explicit operator ratification
 ```
 
 Implementation remains **BLOCKED**.
