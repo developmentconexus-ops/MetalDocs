@@ -1,91 +1,40 @@
-# MetalDocs Agent Routing
+# MetalDocs Agent Bootstrap
 
-## Entry point
+## Fresh-actor route
 
-Read `docs/index.md` first. Read `docs/status.md` when the current stage matters. If `docs/work/current/` exists, read its `index.md` before touching the active Draft gate.
+Read, in order:
 
-Use only the smallest set of authorities required for the task. Do not reconstruct context by reading Git history, closed PRs, or removed implementation unless a current authority names that evidence as necessary.
+1. `AGENTS.md`
+2. `docs/index.md`
+3. `docs/roadmap.md`
+4. only the 1–2 owning documents named for the task
 
-## Engineering method
+Default task context is at most five files. Do not recursively read `docs/`, Git history, closed PRs, or removed implementation without a named material reason.
 
-For material engineering or architecture decisions, apply the canonical DevelopmentConexus Engineering Method from `developmentconexus-ops/conexus-methodology/METHOD.md`.
+## Organizational standards
 
-Repository/product truth remains local to this repository. External documentation and prior implementation are evidence, never product authority.
+Canonical engineering reasoning: `developmentconexus-ops/conexus-methodology/METHOD.md` — DevelopmentConexus Engineering Method v1.0.0.
 
-## Current hard stops
+Canonical repository operating model: `developmentconexus-ops/conexus-methodology/REPOSITORY-STANDARD.md` — DevelopmentConexus Repository Standard v1.0.0.
 
-- `docs/status.md` is the sole stage / implementation-gate authority.
-- If status says implementation is blocked, do not create application code, schemas, runtime, deployment, or dormant implementation.
-- Do not resurrect removed legacy implementation because it existed, was tested, or is easy to copy.
-- Reuse a historical mechanism only when a current authority names a current consumer and reuse is independently smaller than rewrite.
-- A material contradiction with a ratified authority is a STOP / bounded reopen, not a local patch.
-- Any embedded `wiki/...` path in a carried pre-reset authority is provenance only; current routing comes from `docs/index.md`, `docs/status.md`, and `docs/decisions/index.md`.
+Repository-local Product and architecture authority remains in this repository; external standards do not replace Product meaning.
 
-## Remaining-stage input
+## MetalDocs hard stops
 
-Before a remaining T-stage, read the owning semantic authorities plus `docs/decisions/forward-obligations.md`.
+- `docs/roadmap.md` is the sole mutable stage/status/next-action authority.
+- If the roadmap blocks implementation, do not add application code, schema, OpenAPI implementation, frontend/runtime/deploy, dependency manifests, or dormant capability.
+- Do not restore removed legacy implementation from Git merely because it existed or was tested.
+- Historical mechanism reuse requires a current named consumer and the proof-backed reuse gate in `docs/architecture/technical-baseline.md`.
+- Embedded pre-reset `wiki/...` paths are provenance only, not current routing.
+- A material contradiction with current Product/R10 authority is a STOP / bounded reopen, never a silent local patch.
 
-- `PRESERVE` = proof-backed baseline evidence unless materially disproved.
-- `REOPEN` = the owning stage must decide deliberately.
-- `DEFERRED` = preserve the seam/counterexample; do not build dormant implementation.
+## Repository-local Git and verification
 
-Stage ownership after T8-E is defined in `docs/decisions/stage-program.md`.
+- No direct commits to `main`; no force-push or shared-history rewrite.
+- Normal integration is squash merge after explicit operator merge authorization.
+- Current aggregate gate is GitHub Actions job `required` in `.github/workflows/ci.yml`.
+- Required unmerged provenance refs are recorded in `docs/decisions/repository-reset.md`; do not delete them while they have a named consumer.
 
-## Pull requests and review
+Future independent Fable review follows Repository Standard v1 isolation: candidate branch → `review/<gate>-fable`, with only `docs/work/current/ai-dialog.md` differing from the candidate. Reviewer output is Evidence, never authority.
 
-One coherent ratifiable gate uses one branch and one Draft PR.
-
-For governed architecture work:
-
-```text
-proposal converges
-→ final independent Fable review in docs/work/current/ai-dialog.md
-→ Lead adjudication in the same file
-→ bounded Round 2 only if a material contradiction survives
-→ explicit operator decision
-→ promote durable authority
-→ delete temporary work files
-→ required checks
-→ squash merge
-```
-
-Reviewer output is evidence, not authority.
-
-## Git safety
-
-- Never commit directly to `main`.
-- Do not force-push or rewrite shared history.
-- Git history and explicitly retained refs preserve provenance; do not create live-tree archive/tombstone folders.
-- Do not delete an unmerged authority branch that is the only reachable provenance ref until an equivalent immutable archival ref exists.
-- Do not merge a governance/architecture PR while temporary `docs/work/**` review artifacts remain.
-
-## Verification
-
-The live repository is intentionally architecture-first while implementation is blocked. Run the checks defined by current repository CI and the active gate. Do not preserve or recreate old verification machinery merely to satisfy superseded implementation assumptions.
-
-The repository ruleset requires status context `required` and resolved review conversations before merge; see `docs/development/engineering-rules.md`.
-
-## Context routing
-
-| Need | Read |
-|---|---|
-| Product boundary | `docs/product/contract.md` |
-| Whole-product alignment | `docs/product/alignment.md` |
-| User/API journeys | `docs/product/journeys.md` |
-| Current API operation census | `docs/decisions/api-operation-census.md` |
-| Semantic ownership | `docs/architecture/ownership.md` |
-| Domain state | `docs/architecture/domain-model.md` |
-| Lifecycle / transactions | `docs/architecture/lifecycle.md` |
-| Authorization / Audit | `docs/architecture/authorization-and-audit.md` |
-| Exact content | `docs/architecture/content-integrity.md` |
-| Async / Search | `docs/architecture/async-and-search.md` |
-| Clean-slate technical posture | `docs/architecture/technical-baseline.md` |
-| Backend topology | `docs/architecture/backend.md` |
-| Internal contracts | `docs/architecture/interfaces.md` |
-| Persistence | `docs/architecture/persistence.md` |
-| Remaining stage definitions | `docs/decisions/stage-program.md` |
-| Cross-stage forward obligations | `docs/decisions/forward-obligations.md` |
-| Paused T8-E checkpoint | `docs/reference/t8e-checkpoint.md` |
-| Current gate | `docs/status.md`; plus `docs/work/current/index.md` only when it exists |
-
-`CLAUDE.md` has no independent authority.
+`CLAUDE.md` has no independent Product, architecture, roadmap, or status authority.
