@@ -12,10 +12,10 @@ summary: Sole mutable MetalDocs stage, gate, implementation-status, and next-act
 ```text
 REPOSITORY MODE                       CLEAN-SLATE / ARCHITECTURE-FIRST
 REPOSITORY RESET                      MERGED / OPERATOR-RATIFIED
-REPOSITORY STANDARD V1 ALIGNMENT      ACTIVE / DRAFT PR #135
+REPOSITORY STANDARD V1 ALIGNMENT      MERGED
 PRODUCT / OWNERSHIP                   OPERATOR-APPROVED
 T1 → T8-D                             CLOSED / OPERATOR-RATIFIED
-T8-E EXECUTABLE WIRE CONTRACT         PAUSED AT ACCEPTED CHECKPOINT
+T8-E EXECUTABLE WIRE CONTRACT         ACTIVE / DRAFT PR PENDING
 T8-F → T12                            NOT OPEN
 IMPLEMENTATION                        BLOCKED
 LEGACY IMPLEMENTATION                 ABSENT FROM LIVE TREE
@@ -23,36 +23,37 @@ LEGACY IMPLEMENTATION                 ABSENT FROM LIVE TREE
 
 ## Current gate
 
-Align the clean-slate repository operating envelope with DevelopmentConexus Repository Standard v1.0.0 without reopening Product/R10 or restoring legacy implementation.
+T8-E — Executable Wire Contract.
 
-Exit requires:
-
-```text
-Repository Standard routing/conformance controls complete
-+ Fable reset findings closed or deliberately dispositioned
-+ required unique unmerged provenance reachable
-+ docs/work/** absent from merge candidate
-+ required aggregate check green on exact candidate HEAD
-+ no unresolved review conversations
-+ explicit operator merge authorization
-```
+Accepted work through the previous four T8-E layers is preserved at `docs/reference/t8e-checkpoint.md`. The current application census is 78 operations and is owned by `docs/product/journeys.md` plus `docs/decisions/api-operation-census.md`.
 
 ## Exact next action
 
 ```text
-finish Repository Standard v1 verification on PR #135
-→ operator reviews merge-ready evidence
-→ on authorized squash merge, reopen T8-E from docs/reference/t8e-checkpoint.md
-→ create a fresh T8-E Draft PR from updated main
+freeze the remaining executable ledger for all 78 operations
+→ exact request and success schemas
+→ required / optional / nullable fields
+→ closed enum vocabularies
+→ success status + response-header matrix
+→ operation-specific RFC 9457 problem-code matrix
+→ list filters + deterministic ordering
+→ allowed_actions vocabularies
+→ request/body/document limits from evidence
+→ Go + TypeScript generation feasibility
+→ runtime contract-conformance proof design
+→ subtractive / global-coherence pass
+→ isolated final Fable review
+→ Lead adjudication
+→ explicit operator ratification
 ```
 
-No T8-E design decision is made in the repository-governance alignment PR.
+Do not reopen the accepted T8-E checkpoint by preference. A material contradiction follows the DevelopmentConexus Engineering Method reopen law.
 
 ## Remaining architecture program
 
 | Stage | Owns | Opens / exits |
 |---|---|---|
-| T8-E — Executable Wire Contract | Exact OpenAPI application wire, schemas, headers, problems, ETags, idempotency, pagination, upload/exact-byte contract, generated Go/TypeScript boundaries | Resumes only after Repository Standard alignment merges; exits by operator ratification |
+| T8-E — Executable Wire Contract | Exact OpenAPI application wire, schemas, headers, problems, ETags, idempotency, pagination, upload/exact-byte contract, generated Go/TypeScript boundaries | ACTIVE; exits by operator ratification |
 | T8-F — Frontend Realization | Route tree, feature/package topology, generated transport consumption, query/state behavior, read-model consumption, editor/viewer boundaries | Opens after T8-E ratification |
 | T8-G — Runtime / Process / Deployment | Binaries/processes, River workers, renderer/provider boundary, startup/readiness/shutdown, configuration/secrets, trust/network boundaries, observability, recovery/runtime profiles | Opens after T8-F supplies its concrete runtime consumers; exits by ratification |
 | T8-H — Whole-T8 Global Coherence Review | Cross-check backend, persistence, wire, frontend, and runtime realization as one system | Opens after T8-A→T8-G close; exits with no unresolved material contradiction |
