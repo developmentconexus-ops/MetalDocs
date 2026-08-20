@@ -27,14 +27,25 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Review branches are isolated Evidence channels. Their only allowed
-          # delta from the candidate is the temporary Fable dialogue.
+          # Review branches are isolated Evidence channels and are deliberately
+          # non-mergeable. They must target the current candidate branch, not
+          # main; the candidate base must be an ancestor of the review head;
+          # and the only delta may be the temporary Fable dialogue.
           if [[ "$HEAD_REF" == review/* ]]; then
-            mapfile -t changed < <(git diff --name-only "$BASE_SHA...$HEAD_SHA")
+            if [[ "$BASE_REF" == "main" ]]; then
+              echo "::error::review branches must target their candidate branch, never main"
+              exit 1
+            fi
+            if ! git merge-base --is-ancestor "$BASE_SHA" "$HEAD_SHA"; then
+              echo "::error::review branch does not contain the current candidate base"
+              exit 1
+            fi
+            mapfile -t changed < <(git diff --name-only "$BASE_SHA..$HEAD_SHA")
             [[ "${#changed[@]}" -eq 1 ]]
             [[ "${changed[0]}" == "docs/work/current/ai-dialog.md" ]]
-            git diff --check "$BASE_SHA...$HEAD_SHA"
-            exit 0
+            git diff --check "$BASE_SHA..$HEAD_SHA"
+            echo "::error::review branches are Evidence channels and must be closed/deleted, never merged"
+            exit 1
           fi
 
           # Main-targeting architecture-first PRs admit only the accepted live surfaces.
