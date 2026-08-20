@@ -11,7 +11,7 @@ summary: Routes the active T8-E executable wire-contract gate.
 |---|---|
 | Stage | T8-E — Executable Wire Contract |
 | Branch | `arch/t8e-executable-wire-contract` |
-| Pull request | to be assigned |
+| Pull request | `#135` |
 | Status | Draft / architecture work active |
 | Durable checkpoint | `../../reference/t8e-checkpoint.md` |
 | Operation census | `../../decisions/api-operation-census.md` — 78 operations |
