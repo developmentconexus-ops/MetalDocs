@@ -18,6 +18,7 @@ Start here after `AGENTS.md`, then read `roadmap.md`, then only the owning docum
 | Domain state / invariants | [Domain model](architecture/domain-model.md) | Runtime archaeology |
 | Governance / effectivity / transactions | [Lifecycle](architecture/lifecycle.md) | Old Approval implementation |
 | Authorization / Audit | [Authorization and audit](architecture/authorization-and-audit.md) | Provider roles / old ACL machinery |
+| Responsible-owner eligibility | [Responsible owner](architecture/responsible-owner.md) | Old grant/role assumptions |
 | Exact content / restore | [Content integrity](architecture/content-integrity.md) | Removed storage-provider contracts |
 | Durable jobs / Search | [Async and search](architecture/async-and-search.md) | Old jobs registry |
 | Technical clean-slate / reuse decision | [Technical baseline](architecture/technical-baseline.md) | Legacy source unless the reuse gate requires it |
