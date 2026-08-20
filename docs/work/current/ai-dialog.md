@@ -27,9 +27,8 @@ The full independent Fable review is preserved in Git at commit `3b8a25488e1aed5
 
 ## Fable review summary
 
-Primary verdict:
-
 ```text
+PRIMARY VERDICT
 APPROVE REPOSITORY DOCUMENTATION PROFILE WITH MATERIAL FIXES
 
 BLOCKER 3
@@ -37,193 +36,38 @@ MAJOR   8
 LOW     6
 ```
 
-Fable confirmed the structural direction:
-
-```text
-one docs/ root                     YES
-semantic naming/navigation         YES
-one proposal + one AI dialogue     YES
-one coherent ratifiable PR gate    YES
-Git/closed PRs as archive          YES
-```
-
-The profile as reviewed was not yet promotable because deletion/retention, parity proof, and merge-ready enforcement contained bounded defects. Fable reported that another independent round was not materially required if Lead corrections stayed inside the selected information architecture.
+Fable confirmed the structural direction—one `docs/` root, semantic names/navigation, one proposal + AI dialogue, one coherent PR gate, and Git/closed PRs as archive—but found bounded execution defects in retention, parity proof, agent-context preservation, and merge-ready enforcement.
 
 ## Lead adjudication
 
-Reviewer output is evidence, never authority. Lead revalidated the findings against the reviewed repository state and selected the following dispositions.
+Reviewer output is evidence, never authority. Lead selected these dispositions after confronting the findings with the reviewed repository state.
 
-### BLOCKER-1 — verification subjects under `wiki/`
+| Finding | Disposition | Selected correction |
+|---|---|---|
+| B1 machine-consumed `wiki/` subjects | ACCEPT | complete document disposition; explicit homes for ADR/database/problem/trace docs; gate-subject repoint-or-retire invariant |
+| B2 false-green R10 census | ACCEPT WITH STRENGTHENING | closed source→target map + filesystem census + real normative vocabulary + empty-source failure |
+| B3 Ready-state guard cannot fire | ACCEPT | `docs/work/**` Draft-only + CI `ready_for_review` trigger before using it as merge protection |
+| M1 zero textual old-path rule | ACCEPT | repair live executable consumers only; provenance/history citations do not force churn |
+| M2 `.gitleaksignore` historical paths | ACCEPT | preserve history-pinned fingerprints while full-history scanner consumes them |
+| M3 generated report/frontmatter conflict | ACCEPT | generator emits durable frontmatter; no hand-edits to generated output |
+| M4 provenance disappears with work cleanup | ACCEPT | durable authority records G0 provenance; future decision registry retains compact row |
+| M5 AGENTS/CLAUDE safety truth would vanish | ACCEPT | move repository law to `docs/development/engineering-rules.md`; current orientation to `docs/reference/current-system.md` before shrinking bootstrap |
+| M6 local proof weaker than CI | ACCEPT | mirror `--require-infra`, lint, security, and affected non-PR governance checks |
+| M7 `authority + active` ambiguity | ACCEPT WITH SUBTRACTION | remove `status`; closed kinds = `authority | work` |
+| M8 existing `docs/runbooks/**` / `docs/engineering/**` omitted | ACCEPT | complete `git ls-files '*.md'` disposition census; undispositioned path blocks G1 |
+| L1 pushed-branch rebase contradiction | ACCEPT | no force-rebase merely to refresh base; merge updated main or use next clean branch |
+| L2 brittle fixed `git rm` | ACCEPT BY REMOVAL | derive deletions from disposition census |
+| L3 ADR navigation conflict | ACCEPT | governed collection index satisfies reachability for large collections |
+| L4 unrelated `.claude` permission cleanup | ACCEPT | remove from gate |
+| L5 fixture can fail for wrong reason | ACCEPT | fixture includes minimal valid nav/tree and asserts intended finding |
+| L6 MkDocs semantics overstated | ACCEPT PRECISION | `mkdocs.yml` is navigation manifest; publishing is out of scope |
 
-**Disposition: ACCEPT.**
-
-Root cause is valid: the previous plan expressed a retention predicate as a root allowlist and omitted machine-consumed documentation.
-
-Selected correction:
-
-- machine-consumed documentation is a first-class retained class until its gate is moved/retired;
-- target homes include ADRs, database reference pages, problem-code reference and requirement traceability;
-- module-debt material survives only with its gate;
-- hard invariant: no verification gate subject is deleted without repoint/retire + proof in the same PR;
-- G1 performs a complete document disposition census before any root deletion.
-
-No Product/R10 reopen.
-
-### BLOCKER-2 — false-green R10 parity census
-
-**Disposition: ACCEPT WITH STRENGTHENING.**
-
-The reported `git grep` behavior over ignored `.tmp/` is a real false-green risk.
-
-Selected correction:
-
-- closed source-to-target authority map is the primary parity mechanism;
-- temporary extracted source is scanned with filesystem-capable `grep`/`rg`, not tracked-file search;
-- normative vocabulary is widened to actual repository terms;
-- empty source census is an explicit failure;
-- textual census remains supporting evidence and cannot replace semantic parity review.
-
-No Product/R10 reopen.
-
-### BLOCKER-3 — merge-ready work-file guard cannot fire
-
-**Disposition: ACCEPT.**
-
-Selected correction:
-
-- `docs/work/**` may exist only while the PR is Draft;
-- GitHub Actions must include `ready_for_review` among `pull_request` activity types before this is treated as a merge guard;
-- temporary work is deleted before marking Ready.
-
-No upstream reopen.
-
-### MAJOR-1 — zero textual old-path rule explodes G1 scope
-
-**Disposition: ACCEPT.**
-
-Selected correction:
+### Lead result
 
 ```text
-EXECUTABLE CONSUMER
-→ repair or retire
-
-PROVENANCE/HISTORY CITATION
-→ no forced churn
-```
-
-G1 classifies occurrences instead of requiring zero textual references to old paths. Product/OpenAPI/runtime files are not touched merely to rewrite historical comments or citations.
-
-### MAJOR-2 — `.gitleaksignore` historical fingerprints
-
-**Disposition: ACCEPT.**
-
-History-pinned security allowlist entries may continue referencing deleted historical paths while full-history scanning consumes them. No security gate is weakened to make path cleanup visually complete.
-
-### MAJOR-3 — generated requirement report vs frontmatter
-
-**Disposition: ACCEPT.**
-
-Generated durable pages receive required metadata from their generator. Generated output is never hand-edited to satisfy documentation hygiene.
-
-### MAJOR-4 — dangling temporary links / ratification provenance
-
-**Disposition: ACCEPT.**
-
-Selected correction:
-
-- durable authority no longer links to temporary proposal/plan as current related documents;
-- authority records G0 provenance directly until the compact decision registry exists;
-- the promoting PR writes/retains decision provenance before temporary files are deleted;
-- Git preserves the full review record.
-
-### MAJOR-5 — current `AGENTS.md` / `CLAUDE.md` safety truth would evaporate
-
-**Disposition: ACCEPT.**
-
-Selected durable owners before bootstrap reduction:
-
-```text
-docs/development/engineering-rules.md
-docs/reference/current-system.md
-```
-
-`AGENTS.md` routes to them instead of carrying their full prose. `CLAUDE.md` remains a minimal pointer only after its current load-bearing orientation has moved.
-
-### MAJOR-6 — local proof ladder weaker than CI
-
-**Disposition: ACCEPT.**
-
-G0/G1 proof mirrors CI:
-
-```text
-go test ./...
-go run ./tools/verify --require-infra --profile=pr
-go run ./tools/verify --require-infra --only=golangci-lint
-```
-
-Affected non-PR/nightly governance checks are run explicitly when their documentation subjects move.
-
-### MAJOR-7 — undefined `authority + active` metadata state
-
-**Disposition: ACCEPT WITH SUBTRACTION.**
-
-Remove the `status` field entirely. Closed kinds become:
-
-```text
-authority
-work
-```
-
-A durable live page is current for its declared subject; temporary candidacy is represented by Draft-PR `work` files. This removes duplicate lifecycle metadata rather than adding another rule.
-
-### MAJOR-8 — existing `docs/runbooks/**` / `docs/engineering/**` omitted
-
-**Disposition: ACCEPT.**
-
-G1 starts from a complete tracked Markdown census (`git ls-files '*.md'`) plus machine-consumed doc-like subjects. Every path gets explicit `KEEP`, `MERGE`, `GENERATED`, or `DELETE` disposition. Undispositioned paths stop the gate.
-
-### LOW-1 — rebase without rewriting history
-
-**Disposition: ACCEPT.**
-
-Do not rebase/force-push shared pushed PR history merely to refresh base. Merge updated `main` or use the next clean branch according to repository Git policy.
-
-### LOW-2 — brittle `git rm` unmatched paths
-
-**Disposition: ACCEPT BY REMOVING THE DEFECT CLASS.**
-
-G1 deletion commands are derived from the complete disposition census, not a fixed multi-path `git rm` command.
-
-### LOW-3 — ADR navigation conflict
-
-**Disposition: ACCEPT.**
-
-Large governed collections may be reachable through a collection index. Individual ADRs/table pages do not each require top-level `mkdocs.yml` entries, but they must be reachable from the navigation graph.
-
-### LOW-4 — `.claude/settings.json` permission cleanup
-
-**Disposition: ACCEPT.**
-
-Removed from this gate. Unrelated tool-permission cleanup needs its own justified change.
-
-### LOW-5 — negative fixture can fail for wrong reason
-
-**Disposition: ACCEPT.**
-
-Docs-hygiene fixtures must include the minimum valid navigation/repository context and assert the intended finding, not merely non-zero exit.
-
-### LOW-6 — MkDocs build semantics not actually used
-
-**Disposition: ACCEPT PRECISION.**
-
-`mkdocs.yml` is the explicit navigation manifest. Static publishing is not part of G0/G1; build-specific keys are future compatibility only.
-
-## Lead result
-
-```text
-Fable blockers accepted and closed by selected corrections: 3 / 3
-Fable majors accepted/accepted-with-correction:              8 / 8
-Fable lows accepted/precision-subtracted:                    6 / 6
+Fable blockers closed by selected corrections    3 / 3
+Fable majors accepted/corrected                   8 / 8
+Fable lows accepted/precision-subtracted          6 / 6
 
 ONE docs/ ROOT                              CONFIRMED
 SEMANTIC NAMES                              CONFIRMED
@@ -238,7 +82,15 @@ PRODUCT/R10 REOPEN                          NO
 SECOND FABLE ROUND                          NOT REQUIRED
 ```
 
-The corrected durable candidate is `docs/development/documentation.md`. The corrected temporary proposal and execution plan implement the same decisions. No deletion or G1 work has started.
+The corrections are materialized in:
+
+```text
+docs/development/documentation.md
+docs/work/current/proposal.md
+docs/work/current/plan.md
+```
+
+No legacy deletion, Product/R10 authority migration, G1 implementation, or T8-E resumption has begun.
 
 ## Bounded round 2
 
@@ -246,4 +98,4 @@ Not required. No material contradiction survives Lead adjudication, and no corre
 
 ## Operator decision
 
-Pending explicit operator ratification of the corrected G0 profile.
+**PENDING — explicit operator ratification of the corrected G0 profile is the next gate.**
