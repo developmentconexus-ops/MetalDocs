@@ -9,11 +9,11 @@ summary: Sole current MetalDocs stage, gate, and next-action authority.
 
 ```text
 REPOSITORY MODE                              CLEAN-SLATE / ARCHITECTURE-FIRST
-REPOSITORY RESET                             ACTIVE REVIEW GATE / PR #134
+REPOSITORY RESET                             OPERATOR-RATIFIED / PR #134 MERGE PENDING
 PRODUCT CONTRACT                             OPERATOR-APPROVED
 WHOLE-PRODUCT ALIGNMENT / OWNERSHIP          OPERATOR-APPROVED
 T1 → T8-D                                    CLOSED / OPERATOR-RATIFIED
-T8-E EXECUTABLE WIRE CONTRACT                PAUSED AT ACCEPTED CHECKPOINT
+T8-E EXECUTABLE WIRE CONTRACT                ACTIVE / ACCEPTED CHECKPOINT
 T8-F → T12                                   NOT OPEN — SEE decisions/stage-program.md
 IMPLEMENTATION                               BLOCKED
 LEGACY IMPLEMENTATION                        ABSENT FROM RESET TREE
@@ -21,9 +21,27 @@ LEGACY IMPLEMENTATION                        ABSENT FROM RESET TREE
 
 ## Current gate
 
-Review and ratify the clean-slate repository reset. Temporary review material is under `docs/work/current/` only while this PR remains Draft.
+Finalize the ratified clean-slate repository reset, then continue T8-E in a fresh small Draft PR from updated `main`.
 
-The accepted T8-E work is preserved durably at `docs/reference/t8e-checkpoint.md`; the current 78-operation census is owned by `docs/decisions/api-operation-census.md`.
+The accepted T8-E checkpoint is durable at `docs/reference/t8e-checkpoint.md`; the current 78-operation application census is owned by `docs/decisions/api-operation-census.md`.
+
+## T8-E exact next action
+
+```text
+create fresh T8-E Draft PR from updated main
+→ materialize the accepted checkpoint as the active proposal
+→ freeze the remaining 78-operation executable ledger
+→ close exact schemas / enums / nullability / success headers
+→ close operation-specific RFC 9457 problem-code matrix
+→ close filters / deterministic ordering / allowed_actions
+→ close request-body limits from evidence
+→ prove Go + TypeScript generation/conformance feasibility
+→ final subtractive/global-coherence pass
+→ one final independent Fable challenge
+→ explicit operator ratification
+```
+
+T8-F may open only after T8-E ratification.
 
 ## Provenance safety
 
@@ -36,19 +54,6 @@ docs/a8-authz-approval-redesign-ledger @ d8b1c6d31e704e9552a14faa7764c634a29b081
 docs/repository-information-architecture @ b0ebe54cb010e9837a25f7b778f3d9814d283cb8
 ```
 
-## After reset ratification
+The remaining stage ownership and final implementation gate are defined in `docs/decisions/stage-program.md`.
 
-Before merge:
-
-```text
-Lead adjudication complete
-→ operator ratification explicit
-→ delete docs/work/current/**
-→ switch this status to T8-E ACTIVE
-→ required CI green on the final tree
-→ squash merge
-```
-
-Then T8-E resumes from the durable checkpoint. T8-F may open only after T8-E ratification. The remaining stage ownership and final implementation gate are defined in `docs/decisions/stage-program.md`.
-
-Implementation remains blocked throughout.
+Implementation remains blocked.
