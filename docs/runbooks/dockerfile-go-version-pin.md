@@ -34,6 +34,10 @@ binaries with `GO_VERSION` threaded from `go.mod` through the compose build
 stanza. That consolidation is outside the security-baseline patch; until it
 happens, `dockerfile-go-version-drift` keeps the restatement honest.
 
+A module-version change must also run `go mod tidy` and `go mod vendor`; the
+repository commits `vendor/`, so updating `go.mod` alone makes every Go job
+fail closed with an inconsistent-vendoring error before tests or scanners run.
+
 ## What `dockerfile-go-version-drift` does
 
 Static, no Docker daemon, no network. Parses `go.mod`'s `^go X.Y(.Z)?$`
