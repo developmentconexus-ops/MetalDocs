@@ -3,8 +3,10 @@
 ```text
 ACTIVE STAGING ROUTER
 NON-AUTHORITATIVE
-GLOBAL MAXIMUM CANDIDATE MATERIALIZED
-INDEPENDENT FABLE REVIEW = NEXT
+ROUND-1 INDEPENDENT REVIEW COMPLETE
+LEAD ADJUDICATION COMPLETE / OPERATOR-APPROVED
+ADJUDICATED CORRECTED CANDIDATE MATERIALIZED
+BOUNDED FABLE ROUND 2 = NEXT
 NOT IMPLEMENTATION AUTHORIZATION
 ```
 
@@ -16,13 +18,24 @@ NOT IMPLEMENTATION AUTHORIZATION
 > **Method:** DevelopmentConexus Engineering Method v1.0.0  
 > **Implementation:** BLOCKED
 
-This file is the active non-authoritative router for R10 **T8-D — Persistence Realization**. It does not contain target authority.
+This file is the active non-authoritative staging router for R10 **T8-D — Persistence Realization**. It does not contain target authority.
 
-Current candidate:
+## Active staging chain
 
-`docs/superpowers/analysis/2026-08-19-r10-t8d-persistence-realization-global-maximum-candidate.md`
+```text
+original Global Maximum candidate
+  docs/superpowers/analysis/2026-08-19-r10-t8d-persistence-realization-global-maximum-candidate.md
 
-No T8-D decision is durable until independent challenge, Lead adjudication and explicit operator ratification promote it into `wiki/`.
+Round-1 independent Fable review
+  docs/superpowers/analysis/2026-08-19-r10-t8d-persistence-realization-independent-fable-review.md
+
+Lead-adjudicated corrected candidate — ACTIVE ROUND-2 INPUT
+  docs/superpowers/analysis/2026-08-19-r10-t8d-persistence-realization-adjudicated-corrected-candidate.md
+```
+
+For Round 2, the effective corrected candidate is the original candidate plus the adjudicated correction overlay. Where they conflict, the corrected candidate controls staging.
+
+No T8-D decision is durable until bounded Round 2, final Lead adjudication and explicit operator ratification promote one consolidated authority into `wiki/`.
 
 ---
 
@@ -32,32 +45,28 @@ No T8-D decision is durable until independent challenge, Lead adjudication and e
 
 ---
 
-## 2. Binding inputs
+## 2. Binding authority chain
 
 Read in repository authority order:
 
 ```text
-Product Contract REV001
-Whole-Product GCR + 4+1 ownership
-T1 semantic state/invariants
-T2 governance/effectivity/transaction law
-T3 Authorization/Audit + D4
-T4 exact content/storage/restore
-T5 durable async/search/external effects
-T6 canonical API/frontend journeys
-T7 migration truth
-T8-A technical authority/legacy disposition
-T8-B backend topology
-T8-C internal communication contracts
+AGENTS.md
+root-cause-global-maximum-method.md
+current-agent-handoff.md
+r10-technical-architecture.md — sole status/next-action router
+Product Contract REV001 + Whole-Product GCR + 4+1 ownership
+T1→T8-C durable authorities
 Decision Registry + amendments through T8-C
 post-T6 implementation-readiness program
-TRRB
+TRRB / technical-realization reconciliation baseline
 this bootstrap
-current T8-D candidate
+original candidate
+Round-1 review evidence
+adjudicated corrected candidate
 current schema/migrations/SQL only for concrete evidence/reuse claims
 ```
 
-Current implementation is evidence only. Table names, RLS/GUC, legacy module ownership and current migrations receive no survival entitlement.
+Current implementation is evidence only. Reviewer artifacts and staging candidates are evidence/input only, never target authority.
 
 ---
 
@@ -80,7 +89,7 @@ no foreign SQL as communication
 same-Scope required Audit
 same-Scope required River intent
 same-Scope Idempotency claim/completion
-same-Scope AdmissionClaim consumption
+same-Scope AdmissionClaim consumption where applicable
 protected eligibility serialization with offboarding
 self-contained PII-free ReplaySnapshot
 ManagedContent mechanism != semantic authority
@@ -89,9 +98,7 @@ Search materialization OFF
 
 ---
 
-## 4. Current candidate class
-
-The operator-approved design materialized for independent review selects:
+## 4. Global Maximum class — Round 1 confirmed
 
 ```text
 OWNER-NAMESPACED POSTGRESQL RELATIONAL CORE
@@ -119,50 +126,54 @@ GENERIC PERSISTENCE FRAMEWORKS
 DUPLICATE CURRENT TRUTH
 ```
 
-Principal candidate decisions include:
+Round-1 Fable verdict:
 
 ```text
-one PostgreSQL database
-schemas: authn / org / authz / controlled_docs / audit / platform / river
-fully-qualified first-party SQL
-PostgreSQL-16-compatible primitive floor
-complete bidirectional DB-object ownership catalog
-Role/Permission static; RoleAssignment persisted
-no Launch RLS/tenant substrate
-explicit BIGINT VersionToken and WorkingContent generation
-Revision.state canonical lifecycle + immutable Release fact
-partial uniqueness for one open and one EFFECTIVE Revision
-closed relational governance model
-live GROUP dependency separate from activated candidate snapshot
-semantic exact descriptors + technical ManagedContent
-row-existence AdmissionClaim + repeated two-phase GC proof
-paired Idempotency Key + Replay with deferred completion FK
-River under third-party river.*
-identity/existence-only cross-owner FKs; no semantic cascades
-runtime DB role separate from DDL owner
-append-only DB grants for immutable history
-zero semantic lifecycle triggers baseline
-protected actor FOR SHARE; Document FOR UPDATE lifecycle root
-explicit owner-private database/sql SQL; no generic ORM/repository framework
+APPROVE WITH MATERIAL FIXES
+BLOCKER 2 / MAJOR 11 / LOW 10
+Global Maximum class = CONFIRMED
+T8-C reopen = NO
+T8-B/T1→T7 reopen = NO
+stage trespass = NO
+```
+
+Lead adjudication accepted both blockers, accepted or narrowed the material corrections, rejected M7's proposed Company/company_id subtraction, and selected exact corrected realizations. The operator explicitly approved that adjudication.
+
+---
+
+## 5. Corrected material delta
+
+Round 2 must verify only the adjudicated delta unless it creates a new contradiction:
+
+```text
+River custom schema ownership/provisioning/grants on PG16
++ River self-REINDEX OFF
++ third-party catalog class
+
+universal semantic ManagedContent attachment FOR SHARE
+vs GC FOR UPDATE
+
+governance Decision -> frozen candidate composite FK
+immutable platform.malware_inspections evidence
+current-only provider issuer+subject uniqueness
+actor/target User one sorted lock class
+complete transaction-operation census
+GovernanceAttempt subject uniqueness
+M7 Lead rejection: Company is current semantic scope; company_id retained
+static Go <-> DDL vocabulary parity proof
+idempotency retention Replay->Key
+HMAC-SHA-256 semantic fingerprint + key version
+provisioner/owner/runtime/CI DB trust classes
+accepted LOW constraint/proof precision corrections
 ```
 
 ---
 
-## 5. Stage boundaries
+## 6. Stage boundaries
 
-T8-D owns:
+T8-D owns relational persistence, constraints, owner-private queries, immutable-history enforcement, OCC/VersionToken physical realization, and transaction/serialization/lock mapping.
 
-```text
-schemas/tables/material columns and types
-correctness PK/FK/unique/check/partial constraints
-immutable/history relational shapes
-owner-private SQL/query boundaries
-OCC/VersionToken physical realization
-transaction/serialization/lock mapping
-managed-content/idempotency/River persistence boundaries
-```
-
-T8-D does not own:
+It does **not** own:
 
 ```text
 semantic/product changes                         T1→T7
@@ -180,55 +191,26 @@ T8-E remains **NOT OPEN**. Implementation remains **BLOCKED**.
 
 ---
 
-## 6. Independent-review scope
-
-The next reviewer must reconstruct authority independently and attack the exact candidate rather than assuming this router or chat history is correct.
-
-Material challenge surfaces:
-
-```text
-namespace/ownership strategy
-cross-owner FK boundary
-static Role/Permission vs RoleAssignment persistence
-ProviderSubjectBinding current/history shape
-VersionToken/OCC completeness
-Revision.state + Release effectivity split
-open/EFFECTIVE partial uniqueness under concurrency
-current_submission_id boundedness
-closed governance relational completeness
-GROUP deletion/snapshot law
-runtime DB-grant immutability
-ManagedContent/AdmissionClaim/GC race safety
-malware proof persistence
-paired idempotency Key↔Replay deferred-FK feasibility
-READ COMMITTED same-key loser behavior
-River v0.37.1 schema/InsertTx compatibility
-runtime-role vs DDL-owner grant model
-lock ordering/deadlock surface
-zero-trigger baseline
-current-schema T8-A reuse dispositions
-future-capability subtraction
-T8-D/T8-E/T8-G/T10 boundary discipline
-```
-
-Reviewer evidence never becomes authority by itself.
-
----
-
 ## 7. Exact next action
 
 ```text
-independent Fable review
-of:
-  docs/superpowers/analysis/2026-08-19-r10-t8d-persistence-realization-global-maximum-candidate.md
+BOUNDED FABLE ROUND 2
 
-→ reviewer reports BLOCKER / MAJOR / LOW findings
-→ reviewer decides Global Maximum confirmed yes/no
-→ reviewer decides upstream/T8-C reopen yes/no
-→ reviewer checks T8-E/T8-G/T10 trespass
-→ Lead confrontation/adjudication
-→ bounded correction/re-review only if material
-→ explicit operator ratification before durable T8-D promotion
+review the exact corrected delta in:
+  docs/superpowers/analysis/2026-08-19-r10-t8d-persistence-realization-adjudicated-corrected-candidate.md
+
+using original candidate + Round-1 review only as provenance/context
+
+→ verify every Round-1 blocker is actually closed
+→ attack accepted/narrowed corrections and M7 Lead rejection
+→ report new/surviving BLOCKER / MAJOR / LOW
+→ report Global Maximum still confirmed yes/no
+→ report T8-C/T8-B/T1→T7 reopen yes/no
+→ report T8-E/F/G/T10/T11 trespass yes/no
+→ state whether any further review round is materially required
+→ final Lead adjudication
+→ explicit operator ratification
+→ only then durable T8-D promotion and T8-E opening
 ```
 
-Do **not** promote T8-D, open T8-E, create migrations or implement product code from this staging router/candidate.
+Do **not** promote T8-D, open T8-E, create target migrations or implement product code from this staging chain.
