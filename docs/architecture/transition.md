@@ -24,7 +24,7 @@ Launch requires pre-existing business-document import = NO
 
 Therefore current MetalDocs rows, objects, approvals, audit events, releases, templates and identity data are **not business-history migration sources**.
 
-They remain current/legacy technical evidence for later technical-transition reasoning only when a current authority names that evidence.
+They remain current/legacy technical evidence for T8/T10 only.
 
 ## 2. T7 decision
 
@@ -56,19 +56,18 @@ T1's imported/native provenance seam remains the only future-evolution anchor re
 
 ## 4. T10 boundary
 
-T10 remains mandatory for any **technical transition** that actually exists when that stage opens. Its current ownership/sequence is defined only by `docs/roadmap.md`.
-
-Potential concerns include:
+T10 remains mandatory for **technical transition**:
 
 ```text
-current→target implementation transition that still exists
-schema/data transition if any exists
-API/frontend/runtime switch-over
+current DEV implementation → R10 implementation
+current schema → target schema
+current API/frontend/runtime → target realization
+DEV/test-state disposal/reset
 technical cutover/readiness/rollback
-legacy technical deletion that still remains
+legacy technical deletion map
 ```
 
-For Launch, the historical-business-import branch is empty.
+For Launch, the T10 historical-business-import branch is empty.
 
 No compatibility structure may survive merely to preserve disposable DEV/test data.
 
@@ -76,7 +75,7 @@ No compatibility structure may survive merely to preserve disposable DEV/test da
 
 T8 receives no historical-data compatibility consumer from T7.
 
-Therefore removed packages, tables, routes, frontend features, jobs, binaries and technical abstractions have no survival entitlement for migration compatibility. Any historical mechanism reuse must be justified independently by current technical value and target fit.
+Therefore current packages, tables, routes, frontend features, jobs, binaries and technical abstractions have no survival entitlement for migration compatibility. T8 must classify them independently by current technical value and target fit.
 
 ## 6. Reopen triggers
 
@@ -99,7 +98,7 @@ pre-existing business corpus required at Launch NO
 historical business migration                   NOT REQUIRED
 generic import platform                         REJECTED
 DEV/test history preservation                   REJECTED
-T10 technical transition                        STILL REQUIRED IF A REAL TRANSITION EXISTS
+T10 technical transition                        STILL REQUIRED
 future imported-provenance seam                 PRESERVED
 ```
 
