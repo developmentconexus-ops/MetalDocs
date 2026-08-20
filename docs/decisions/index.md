@@ -1,43 +1,58 @@
 ---
-id: decision-registry
+id: decision-register
 kind: authority
 owner: architecture
-summary: Routes current ratified decisions, forward obligations, stage ownership, and the active T8-E checkpoint.
+summary: Current MetalDocs decision/disposition register and entrypoint to forward obligations.
 ---
 
-# Decision registry
+# Decision register
 
-This page is an index. Detailed current truth remains in the owning Product/architecture authority.
+A fresh actor uses this register to discover current material decisions without reconstructing review chronology. Detailed meaning remains in each owning authority.
 
-| Decision | State | Authority |
-|---|---|---|
-| Product contract | approved | `../product/contract.md` |
-| Whole-product alignment | approved | `../product/alignment.md` |
-| Semantic ownership | approved | `../architecture/ownership.md` |
-| Domain state and invariants | ratified | `../architecture/domain-model.md` |
-| Governance/effectivity transactions | ratified | `../architecture/lifecycle.md` |
-| Authorization and Audit | ratified | `../architecture/authorization-and-audit.md` |
-| Responsible-owner eligibility | ratified | `../architecture/responsible-owner.md` |
-| Exact content / integrity / restore | ratified | `../architecture/content-integrity.md` |
-| Durable async / Search / effects | ratified | `../architecture/async-and-search.md` |
-| Canonical journeys | ratified | `../product/journeys.md` |
-| Current `/api/v1` operation census | ratified precision | `api-operation-census.md` |
-| Historical migration truth | ratified | `../architecture/transition.md` |
-| Clean-slate technical posture | ratified | `../architecture/technical-baseline.md` |
-| Backend topology | ratified | `../architecture/backend.md` |
-| Internal communication contracts | ratified | `../architecture/interfaces.md` |
-| Persistence realization | ratified | `../architecture/persistence.md` |
-| Remaining T8-F→T12 program | ratified | `stage-program.md` |
-| Cross-stage forward obligations | ratified baseline | `forward-obligations.md` |
-| Repository clean-slate reset | operator-ratified | `repository-reset.md` |
-| T8-E executable wire contract | active accepted checkpoint | `../reference/t8e-checkpoint.md` |
+| ID | Subject | Disposition | Current consequence | Owning authority / reopen source |
+|---|---|---|---|---|
+| PC | Product contract | CURRENT / APPROVED | Launch scope and Product concepts are binding | `../product/contract.md` |
+| ALIGN | Whole-product alignment | CURRENT / APPROVED | Product-wide alignment baseline is binding | `../product/alignment.md` |
+| OWN | Semantic ownership | CURRENT / APPROVED | Authentication, Organization, Authorization, Controlled Documents + supporting Audit | `../architecture/ownership.md` |
+| T1 | Domain state/invariants | CURRENT / RATIFIED | Stable semantic state/lifecycle vocabulary | `../architecture/domain-model.md` |
+| T2 | Governance/effectivity transactions | CURRENT / RATIFIED | Transaction, serialization, Release/effectivity laws | `../architecture/lifecycle.md` |
+| T3 | Authorization/Audit | CURRENT / RATIFIED | Live grant/scope/domain authorization + bounded same-commit Audit | `../architecture/authorization-and-audit.md` |
+| T3-D4 | Responsible-owner eligibility | REFINED / RATIFIED | New owner must be existing, same-Company, ENABLED User | `../architecture/responsible-owner.md` |
+| T4 | Exact content / restore | CURRENT / RATIFIED | Exact-content descriptor truth, managed-content seam, fail-closed restore | `../architecture/content-integrity.md` |
+| T5 | Async/Search/effects | CURRENT / RATIFIED | River-backed named durable effects; canonical PostgreSQL Search baseline | `../architecture/async-and-search.md` |
+| T6 | Canonical journeys | CURRENT / RATIFIED | Product/API/frontend journey semantics | `../product/journeys.md` |
+| T6-API | `/api/v1` application census | REFINED / RATIFIED PRECISION | Current census = 78 operations; no operation 79 without material reopen | `api-operation-census.md` + `../product/journeys.md` |
+| T7 | Historical migration truth | CURRENT / RATIFIED | No historical business migration required for Launch | `../architecture/transition.md` |
+| T8-A | Clean-slate technical posture | CURRENT / RATIFIED | Legacy physical shape has no survival entitlement | `../architecture/technical-baseline.md` |
+| T8-B | Backend topology | CURRENT / RATIFIED | Owner-first modular monolith realization baseline | `../architecture/backend.md` |
+| T8-C | Internal contracts | CURRENT / RATIFIED | Authority-aligned owner/resolver contract model | `../architecture/interfaces.md` |
+| T8-D | Persistence | CURRENT / RATIFIED | Owner-namespaced PostgreSQL relational core and concurrency realization | `../architecture/persistence.md` |
+| RESET | Repository clean-slate reset | CURRENT / OPERATOR-RATIFIED | Superseded implementation remains absent; required provenance stays reachable | `repository-reset.md` |
+| REPO-STD-V1 | Repository operating envelope | CURRENT ORGANIZATIONAL BASELINE / ALIGNMENT IN PROGRESS | Repository conforms to Repository Standard v1 through the active governance gate | `../roadmap.md` + `../development/documentation.md` + `../development/engineering-rules.md` |
+
+## Forward obligations
+
+The old decision corpus is intentionally not restored wholesale. Cross-stage obligations that still matter are preserved in `forward-obligations.md`:
+
+```text
+PRESERVE  21
+REOPEN     4
+DEFERRED  27
+TOTAL     52
+```
+
+`CURRENT` semantics already live in the owning authorities above. `SUPERSEDED` mechanics remain deleted unless new material evidence explicitly reopens them.
 
 ## Consumption law
 
-Remaining stages consume current semantic authorities plus `forward-obligations.md`. A stage deliberately resolves only the `REOPEN` obligations it owns, treats `PRESERVE` as proof-backed baseline evidence, and keeps `DEFERRED` as future seams without dormant implementation.
+Remaining stages:
 
-A material contradiction reopens the owning decision; it is never reconciled by silently changing this index.
+```text
+consume current owning authorities
++ consume PRESERVE as proof-backed baseline
++ deliberately decide only stage-relevant REOPEN items
++ retain DEFERRED as future seams/counterexamples
+- never inherit SUPERSEDED implementation by default
+```
 
-## Provenance
-
-Product/R10 authorities through persistence were ratified in PR #131. Their pre-reset branch remains a reachable provenance ref until equivalent immutable archival tags exist. The live tree contains only current semantic authority plus the compact forward obligations that still matter.
+Reviewer findings and historical registry rows are Evidence, not independent requirement authority. A material contradiction reopens only the owning decision it actually implicates.
