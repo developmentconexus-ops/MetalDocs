@@ -247,7 +247,7 @@ Product/R10 consolidation uses both structural mapping and normative-content che
 Required proof:
 
 1. A closed, final source-to-target map from the immutable PR #131 authority HEAD maps every accepted source authority to one or more target authorities.
-2. The source census is read with a filesystem-capable command (`grep`, `rg`, or equivalent), not `git grep` against ignored temporary files.
+2. The source census uses a filesystem traversal that includes hidden and ignored temporary source material (`rg --hidden --no-ignore`, `grep -r`, or equivalent), never `git grep` against ignored temporary files.
 3. The normative vocabulary census covers the repository's actual terms, including at least `MUST`, `SHOULD`, `MAY`, `SHALL`, `REQUIRE`, `FORBID`, `PROHIBIT`, `NEVER`, `ALWAYS`, `ONLY`, `SELECT`, `REJECT`, `BLOCKED`, and `CLOSED` where used normatively.
 4. An empty source census is failure, never parity.
 5. Any semantic contradiction found during consolidation stops the Writer; it is not silently reconciled.
