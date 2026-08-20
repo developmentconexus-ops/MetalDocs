@@ -1,7 +1,0 @@
-# Guard fixture — target architecture
-
-Deliberately declares a MUST requirement that no test cites and that the
-evidence map does not cover, so the traceability gate has nothing to point at.
-See scripts/testdata/guard-fixtures/README.md.
-
-- **REQ-FIXTURE-1** This requirement exists only to be uncovered. (MUST)

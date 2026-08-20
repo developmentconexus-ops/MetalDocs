@@ -1,60 +1,23 @@
 # MetalDocs
 
-MetalDocs e uma plataforma interna para centralizacao, versionamento, workflow e auditoria de documentos.
+MetalDocs is being rebuilt from its ratified product and architecture authorities.
 
-## Objetivo
-- Ter controle total de documentos e historico de mudancas.
-- Garantir rastreabilidade (quem fez, o que mudou, quando mudou).
-- Escalar sem reescrita estrutural.
+The previous implementation was intentionally removed from the live tree because it represented a superseded product and technical model. Git history and closed pull requests preserve that provenance.
 
-## Escopo v1
-- Cadastro de documentos e metadados.
-- Versionamento imutavel.
-- Workflow de aprovacao.
-- Busca e consulta.
-- Auditoria append-only.
-- RBAC no backend.
+## Start here
 
-## Fora de escopo v1
-- Funcionalidades de IA generativa, NLP ou agentes no produto.
-- Sugestoes automaticas baseadas em IA.
-- Qualquer processamento em runtime dependente de LLM.
+- [Documentation index](docs/index.md)
+- [Current status](docs/status.md)
+- [Repository reset decision](docs/decisions/repository-reset.md)
+- [Active work](docs/work/current/index.md)
 
-## Source of Truth (ordem de prioridade)
-1. `AGENTS.md`
-2. `docs/plans/MASTER_IMPLEMENTATION_PLAN.md`
-3. `docs/architecture/ARCHITECTURE_GUARDRAILS.md`
-4. `docs/standards/ENGINEERING_STANDARDS.md`
-5. `docs/adr/*.md`
-6. `api/openapi/v1/openapi.yaml`
+## Current posture
 
-## Documentos chave
-- Plano mestre: `docs/plans/MASTER_IMPLEMENTATION_PLAN.md`
-- Guardrails de arquitetura: `docs/architecture/ARCHITECTURE_GUARDRAILS.md`
-- Blueprint do dominio documental: `docs/architecture/DOCUMENT_DOMAIN_BLUEPRINT.md`
-- Standards de engenharia: `docs/standards/ENGINEERING_STANDARDS.md`
-- Plano do proximo ciclo de produto: `docs/plans/NEXT_PRODUCT_EXECUTION_PLAN.md`
-- Contratos internos (eventos/erros): `docs/contracts/INTERNAL_EVENTS_AND_ERRORS.md`
-- Setup dev Go: `docs/runbooks/dev-setup.md`
-- Setup manual Postgres: `docs/runbooks/postgres-manual-setup.md`
-- Security baseline (SAST): `docs/runbooks/security-baseline.md`
-- Contract baseline: `docs/runbooks/contract-baseline.md`
-- Branch protection: `docs/runbooks/branch-protection.md`
-- Release readiness: `docs/runbooks/release-readiness.md`
-- Phase 3 hardening checklist: `docs/hardening/PHASE3_RELEASE_CHECKLIST.md`
-- Architecture review (Q1): `docs/hardening/ARCHITECTURE_REVIEW_2026Q1.md`
-- Module extraction strategy: `docs/hardening/MODULE_EXTRACTION_PLAN.md`
-- Templates: `docs/templates/`
-- Prompts oficiais: `docs/prompts/`
+```text
+Product / semantic architecture through T8-D   RATIFIED
+T8-E executable API contract                   ACTIVE
+Implementation                                 BLOCKED
+Legacy implementation                          REMOVED FROM LIVE TREE
+```
 
-## Dependency Management (Go)
-- O projeto nao usa `venv` ou `requirements.txt`.
-- Dependencias sao geridas por `go.mod` e travadas em `go.sum`.
-
-## Repository Modes
-- `METALDOCS_REPOSITORY=memory` (default para desenvolvimento rapido)
-- `METALDOCS_REPOSITORY=postgres` (persistencia real)
-
-## Ambiente inicial
-- Host local: `192.168.0.3`.
-- Deploy inicial: Docker Compose single-node.
+Do not reconstruct the previous implementation from Git history unless a current ratified authority explicitly proves a reusable mechanism.

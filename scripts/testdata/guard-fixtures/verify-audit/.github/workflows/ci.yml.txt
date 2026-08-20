@@ -1,9 +1,0 @@
-# Guard fixture: a workflow that runs a check ID the registry does not define.
-# See scripts/testdata/guard-fixtures/README.md.
-name: ci
-on: [push]
-jobs:
-  verify:
-    runs-on: ubuntu-latest
-    steps:
-      - run: go run ./tools/verify --only=no-such-check-id

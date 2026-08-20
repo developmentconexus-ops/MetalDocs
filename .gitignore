@@ -1,103 +1,18 @@
-# --- Secrets (never commit) ---
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Local environment / secrets
 .env
-.env.docx-renderer
-.env.docgen-v2
+.env.*
+!.env.example
 
-# --- Build artifacts (pattern-based; no binaries in repo) ---
-*.exe
-*.exe~
-bin/
-*.tsbuildinfo
-
-# --- Logs & runtime captures (pattern-based) ---
-*.log
-*.out
-*.err
-logs/
-docx-renderer.*.log
-docgen-v2.*.log
-# Exception: vendored packages may legitimately contain a `logs/` subtree
-# (e.g. go.opentelemetry.io/proto/otlp/logs, redis maintnotifications/logs).
-# The broad `logs/` rule above must not strip them from the committed vendor tree.
-!vendor/**/logs/
-!vendor/**/logs/**
-
-# --- Local QA scratch (cookie jars, request/response captures) ---
-cookies.txt
-qa-*.txt
-qa-session.tmp
-*-payload.json
-login-response.txt
-
-# --- Caches & package stores ---
-.gocache/
-.gocache-build/
-.gomodcache/
-.pnpm-store/
-node_modules/
-frontend/apps/web/node_modules/
-apps/docgen/node_modules/
-apps/docx-renderer/node_modules/
-
-# --- Frontend build/test output ---
-frontend/apps/web/dist/
-frontend/apps/web/vite.config.js
-frontend/apps/web/vite.config.d.ts
-frontend/apps/web/test-results/
-frontend/apps/web/playwright-report/
-frontend/apps/web/.cache/
-frontend/apps/web/.tmp-main-tsc.txt
-frontend/apps/web/tmp-*.docx
-frontend/apps/web/design-source/.design-canvas.state.json
-frontend/apps/web/design-source/uploads/
-apps/docgen/dist/
-apps/docx-renderer/dist/
-apps/ck5-studio/.dev.err
-
-# --- Scratch & temp dirs ---
+# Temporary agent / build material
 .tmp/
-.tmp*
 tmp/
-tmp_*
-backups/
-non_git/
-carbone/renders/
-.clone/
-
-# --- Tooling runtime (Claude / Codex / superpowers) ---
-.claude/settings.local.json
-.claude/launch.json
-.claude/worktrees/
-.claude/scheduled_tasks.lock
-.claude/agents/
-frontend/apps/web/.claude/
-.codex/
-.codex-run/
-.codex-gocache/
-.codex-appdata/
-.codex-go-build-cache/
-.superpowers/
-.worktrees/
-memory/
-
-# --- AI session artifacts (not canonical docs) ---
-docs/superpowers/plans/
-docs/superpowers/reviews/
-reviews/
-# Canonical wiki reviews (multi-session review tracker) are NOT ignored
-!wiki/reviews/
-!wiki/reviews/**
-
-# --- Local QA scratch captures (cookies, logins, responses) ---
-scratch_qa/
-
-# --- Local env overrides ---
-.env.local
-**/.env.local
-
-# gitleaks JSON report — local triage artifact, never committed.
-.gitleaks-report.json
-
-# grype SARIF report, written by the `vuln-scan` registry check so
-# ci.yml:security can upload it. A run artifact, not a source.
-.grype.sarif
+node_modules/
+dist/
+build/
+coverage/

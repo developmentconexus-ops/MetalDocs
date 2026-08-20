@@ -1,7 +1,0 @@
-# Vendored upstream file, reproduced in the fixture tree in the form that WOULD
-# fire if discovery did not exclude vendor/: a golang builder stage older than
-# this repo's go.mod requires. `go mod vendor` overwrites anything edited here,
-# so a drift report against it is not actionable -- the exclusion is the rule,
-# and the NotWant entry is that rule's firing mechanism.
-FROM golang:1.19 AS builder
-WORKDIR /src

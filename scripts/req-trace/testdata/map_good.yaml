@@ -1,9 +1,0 @@
-entries:
-  - req: REQ-FOO-1
-    kind: commit
-    ref: abc1234
-    note: "M2 F2.1 evidence, commit abc1234"
-  - req: REQ-FOO-2
-    kind: commit
-    ref: def5678
-    note: "M3 F3.2 evidence, commit def5678"

@@ -1,7 +1,0 @@
-{
-  "verify": { "result": "success" },
-  "test-integration": { "result": "success" },
-  "security": { "result": "success" },
-  "lint-go": { "result": "success" },
-  "rogue": { "result": "success" }
-}

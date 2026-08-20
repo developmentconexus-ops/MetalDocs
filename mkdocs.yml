@@ -1,0 +1,29 @@
+site_name: MetalDocs
+site_description: MetalDocs product and architecture authority
+
+nav:
+  - Home: docs/index.md
+  - Status: docs/status.md
+  - Product:
+      - Contract: docs/product/contract.md
+      - Alignment: docs/product/alignment.md
+      - Journeys: docs/product/journeys.md
+  - Architecture:
+      - Ownership: docs/architecture/ownership.md
+      - Domain model: docs/architecture/domain-model.md
+      - Lifecycle: docs/architecture/lifecycle.md
+      - Authorization and audit: docs/architecture/authorization-and-audit.md
+      - Responsible owner: docs/architecture/responsible-owner.md
+      - Content integrity: docs/architecture/content-integrity.md
+      - Async and search: docs/architecture/async-and-search.md
+      - Transition: docs/architecture/transition.md
+      - Technical baseline: docs/architecture/technical-baseline.md
+      - Backend: docs/architecture/backend.md
+      - Interfaces: docs/architecture/interfaces.md
+      - Persistence: docs/architecture/persistence.md
+  - Decisions:
+      - Registry: docs/decisions/index.md
+      - Repository reset: docs/decisions/repository-reset.md
+  - Development:
+      - Documentation governance: docs/development/documentation.md
+      - Engineering rules: docs/development/engineering-rules.md

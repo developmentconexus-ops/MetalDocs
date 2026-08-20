@@ -1,4 +1,0 @@
-package http
-
-// Guard fixture. See scripts/testdata/guard-fixtures/README.md.
-func Status() int { return 200 }
