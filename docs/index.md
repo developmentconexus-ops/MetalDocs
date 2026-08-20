@@ -2,46 +2,44 @@
 id: documentation-index
 kind: authority
 owner: engineering
-summary: Routes humans and agents to the smallest current MetalDocs authority set.
+summary: Canonical task/intention router to the smallest current MetalDocs authority pack.
 ---
 
 # MetalDocs documentation
 
-Use this page as the documentation entrypoint.
+Start here after `AGENTS.md`, then read `roadmap.md`, then only the owning documents needed for the task.
 
-| Need | Read |
-|---|---|
-| Current stage / whether implementation is allowed | [Status](status.md) |
-| Product scope and concepts | [Product contract](product/contract.md) |
-| Whole-product alignment | [Product alignment](product/alignment.md) |
-| Canonical user/API journeys | [Product journeys](product/journeys.md) |
-| Current `/api/v1` operation census | [API operation census](decisions/api-operation-census.md) |
-| Semantic owners | [Ownership](architecture/ownership.md) |
-| Domain concepts and invariants | [Domain model](architecture/domain-model.md) |
-| Governance/effectivity transactions | [Lifecycle](architecture/lifecycle.md) |
-| Authorization and Audit | [Authorization and audit](architecture/authorization-and-audit.md) |
-| Responsible-owner eligibility | [Responsible owner](architecture/responsible-owner.md) |
-| Exact content / integrity / restore | [Content integrity](architecture/content-integrity.md) |
-| Durable jobs and Search | [Async and search](architecture/async-and-search.md) |
-| Migration/compatibility posture | [Transition](architecture/transition.md) |
-| What may be reused from removed implementation | [Technical baseline](architecture/technical-baseline.md) |
-| Backend target topology | [Backend](architecture/backend.md) |
-| Internal owner contracts | [Interfaces](architecture/interfaces.md) |
-| Persistence realization | [Persistence](architecture/persistence.md) |
-| Remaining T8-F→T12 stage ownership | [Stage program](decisions/stage-program.md) |
-| Preserved future/reopen constraints | [Forward obligations](decisions/forward-obligations.md) |
-| Decision routing | [Decision registry](decisions/index.md) |
-| Why the legacy repository was removed | [Repository reset](decisions/repository-reset.md) |
-| Repository documentation rules | [Documentation governance](development/documentation.md) |
-| Engineering / PR / review rules | [Engineering rules](development/engineering-rules.md) |
-| Paused accepted T8-E checkpoint | [T8-E checkpoint](reference/t8e-checkpoint.md) |
-
-## Active Draft work
-
-`docs/work/current/` is temporary and exists only while a governed Draft PR is under review. `AGENTS.md` routes to it conditionally when the directory exists; durable navigation never depends on it.
+| Task / intention | Start with | Do not read by default |
+|---|---|---|
+| Current stage, gate, implementation permission, next action | [Roadmap](roadmap.md) | Git history, closed PRs, old implementation |
+| Product scope and concepts | [Product contract](product/contract.md) | Technical realization docs |
+| Whole-product alignment / ownership | [Product alignment](product/alignment.md) + [Ownership](architecture/ownership.md) | Historical review artifacts |
+| User journeys / application API meaning | [Product journeys](product/journeys.md) + [API operation census](decisions/api-operation-census.md) | Removed OpenAPI/generated code |
+| Domain state / invariants | [Domain model](architecture/domain-model.md) | Runtime archaeology |
+| Governance / effectivity / transactions | [Lifecycle](architecture/lifecycle.md) | Old Approval implementation |
+| Authorization / Audit | [Authorization and audit](architecture/authorization-and-audit.md) | Provider roles / old ACL machinery |
+| Exact content / restore | [Content integrity](architecture/content-integrity.md) | Removed storage-provider contracts |
+| Durable jobs / Search | [Async and search](architecture/async-and-search.md) | Old jobs registry |
+| Technical clean-slate / reuse decision | [Technical baseline](architecture/technical-baseline.md) | Legacy source unless the reuse gate requires it |
+| Backend topology | [Backend](architecture/backend.md) | Removed package tree |
+| Internal owner contracts | [Interfaces](architecture/interfaces.md) | Foreign-SQL legacy evidence unless named |
+| Persistence realization | [Persistence](architecture/persistence.md) | Old migrations/schema |
+| Transition / migration posture | [Transition](architecture/transition.md) | Old cutover plans |
+| Current decisions / forward obligations | [Decision register](decisions/index.md) | Review chronology |
+| Repository reset / provenance | [Repository reset](decisions/repository-reset.md) | Unmerged branches unless exact provenance is required |
+| Documentation governance | [Documentation rules](development/documentation.md) | Product architecture |
+| Repository-local engineering / CI / Git | [Engineering rules](development/engineering-rules.md) | Global Method text duplicated locally |
+| Accepted T8-E design checkpoint | [T8-E checkpoint](reference/t8e-checkpoint.md) | Conversation history / old OpenAPI |
 
 ## Reading law
 
-Routine work should normally require this index, current status, and 1–3 owning authorities. Any `wiki/...` path embedded inside a carried pre-reset authority is provenance only and MUST NOT be followed as current routing. Current routing is defined by this index, `status.md`, and `decisions/index.md`.
+Default fresh-actor route:
 
-Git history, closed PRs, and removed implementation are provenance only unless a current authority explicitly requests them as evidence.
+```text
+AGENTS.md
+→ docs/index.md
+→ docs/roadmap.md
+→ 1–2 task authorities
+```
+
+Normal work stays at five files or fewer. Exceed that only for a named material reason. `docs/work/**`, research/evidence/history, Git history, and removed implementation are never default-read.
