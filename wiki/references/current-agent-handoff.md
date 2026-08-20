@@ -1,7 +1,7 @@
 # Current Agent Handoff
 
-> **Last verified:** 2026-08-19  
-> **Status:** ACTIVE — **T1→T8-C CLOSED / OPERATOR-RATIFIED; T8-D ACTIVE / ROUND-1 REVIEW + LEAD ADJUDICATION COMPLETE / ADJUDICATED CORRECTED CANDIDATE MATERIALIZED / BOUNDED FABLE ROUND 2 NEXT; T8-E→T12 NOT OPEN; IMPLEMENTATION BLOCKED**  
+> **Last verified:** 2026-08-20  
+> **Status:** ACTIVE — **T1→T8-C CLOSED / OPERATOR-RATIFIED; T8-D ACTIVE / BOTH FABLE PASSES COMPLETE / FINAL LEAD ADJUDICATION MATERIALIZED / FINAL OPERATOR RATIFICATION NEXT; T8-E→T12 NOT OPEN; IMPLEMENTATION BLOCKED**  
 > **Branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131
 
 ## Fresh-session route
@@ -17,21 +17,10 @@ Read in this order:
 7. Decision Registry + amendments through T8-C
 8. `wiki/architecture/r10-post-t6-implementation-readiness-program.md`
 9. `wiki/architecture/r10-technical-realization-reconciliation-baseline.md`
-10. `docs/superpowers/analysis/2026-08-19-r10-t8d-persistence-realization-bootstrap.md`
-11. original T8-D candidate
-12. Round-1 independent Fable review
-13. adjudicated corrected T8-D candidate — active Round-2 input
-14. current schema/migrations/SQL/code only when a concrete T8-D evidence/reuse claim needs them
+10. T8-D staging chain below
+11. current schema/migrations/SQL/code only for a concrete evidence/reuse claim
 
-Exact staging paths:
-
-```text
-docs/superpowers/analysis/2026-08-19-r10-t8d-persistence-realization-global-maximum-candidate.md
-docs/superpowers/analysis/2026-08-19-r10-t8d-persistence-realization-independent-fable-review.md
-docs/superpowers/analysis/2026-08-19-r10-t8d-persistence-realization-adjudicated-corrected-candidate.md
-```
-
-Do not route target design through superseded/historical architecture or current table/repository existence. Reviewer output and T8-D staging remain non-authoritative.
+Current implementation proves what exists, not what survives. Staging/reviewer artifacts are not authority.
 
 ## Current checkpoint
 
@@ -40,10 +29,9 @@ Product Contract                         REV001 / OPERATOR-APPROVED
 Whole-Product GCR / 4+1 ownership       CLOSED / OPERATOR-APPROVED
 T1→T8-C                                  CLOSED / OPERATOR-RATIFIED
 Decision Registry                        CURRENT + amendments through T8-C
-Post-T6 Stage-Decomposition GCR          OPERATOR-RATIFIED
 TRRB                                     CLOSED / OPERATOR-RATIFIED / PROMOTED
 
-T8-D                                     ACTIVE / CORRECTED CANDIDATE / BOUNDED ROUND 2 NEXT
+T8-D                                     ACTIVE / FINAL OPERATOR RATIFICATION NEXT
 T8-E                                     NOT OPEN
 T8-F                                     NOT OPEN
 T8-G                                     NOT OPEN
@@ -55,30 +43,25 @@ T12                                      NOT OPEN
 implementation                           BLOCKED
 ```
 
-## Binding execution law
+## Binding execution/reference law
 
 > **No Writer task may contain a material architecture decision that should have been decided before execution.**
 
-## Reference-backed decision law
+For material technical decisions:
 
 ```text
 MetalDocs semantic/product authority
 → DevelopmentConexus Engineering Method
 → current repository evidence
-→ primary/current standards and official tool/library documentation
-→ relevant reference products/patterns as falsification evidence
+→ primary/current standards + exact pinned library evidence
 → credible alternatives + Global Maximum
 → proof/adversarial review
 → operator ratification
 ```
 
+Reference evidence informs mechanism feasibility; it never creates Product requirements.
+
 ## Durable baseline through T8-C
-
-T7:
-
-```text
-NO HISTORICAL BUSINESS MIGRATION REQUIRED FOR LAUNCH
-```
 
 T8-A:
 
@@ -86,7 +69,6 @@ T8-A:
 CLEAN-SLATE PHYSICAL TARGET FREEDOM
 + SELECTIVE PROOF-BACKED MECHANISM REUSE
 - LEGACY SHAPE INHERITANCE
-- FULL-GREENFIELD PURITY RESET WITHOUT EVIDENCE
 ```
 
 T8-B:
@@ -95,10 +77,20 @@ T8-B:
 ONE GO MODULE
 + OWNER-FIRST MODULAR MONOLITH
 + ONE IMPORTABLE PUBLIC SURFACE PER SEMANTIC OWNER
-+ STATELESS APPLICATION ORCHESTRATION
-+ TRANSPORT -> APPLICATION AS SOLE SEMANTIC INBOUND DOOR
++ STATELESS APPLICATION LEAF ORCHESTRATION
++ ONE SEMANTIC INBOUND DOOR THROUGH APPLICATION
 + NON-SEMANTIC PLATFORM MECHANISMS
-+ CLOSED-WORLD DEFAULT-DENY DEPENDENCY GRAPH
++ CLOSED-WORLD / DEFAULT-DENY FIRST-PARTY DEPENDENCY GRAPH
+```
+
+Semantic homes remain exactly:
+
+```text
+Authentication
+Organization
+Authorization
+Controlled Documents
+Audit
 ```
 
 T8-C:
@@ -107,25 +99,79 @@ T8-C:
 AUTHORITY-ALIGNED HYBRID CONTRACT MODEL
 ```
 
-Key T8-C laws consumed by T8-D:
+Key T8-C laws consumed by final T8-D staging:
 
 ```text
-database/sql family txscope
+database/sql transaction family
 PostgreSQL READ COMMITTED posture
-owner-private SQL only
-same-Scope Audit
-Authorization sole final ALLOW/default-DENY
-protected User eligibility serialization
-owner VersionToken / WorkingContent OCC
+application owns txscope lifecycle
+owner-private SQL only; no owner imports/cross-owner SQL
+same-Scope required Audit
+Authorization final ALLOW/default-DENY
+ProtectedSecuritySubjectIn serializes enabled User against offboarding
+owner VersionToken + WorkingContent generation OCC
+GROUP snapshot freezes in same Scope; empty stays empty
 ManagedContent create-once + AdmissionClaims + two-phase GC
-required River intent in same semantic commit
-Idempotency same-key race must not poison Scope
-ReplaySnapshot versioned/self-contained/PII-free/snapshot-only
+required OfficialRendition River intent shares semantic commit
+same-key idempotency race must not poison Scope
+ReplaySnapshot self-contained / PII-free / snapshot-only
 ```
 
-## T8-D Round-1 result
+## T8-D staging chain
 
-Original candidate class:
+```text
+original candidate
+  docs/superpowers/analysis/2026-08-19-r10-t8d-persistence-realization-global-maximum-candidate.md
+
+Round-1 independent Fable review
+  docs/superpowers/analysis/2026-08-19-r10-t8d-persistence-realization-independent-fable-review.md
+
+adjudicated corrected candidate
+  docs/superpowers/analysis/2026-08-19-r10-t8d-persistence-realization-adjudicated-corrected-candidate.md
+
+bounded Round-2 Fable delta review
+  docs/superpowers/analysis/2026-08-19-r10-t8d-persistence-realization-corrected-candidate-fable-delta-review.md
+
+FINAL LEAD ADJUDICATION / ACTIVE RATIFICATION INPUT
+  docs/superpowers/analysis/2026-08-20-r10-t8d-persistence-realization-final-lead-adjudication.md
+```
+
+Effective final staging candidate:
+
+```text
+original candidate
++ adjudicated corrected overlay
++ final Lead adjudication overlay
+```
+
+## Review convergence
+
+```text
+Round 1:
+  APPROVE WITH MATERIAL FIXES
+  BLOCKER 2 / MAJOR 11 / LOW 10
+  Global Maximum CONFIRMED
+
+Round 2:
+  APPROVE CORRECTED DELTA WITH MATERIAL FIXES
+  BLOCKER 0 / MAJOR 7 / LOW 6
+  BOTH Round-1 blockers CLOSED
+  Global Maximum CONFIRMED
+  upstream reopen NO
+  stage trespass NO
+  third review round NOT REQUIRED
+
+Final Lead:
+  7/7 Round-2 MAJORs adjudicated/closed in staging
+  6/6 Round-2 LOWs adjudicated/closed in staging
+  surviving material contradiction 0
+```
+
+No T1→T7, T8-B or T8-C reopen is proposed.
+
+## Final selected T8-D posture
+
+Global Maximum:
 
 ```text
 OWNER-NAMESPACED POSTGRESQL RELATIONAL CORE
@@ -136,114 +182,53 @@ OWNER-NAMESPACED POSTGRESQL RELATIONAL CORE
 + IDENTITY-ONLY CROSS-OWNER REFERENTIAL INTEGRITY
 + TRANSACTIONAL KEY↔REPLAY COMPLETION
 + THIRD-PARTY RIVER SCHEMA ISOLATION
-+ SELECTIVE PROOF-BACKED PROPERTY REUSE
++ PROOF-BACKED SELECTIVE LEGACY PROPERTY REUSE
+- LEGACY PHYSICAL SHAPE INHERITANCE
+- GENERIC PERSISTENCE FRAMEWORKS
+- DUPLICATE CURRENT TRUTH
 ```
 
-Independent Fable Round 1:
+Final adjudicated precision includes:
 
 ```text
-APPROVE WITH MATERIAL FIXES
-BLOCKER 2
-MAJOR 11
-LOW 10
-Global Maximum CONFIRMED
-upstream reopen NO
-stage trespass NO
-```
-
-Publication delta from reviewed candidate HEAD was exactly one review artifact.
-
-## Lead adjudication — operator approved
-
-```text
-B1 River PG16 / ownership         ACCEPT
-B2 attach-vs-GC                   ACCEPT
-M1 frozen candidate FK            ACCEPT
-M2 immutable malware proof        ACCEPT
-M3 provider subject uniqueness    ACCEPT WITH NARROWING
-M4 User lock ordering             ACCEPT
-M5 transaction census             ACCEPT
-M6 GovernanceAttempt uniqueness   ACCEPT
-M7 Company/company_id subtraction REJECT
-M8 Go<->DDL vocabulary parity     ACCEPT
-M9 idempotency cleanup order      ACCEPT
-M10 HMAC fingerprint              ACCEPT
-M11 DB trust classes/proof role   ACCEPT
-```
-
-No T1→T7, T8-B or T8-C reopen is proposed.
-
-## Corrected T8-D staging — active Round-2 input
-
-For bounded Round 2:
-
-```text
-effective corrected candidate
-=
-original candidate
-+ adjudicated corrected candidate overlay
-
-where conflict exists, overlay controls staging
-```
-
-Material corrections:
-
-```text
-River schema created/provisioned outside serving; owner != runtime
-River self-REINDEX OFF under PG16 floor
-river.* classified THIRD_PARTY_MANAGED
-
-semantic managed-content reference write takes managed_content FOR SHARE
-GC phase 1/2 take managed_content FOR UPDATE
-
-GovernanceDecision composite FK -> frozen candidate snapshot
-immutable insert-only platform.malware_inspections
-provider issuer+subject unique only while current
-actor/target User rows acquired as one sorted lock class
-complete T6 mutation/transaction census
-one GovernanceAttempt per governed subject
-Company singleton + current semantic company_id retained; no RLS/tenant substrate
-blocking static-Go <-> DDL vocabulary parity proof
-idempotency retention DELETE Replay then Key
-HMAC-SHA-256 semantic fingerprint + fingerprint key version
-provisioner / owner / runtime / CI DB trust classes
-accepted constraint/proof LOW corrections
-```
-
-## Bounded Round-2 scope
-
-Round 2 must attack only the corrected material delta unless a correction exposes a new contradiction.
-
-Required explicit verdicts:
-
-```text
-both Round-1 blockers actually closed?
-new/surviving BLOCKER / MAJOR / LOW?
-Global Maximum still confirmed?
-M7 Lead rejection technically sustainable?
-River v0.37.1 + PG16 privilege model coherent?
-attach-vs-GC race closed on every semantic reference path?
-HMAC fingerprint privacy/equality law coherent?
-malware proof remains mechanism-only and immutable?
-lock ordering free of architecture-induced cycles?
-operation census complete?
-T8-C reopen?
-T8-B/T1→T7 reopen?
-T8-E/F/G/T10/T11 trespass?
-another review round materially required?
-final Lead adjudication may proceed?
+schemas authn / org / authz / controlled_docs / audit / platform / river
+fully-qualified owner-private SQL
+PostgreSQL-16-compatible persistence floor
+static Role/Permission; persisted RoleAssignment
+no Launch RLS/tenant substrate
+explicit BIGINT VersionToken + WorkingContent generation
+Revision.state canonical lifecycle + immutable Release evidence
+closed relational governance + structural frozen-candidate FK
+immutable managed-content descriptor + immutable malware evidence
+semantic attach FOR SHARE vs GC FOR UPDATE
+GC downstream proofs non-locking
+AdmissionClaim reserve at claim-bound OPEN allocation
+Area lifecycle serialization
+paired Idempotency Key↔Replay + HMAC fingerprint drain law
+River self-REINDEX OFF; runtime never owner
+provisioner / owner / runtime / verifier trust classes + grant parity proof
+Company singleton fail-closed no-isolation interlock; semantic company_id retained
+backup-pin acquire/release locking contract
+closed vocabulary ↔ DDL CHECK equality obligation; execution in T9
+zero semantic lifecycle triggers baseline
 ```
 
 ## Exact next action
 
 ```text
-BOUNDED FABLE ROUND 2
-→ final Lead adjudication
-→ explicit operator ratification
-→ only then durable T8-D promotion
-→ only then T8-E opens
+EXPLICIT OPERATOR RATIFICATION OF FINAL T8-D EFFECTIVE STAGING CANDIDATE
 ```
 
-Do **not** start migrations, code, T8-E or implementation planning from this staging chain.
+Do not perform durable promotion until the operator explicitly ratifies.
+
+After ratification only:
+
+```text
+consolidate one durable T8-D authority
+append Decision Registry T8-D amendment
+tombstone/retire T8-D staging artifacts with Git history preserved
+mark T8-D CLOSED / OPERATOR-RATIFIED / PROMOTED
+open T8-E Executable Wire Contract
+```
 
 Implementation remains **BLOCKED**.
