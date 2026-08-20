@@ -3,16 +3,16 @@ id: work-repository-information-architecture
 kind: work
 status: active
 owner: architecture
-summary: Defines the proposed docs-only information architecture, agent context model, review protocol, PR lifecycle, and legacy-deletion strategy for MetalDocs.
+summary: Proposes the docs-only information architecture, agent context model, review protocol, PR lifecycle, and legacy-deletion strategy for MetalDocs.
 ---
 
 # Repository documentation and agent context architecture
 
-> **Non-authoritative proposal.** This file exists only while the repository-governance change is under review. It must be deleted before the final PR is merged.
+> **Non-authoritative proposal.** Delete this file before the final governance PR is merged.
 
-## 1. Decision requested
+## 1. Decision
 
-Adopt a single documentation root and rebuild the repository's live documentation around stable subjects rather than historical stages, dates, review rounds, or implementation modules.
+Rebuild the live documentation around stable subjects rather than historical stages, dates, review rounds, or current implementation modules.
 
 ```text
 ONE docs/ ROOT
@@ -50,21 +50,26 @@ live-tree archives
 duplicated status and authority
 ```
 
-## 2. Evidence and root cause
-
-The current R10 PR is a useful provenance source, but it has become an unsafe unit of continued work:
+Method outcome:
 
 ```text
-PR #131
+RESTRUCTURE NOW
+```
+
+Updating a few indexes would preserve the defect class.
+
+## 2. Root cause and invariants
+
+PR #131 is valuable provenance, but it is no longer a safe continuing workspace:
+
+```text
 575 commits
 1,018 changed files
 39,173 additions
 128,852 deletions
 ```
 
-The live tree also contains multiple entry points that repeat or disagree about current status, while completed candidates, reviews, adjudications, tombstones, old roadmaps, module pages, and historical milestone trees remain searchable beside current authority.
-
-The root cause is not merely a large number of files. It is that the live repository performs three incompatible jobs at once:
+The live repository currently performs three incompatible jobs:
 
 ```text
 current maintained truth
@@ -74,63 +79,42 @@ active working material
 historical archive
 ```
 
-This forces humans and agents to reconstruct authority from filenames and chronology. It increases token use, stale-context risk, Git conflicts, and the probability of implementing from an internally coherent but superseded document.
+That forces humans and agents to infer authority from filenames and chronology, increasing token use, stale-context risk, Git conflicts, and wrong-target implementation.
 
-## 3. Target invariants
-
-The restructured repository must keep these properties true:
+The replacement must guarantee:
 
 1. One meaning has one current authority.
-2. A new agent can locate the right document without knowing R10 stage codes.
-3. Routine orientation requires a small deterministic read set.
-4. Historical provenance remains available in Git and closed PRs, not in the live tree.
-5. Work-in-progress cannot be confused with durable authority.
+2. A reader can find that authority without knowing R10 stage codes.
+3. Routine orientation uses a small deterministic read set.
+4. Work-in-progress cannot be mistaken for durable truth.
+5. Git and closed PRs preserve history; the live tree does not.
 6. Review artifacts cannot survive merge accidentally.
-7. Current runtime documentation is retained only when a named current consumer still needs it.
-8. No accepted Product/R10 decision is lost during consolidation.
-9. The reorganization changes documentation and governance only; it does not authorize product implementation.
-10. The structure can be reused as a DevelopmentConexus repository profile without centralizing each product's truth.
+7. Current-runtime documentation survives only for a named current consumer.
+8. No operator-ratified Product/R10 decision is lost.
+9. The reorganization changes documentation/governance only and authorizes no product implementation.
+10. The repository profile remains reusable by other Conexus products without centralizing their truth.
 
-## 4. Industry-aligned basis
+## 3. Industry-aligned basis
 
-This design deliberately reuses established documentation practices rather than inventing a MetalDocs-specific archive system.
+This design reuses established documentation practices:
 
-### Docs as code
+- Backstage TechDocs: Markdown beside code, repository-root `docs/`, `docs/index.md`, and `mkdocs.yml` navigation.
+- arc42: architecture docs as plain-text docs-as-code, Git versioning, pull-request review, optional static publishing.
+- Diátaxis: organize by reader need rather than the history of the team that produced the document.
+- GitHub agent instructions: keep repository-wide instructions bounded and use path-specific instructions only where local context genuinely differs.
 
-Backstage TechDocs uses a repository-root `docs/` directory, `docs/index.md` as the entry point, and `mkdocs.yml` for navigation. It keeps Markdown beside code and updates it through ordinary Git and pull-request workflows.
+Primary references:
 
 - https://backstage.io/docs/features/techdocs/
 - https://backstage.io/docs/features/techdocs/creating-and-publishing/
-
-arc42 recommends architecture documentation as plain-text docs-as-code, stored beside source, diffed in Git, reviewed through pull requests, and published with a static-site generator when useful.
-
 - https://arc42.org/documentation/
-
-### Reader-oriented information architecture
-
-Diátaxis separates documentation by reader need—explanation, reference, how-to, and tutorial—rather than by the internal history of the team that produced it.
-
 - https://diataxis.fr/
-
-MetalDocs does not need to copy Diátaxis folder-for-folder. It does use the core separation:
-
-```text
-product/architecture explanation and authority
-reference facts
-how-to development and operations guides
-active work kept separately
-```
-
-### Agent instructions
-
-GitHub supports repository-wide and path-specific agent instructions, including `AGENTS.md`, and recommends path-specific instructions when context applies only to one area. This supports a short root bootstrap instead of loading all repository policy into every task.
-
 - https://docs.github.com/en/copilot/how-tos/configure-custom-instructions-in-your-ide/add-repository-instructions-in-your-ide
 - https://docs.github.com/en/copilot/concepts/prompting/response-customization
 
-These references are implementation evidence and design guidance. They do not create MetalDocs product requirements.
+These references inform the mechanism. They do not create MetalDocs product requirements.
 
-## 5. One documentation root
+## 4. One documentation root
 
 Select:
 
@@ -138,7 +122,7 @@ Select:
 docs/
 ```
 
-Delete after parity proof:
+Delete after authority and consumer parity is proven:
 
 ```text
 wiki/
@@ -147,7 +131,7 @@ docs/operator/
 repository-local archive/tombstone trees
 ```
 
-Files with platform-defined locations remain at repository root when applicable:
+Platform-defined files may remain at the root:
 
 ```text
 README.md
@@ -160,11 +144,7 @@ mkdocs.yml
 .github/*
 ```
 
-### Why `docs/`
-
-`docs/` is immediately recognizable to people, GitHub tooling, MkDocs, and Backstage TechDocs. Keeping both `docs/` and `wiki/` creates an avoidable authority question. The target makes that question unrepresentable.
-
-## 6. Target tree
+## 5. Target information architecture
 
 ```text
 MetalDocs/
@@ -172,17 +152,14 @@ MetalDocs/
 ├── AGENTS.md
 ├── CLAUDE.md
 ├── mkdocs.yml
-│
 └── docs/
     ├── index.md
     ├── status.md
-    │
     ├── product/
     │   ├── index.md
     │   ├── contract.md
     │   ├── journeys.md
     │   └── glossary.md
-    │
     ├── architecture/
     │   ├── index.md
     │   ├── overview.md
@@ -201,27 +178,22 @@ MetalDocs/
     │   ├── frontend.md
     │   ├── runtime.md
     │   └── transition.md
-    │
     ├── decisions/
     │   ├── index.md
     │   └── adr-0001-short-title.md
-    │
     ├── development/
     │   ├── index.md
     │   ├── setup.md
     │   ├── testing.md
     │   ├── verification.md
     │   └── contributing.md
-    │
     ├── operations/
     │   ├── index.md
     │   └── runbooks/
-    │
     ├── reference/
     │   ├── index.md
     │   ├── repository-map.md
     │   └── configuration.md
-    │
     └── work/
         └── current/
             ├── index.md
@@ -229,11 +201,11 @@ MetalDocs/
             └── ai-dialog.md
 ```
 
-Only files with a real consumer survive. Empty folders and speculative documents are not created merely because they appear in this target map.
+This is a placement model, not a requirement to create empty pages. Every surviving file needs a current consumer and unique meaning.
 
-## 7. Stable naming law
+## 6. Naming and metadata
 
-Durable filenames describe the subject, not the process that produced the content.
+Durable filenames describe stable subjects.
 
 Use:
 
@@ -256,13 +228,7 @@ amendment/tombstone
 legacy/historical
 ```
 
-Exceptions are allowed only when time or numbering is the identity of the document:
-
-```text
-ADR numbers
-incident dates
-release notes
-```
+Exceptions are explicit for ADR numbers, incident dates, and release notes.
 
 Examples:
 
@@ -281,11 +247,7 @@ r10-t8d-persistence-realization.md
 2026-08-20-final-api-candidate.md
 ```
 
-Versions, status, provenance, and review dates belong in frontmatter, the owning decision index, PRs, and Git history—not in stable paths.
-
-## 8. Document classes and metadata
-
-Every live Markdown document under `docs/` has minimal frontmatter:
+Every live Markdown page under `docs/` has minimal frontmatter:
 
 ```yaml
 ---
@@ -300,156 +262,89 @@ summary: Defines the target relational model, constraints, and concurrency rules
 Closed vocabularies:
 
 ```text
-kind:
-  authority
-  guide
-  reference
-  work
-
-status:
-  current
-  active
+kind: authority | guide | reference | work
+status: current | active
 ```
 
-The live tree does not retain documents with status:
+The live tree does not retain `legacy`, `historical`, `superseded`, or `tombstone` documents. Replacement means repairing links and deleting the previous page; Git retains its history.
 
-```text
-legacy
-historical
-superseded
-tombstone
-closed-candidate
-```
+## 7. Authority and navigation
 
-When a page is replaced:
+Sole owners:
 
-```text
-promote replacement
-→ repair links/navigation
-→ delete replaced page
-→ rely on Git history
-```
-
-## 9. Authority map
-
-| Meaning | Sole current authority |
+| Meaning | Authority |
 |---|---|
 | Current project/stage status | `docs/status.md` |
 | Documentation discovery | `docs/index.md` |
-| Product boundary and launch contract | `docs/product/contract.md` |
-| User/system journeys | `docs/product/journeys.md` |
+| Product boundary | `docs/product/contract.md` |
+| Product journeys | `docs/product/journeys.md` |
 | Semantic ownership | `docs/architecture/ownership.md` |
-| Domain state and invariants | `docs/architecture/domain-model.md` |
+| Domain state/invariants | `docs/architecture/domain-model.md` |
 | Lifecycle/effectivity | `docs/architecture/lifecycle.md` |
 | Authorization | `docs/architecture/authorization.md` |
 | Audit | `docs/architecture/audit.md` |
 | Exact content/storage/restore | `docs/architecture/content-integrity.md` |
-| Async effects and Search | `docs/architecture/async-and-search.md` |
+| Async effects/Search | `docs/architecture/async-and-search.md` |
 | Backend topology | `docs/architecture/backend.md` |
-| Internal communication contracts | `docs/architecture/interfaces.md` |
+| Internal contracts | `docs/architecture/interfaces.md` |
 | Persistence | `docs/architecture/persistence.md` |
-| Executable API contract | `docs/architecture/api.md` |
+| Executable API | `docs/architecture/api.md` |
 | Frontend realization | `docs/architecture/frontend.md` |
-| Runtime/deployment realization | `docs/architecture/runtime.md` |
+| Runtime/deployment | `docs/architecture/runtime.md` |
 | Transition/cutover | `docs/architecture/transition.md` |
 | Compact decision registry | `docs/decisions/index.md` |
 | Active proposal | `docs/work/current/proposal.md` |
-| Lead↔Fable review dialogue | `docs/work/current/ai-dialog.md` |
-| Historical process | Git commits and closed PRs |
+| Lead↔Fable dialogue | `docs/work/current/ai-dialog.md` |
+| Historical process | Git and closed PRs |
 
-Indexes point; they do not duplicate the owned decision prose.
+`docs/index.md` maps reader intent to the owning page. `mkdocs.yml` publishes only durable documentation; `docs/work/` is excluded.
 
-## 10. R10 consolidation map
+Indexes point to authorities and do not repeat their decision prose.
 
-The existing stage files are source material for consolidation, not target paths.
+## 8. R10 consolidation
 
-| Existing authority family | Target destination |
+Existing stage documents are source material, not target paths.
+
+| Existing family | Target |
 |---|---|
 | Product Contract | `product/contract.md` |
-| Whole-Product GCR conclusions | merge into owning product/architecture pages; delete review artifact |
+| Whole-Product review conclusions | merge into owning pages; delete review artifact |
 | Ownership topology | `architecture/ownership.md` |
-| T1 semantic state | `architecture/domain-model.md` |
-| T2 lifecycle/effectivity | `architecture/lifecycle.md` |
-| T3 authorization and audit | split into `authorization.md` and `audit.md` |
-| T4 exact content/storage/restore | `content-integrity.md` |
-| T5 async/Search/effects | `async-and-search.md` |
-| T6 journeys/API | split into `product/journeys.md` and `architecture/api.md` |
-| T7 migration truth | `architecture/transition.md` |
-| T8-A disposition conclusions | merge into `transition.md` and relevant target pages; delete census staging |
-| T8-B backend topology | `architecture/backend.md` |
-| T8-C communication contracts | `architecture/interfaces.md` |
-| T8-D persistence | `architecture/persistence.md` |
-| T8-E accepted work | continue in `work/current/proposal.md`, then promote to `architecture/api.md` |
-| Registry + amendments | one compact `decisions/index.md` |
+| T1 | `architecture/domain-model.md` |
+| T2 | `architecture/lifecycle.md` |
+| T3 | `architecture/authorization.md` + `architecture/audit.md` |
+| T4 | `architecture/content-integrity.md` |
+| T5 | `architecture/async-and-search.md` |
+| T6 | `product/journeys.md` + `architecture/api.md` |
+| T7 | `architecture/transition.md` |
+| T8-A | merge surviving conclusions into target/transition pages; delete census staging |
+| T8-B | `architecture/backend.md` |
+| T8-C | `architecture/interfaces.md` |
+| T8-D | `architecture/persistence.md` |
+| T8-E accepted checkpoint | fresh `work/current/proposal.md`, then `architecture/api.md` |
+| Registry amendments | one `decisions/index.md` |
 | Router | `status.md` |
-| Agent handoff | `work/current/index.md` |
+| Handoff | `work/current/index.md` |
 
-Stage boundaries remain in decision provenance. They do not determine the information architecture.
+Stage identifiers remain in PR/decision provenance. They do not remain the documentation navigation model.
 
-## 11. Index and navigation
+## 9. Agent context model
 
-### `docs/index.md`
-
-The landing page is task-oriented:
-
-| I need to know… | Read |
-|---|---|
-| Where the project is now | `status.md` |
-| What belongs to the product | `product/contract.md` |
-| Which journeys must work | `product/journeys.md` |
-| Who owns each meaning | `architecture/ownership.md` |
-| How lifecycle works | `architecture/lifecycle.md` |
-| How authorization works | `architecture/authorization.md` |
-| How persistence works | `architecture/persistence.md` |
-| What the API contract is | `architecture/api.md` |
-| How to run or verify the repository | `development/index.md` |
-| What proposal is active | `work/current/index.md` |
-
-### `mkdocs.yml`
-
-`mkdocs.yml` declares the durable published navigation. `docs/work/` is excluded from published navigation.
-
-Build verification must fail when:
-
-```text
-a durable page is orphaned
-an internal link is broken
-navigation references a missing page
-a work artifact is published
-```
-
-Adopting the directory and navigation format does not require deploying Backstage now. It preserves compatibility with MkDocs/TechDocs while remaining useful as plain Markdown in GitHub.
-
-## 12. Agent context model
-
-### Root `AGENTS.md`
-
-The root file is a bootstrap/router only. It contains:
+Root `AGENTS.md` is a short bootstrap/router containing only:
 
 ```text
 repository purpose
-read docs/index.md
-read docs/status.md when status matters
-read docs/work/current/index.md only for active governed work
-how to locate task-specific authority
+docs/index.md entrypoint
+docs/status.md when current stage matters
+docs/work/current/index.md for active governed work
+task-specific authority lookup
 build/test/verify commands
-stable Git and security rules
+stable Git/security rules
 canonical Method pointer for material decisions
 short Fable protocol pointer
 ```
 
-It does not contain:
-
-```text
-R10 stage summaries
-decision ledgers
-architecture prose
-review history
-Fable prompts
-lists of every document
-```
-
-### Path-specific instructions
+It does not copy architecture, stage summaries, decision ledgers, review history, or prompts.
 
 Default:
 
@@ -457,58 +352,40 @@ Default:
 one root AGENTS.md
 ```
 
-A nested `AGENTS.md` is introduced only after repeated evidence proves that one path requires materially different instructions. Path-specific guidance must never duplicate global architecture authority.
+Nested `AGENTS.md` files require repeated evidence of genuinely path-specific needs. `CLAUDE.md` remains a minimal pointer to `AGENTS.md` with no independent authority.
 
-### `CLAUDE.md`
-
-Retain the current minimal pattern:
+Routine orientation becomes:
 
 ```text
-Read AGENTS.md first.
-This file has no independent authority.
+AGENTS.md
+→ docs/index.md
+→ one status/work pointer when relevant
+→ 1–3 task-specific authorities
+→ concrete code evidence only as needed
 ```
 
-## 13. Active work protocol
+## 10. Active work and Fable
 
-A repository has at most one active governed architecture proposal in:
+A governed architecture PR maintains one active proposal in:
 
 ```text
-docs/work/current/
+docs/work/current/proposal.md
 ```
 
-### `index.md`
+It is edited in place. Do not create permanent candidates, corrected candidates, review requests, delta reviews, adjudications, or tombstones.
 
-Contains only:
+`docs/work/current/index.md` contains only:
 
 ```text
-gate/topic
+topic/gate
 branch and PR
 expected HEAD — revalidate
 proposal path
-current checkpoint
-open questions
+checkpoint/open questions
 exact next action
 ```
 
-### `proposal.md`
-
-One coherent proposal, edited in place until convergence.
-
-Do not create:
-
-```text
-candidate-1.md
-corrected-candidate.md
-final-candidate.md
-lead-adjudication.md
-review-request.md
-delta-review.md
-tombstone.md
-```
-
-### `ai-dialog.md`
-
-Created only when the proposal is ready for independent review.
+`ai-dialog.md` is created only when the proposal is ready for final independent review:
 
 ```markdown
 # AI dialogue
@@ -520,37 +397,23 @@ Created only when the proposal is ready for independent review.
 ## Operator decision
 ```
 
-The file is temporary, non-authoritative, and deleted before merge.
-
-## 14. Fable protocol
-
-Fable is used once at the end of a coherent material decision package.
+Flow:
 
 ```text
 Lead analysis
 → coherent proposal
 → operator convergence
-→ create ai-dialog.md
-→ final independent Fable challenge
+→ one final Fable challenge
 → Lead adjudication in the same file
 → Round 2 only if a material contradiction survives
 → operator ratification
-→ promote durable authority
+→ promote durable docs
 → delete proposal and ai-dialog
 ```
 
-The chat handoff stays compact:
+The Fable chat handoff contains only repository/branch/PR/HEAD and pointers to `AGENTS.md`, `proposal.md`, and `ai-dialog.md`. The canonical DevelopmentConexus Method/Fable workflow is referenced, not copied into a local skill.
 
-```text
-repository / branch / PR / expected HEAD
-read AGENTS.md
-review docs/work/current/proposal.md
-write only in docs/work/current/ai-dialog.md
-```
-
-The canonical DevelopmentConexus Method and Fable workflow remain organizational authority. MetalDocs does not copy them into another local skill.
-
-## 15. Pull-request lifecycle
+## 11. PR lifecycle
 
 One coherent ratifiable gate uses:
 
@@ -563,112 +426,53 @@ one operator decision
 one squash merge
 ```
 
-Do not create one PR per conversation or one permanent file per review round.
-
 Architecture/governance PR flow:
 
 ```text
-1. branch from current clean main
-2. open Draft PR
-3. maintain one proposal
-4. converge with operator
-5. final Fable review through ai-dialog.md
-6. Lead adjudication in the same file
-7. operator ratification
-8. promote durable docs
-9. delete temporary work files
-10. required checks green
-11. squash merge
-12. delete branch
-13. next gate starts from updated main
+branch from current main
+→ Draft PR
+→ proposal converges
+→ final Fable review
+→ Lead adjudication
+→ operator ratification
+→ promote durable docs
+→ delete temporary work files
+→ required checks green
+→ squash merge
+→ next gate starts from updated main
 ```
 
-A stage may be split only into independently coherent, ratifiable, merge-safe gates.
+A stage may be split only into independently coherent, ratifiable, merge-safe gates—not per conversation.
 
-## 16. Legacy deletion strategy
+## 12. PR #131 and T8-E
 
-Use an allowlist, not file-by-file preservation by inertia.
+PR #131 is frozen as provenance and receives no further architecture stages.
 
-A document survives only if all are true:
-
-1. It has a named current consumer.
-2. It contains unique current meaning.
-3. Its authority class is explicit.
-4. It is reachable through the new index/navigation.
-5. It has an owner.
-6. Its lifecycle is clear.
-
-Otherwise:
+Clean sequence:
 
 ```text
-DELETE FROM LIVE TREE
-```
-
-### Default deletion set
-
-After accepted truth has been consolidated and links/tooling repaired, delete:
-
-```text
-wiki/**
-docs/superpowers/**
-docs/operator/**
-old roadmaps and milestone trees
-old candidates/reviews/adjudications/tombstones
-historical reports and review requests
-superseded architecture pages
-Decision Registry amendment chain after consolidation
-repository-local archive directories
-skills that duplicate the canonical Method/Fable workflow
-```
-
-### Possible retention set
-
-Retain only after current-consumer proof:
-
-```text
-runbooks needed to operate the current runtime
-local setup and verification instructions used by tools/operators
-security and recovery procedures
-current schema/reference material required before T10 cutover
-ADRs still referenced by current code or tooling
-```
-
-No compatibility stub is retained unless an external consumer or unchangeable tool requires the old path.
-
-## 17. PR #131 disposition
-
-PR #131 is frozen as provenance. It must not receive additional architecture stages.
-
-The clean replacement sequence is:
-
-```text
-G0 — repository information architecture and governance
-G1 — current R10 authority consolidation into semantic docs/
+G0 — repository information architecture/governance
+G1 — current Product/R10 authority consolidation into semantic docs/
 T8-E — fresh executable API-contract PR from the clean merged baseline
 ```
 
-Before PR #131 is closed as superseded, G1 must prove:
+Before #131 is closed as superseded, G1 proves:
 
 ```text
 all operator-ratified Product/R10 decisions through T8-D are present
 all accepted T8-E checkpoint decisions are transferred
-no product-code behavior is silently changed
+no product behavior is silently changed
 no required current-runtime runbook is lost
-all live links and tool consumers are repaired
+all live links/tool consumers are repaired
 ```
 
-PR #131 remains available as historical provenance and archaeology.
-
-## 18. T8-E checkpoint preservation
-
-The governance reset must preserve the already-approved T8-E direction, including:
+The T8-E checkpoint to preserve includes:
 
 ```text
 one OpenAPI application SSOT
 one generated Go wire boundary
 one generated TypeScript boundary
-purpose-built response schemas
-semantic operationIds
+purpose-built responses and semantic operationIds
 strong ETag / If-Match rules
 bounded T6 resource precision
 Idempotency-Key operation matrix
@@ -682,139 +486,94 @@ exact-byte response contract
 Submission/Governance/Release/Rendition wire shapes
 ```
 
-The exact upload/document corpus measurement remains open and must be carried into the fresh T8-E proposal rather than guessed during repository cleanup.
+Upload/document corpus measurement remains open and must be carried forward rather than guessed during cleanup.
 
-## 19. Mechanical controls
+## 13. Allowlist deletion
 
-The final governance implementation must introduce a repository documentation verifier that can be demonstrated to fail.
+A document survives only when all are true:
 
-### Structure
+1. Named current consumer.
+2. Unique current meaning.
+3. Explicit authority class.
+4. Reachable from navigation.
+5. Named owner.
+6. Clear lifecycle.
 
-```text
-wiki/ exists                         → FAIL
-docs/superpowers/ exists             → FAIL
-unapproved Markdown root             → FAIL
-archive/legacy/tombstone directory   → FAIL
-```
-
-### Naming
-
-For durable docs, prohibited filename tokens include:
+Otherwise:
 
 ```text
-date prefixes
-r10-t*
-candidate
-corrected
-final
-review
-adjudication
-amendment
-legacy
-tombstone
-v1/v2
+DELETE FROM LIVE TREE
 ```
 
-ADR and incident exceptions are explicit.
-
-### Metadata
+Default deletion set after consolidation and link/tool repair:
 
 ```text
-missing required frontmatter
-unknown kind/status
-duplicate document id
-→ FAIL
+wiki/**
+docs/superpowers/**
+docs/operator/**
+old roadmaps and milestone trees
+old candidates/reviews/adjudications/tombstones
+historical reports and review requests
+superseded architecture pages
+Registry amendment chain after consolidation
+repository-local archives
+skills duplicating the canonical Method/Fable workflow
 ```
 
-### Navigation
+Possible retention requires proof of a current consumer:
 
 ```text
-broken link
-orphan durable page
-page absent from mkdocs navigation
-work page included in published navigation
-→ FAIL
+runtime runbooks
+local setup/verification instructions
+security/recovery procedures
+current schema/reference required before T10
+ADRs referenced by current code/tooling
 ```
 
-### Merge hygiene
+No compatibility stub survives unless an external consumer or unchangeable tool requires the old path.
+
+## 14. Mechanical controls and proof
+
+The final implementation adds a verifier with negative fixtures.
+
+It must fail on:
 
 ```text
-docs/work/current/ai-dialog.md exists
-unpromoted proposal remains in merge-ready PR
-status authority conflicts with current work
-→ FAIL
+wiki/ or docs/superpowers/ in the final tree
+unapproved Markdown roots
+archive/legacy/tombstone directories
+prohibited durable filenames
+missing/invalid frontmatter
+duplicate document ids
+broken links
+orphan durable pages
+pages absent from mkdocs navigation
+work pages included in published navigation
+ai-dialog.md or unpromoted proposal in a merge-ready PR
 ```
 
-### Agent bloat
+Completion proof:
 
-Bootstrap files may point to authority but must not copy durable decision prose. The verifier should prefer structural duplicate detection/allowlists over an arbitrary line-count limit.
+1. Fresh-agent routing works from `AGENTS.md` and `docs/index.md` without historical stage reading.
+2. Every durable page is indexed, owned, and unambiguous.
+3. Product/R10 authority parity against PR #131 passes.
+4. Retained operational docs still satisfy named current consumers.
+5. Verifier negative fixtures demonstrate every major rule fires.
+6. Final PR contains no temporary work files.
+7. Existing repository gates are not weakened and required CI is green.
+8. PR #131 can be closed as superseded without losing current truth.
 
-## 20. Proof strategy
+## 15. Non-goals and reopen triggers
 
-The rebaseline is complete only when all of these are demonstrated:
+This work does not implement R10, change product semantics, migrate business data, deploy Backstage, create a central Conexus documentation service, preserve old paths for convenience, or rewrite PR #131 history.
 
-1. A fresh agent can identify the current task from `AGENTS.md` and `docs/index.md` without reading historical stages.
-2. Every durable document is reachable from task-oriented navigation.
-3. No live document has ambiguous class or owner.
-4. `wiki/`, `docs/superpowers/`, archives, tombstones, and completed review artifacts are absent.
-5. Accepted Product/R10 authority parity against PR #131 passes.
-6. Current runtime operational documentation retained by allowlist still supports its named consumer.
-7. The docs verifier has negative fixtures proving each major rule fires.
-8. The final PR contains no `proposal.md` or `ai-dialog.md`.
-9. Required repository CI is green without weakening an existing guard.
-10. PR #131 can be closed as superseded without losing current authority.
+The shared Conexus profile is the structure/lifecycle. Each repository owns its product and architecture truth.
 
-## 21. Non-goals
+Reopen only on material evidence such as:
 
-This governance change does not:
-
-```text
-implement R10 product code
-change product semantics
-change target backend/persistence/API decisions
-migrate production business data
-introduce Backstage as a runtime dependency
-build a central Conexus documentation platform
-create a shared cross-product architecture authority
-preserve old paths for convenience
-rewrite Git history or force-push PR #131
-```
-
-## 22. DevelopmentConexus reuse
-
-The reusable organizational profile is the structure and lifecycle:
-
-```text
-docs/
-product/
-architecture/
-decisions/
-development/
-operations/
-reference/
-work/
-```
-
-Each product owns its own content and decisions. MetalDocs does not become the shared authority for Marketplace Central or other Conexus products.
-
-After the profile is proven in at least two repositories, a small organization-level template may be extracted. Until then, reuse is manual and evidence-driven.
-
-## 23. Reopen triggers
-
-Reopen this design only if evidence shows one of these:
-
-- a real external consumer requires stable historical documentation URLs;
-- a tool cannot operate without a second documentation root;
-- one active-work directory prevents safe parallel independent gates;
-- MkDocs navigation cannot represent a required documentation consumer;
-- deleting a current-state document makes the existing runtime unsafe to operate;
-- a product requires a different information architecture that cannot be expressed through the common profile;
-- agent measurements show the new routing still requires excessive or ambiguous context.
-
-## 24. Proposed outcome
-
-```text
-RESTRUCTURE NOW
-```
-
-The current documentation shape preserves the defect class. Updating a few indexes would be a local maximum. The selected structure removes duplicate authority, makes historical artifacts non-live by default, and establishes mechanically enforceable lifecycle rules.
+- a real external consumer requires historical documentation URLs;
+- a required tool cannot operate with one documentation root;
+- safe parallel gates cannot use the proposed work lifecycle;
+- deleting a current-state page makes the existing runtime unsafe to operate;
+- another product cannot fit the common profile without semantic distortion;
+- agent measurements show routing remains materially ambiguous or expensive.
