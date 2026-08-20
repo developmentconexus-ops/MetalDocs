@@ -1,14 +1,11 @@
 module metaldocs
 
-// Deliberately the `go` directive, not `toolchain`, to remediate
-// GO-2026-5856 (crypto/tls): actions/setup-go parses only this line, never
-// `toolchain`, so a `toolchain`-only bump would leave CI provisioning
-// 1.25.x and force every job to download a second toolchain at build time.
-// The usual downside of bumping the declared minimum (forcing it up for
-// downstream consumers) does not apply here -- this is an application
-// module with no external consumers. Do not "correct" this back to
-// `toolchain`.
-go 1.26.5
+// Deliberately the `go` directive, not `toolchain`, so actions/setup-go and
+// every local/CI consumer provision the same patched standard library.
+// This is an application module with no external downstream consumers, so
+// raising the declared patch floor does not impose a library compatibility
+// burden. Do not "correct" this back to a toolchain-only pin.
+go 1.26.7
 
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2
@@ -105,7 +102,7 @@ require (
 	go.uber.org/goleak v1.3.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.4 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
-	golang.org/x/mod v0.37.0 // indirect
+	golang.org/x/mod v0.40.0 // indirect
 	golang.org/x/net v0.56.0 // indirect
 	golang.org/x/sys v0.46.0 // indirect
 	golang.org/x/tools v0.47.0 // indirect
