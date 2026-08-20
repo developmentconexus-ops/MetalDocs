@@ -81,13 +81,15 @@ Reason: Fable confirmed the selected structure as the Global Maximum. Every corr
 
 ## Operator decision
 
-**PENDING EXPLICIT OPERATOR RATIFICATION.**
+```text
+APPROVED
+Operator ratification date: 2026-08-20
+```
 
-If approved, finalization is:
+The operator explicitly ratifies the corrected clean-slate repository reset and authorizes finalization:
 
 ```text
-record APPROVED here
-→ delete docs/work/current/**
+delete docs/work/current/**
 → change docs/status.md to T8-E ACTIVE
 → keep PR #131/#132 source branches protected until immutable archival refs exist
 → required CI green on final tree
@@ -96,4 +98,4 @@ record APPROVED here
 → resume T8-E from docs/reference/t8e-checkpoint.md in a fresh small PR
 ```
 
-No implementation is authorized by this decision.
+This ratification does **not** authorize product implementation, schema/runtime/deploy work, T8-F, or restoration of superseded legacy code.
