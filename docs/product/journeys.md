@@ -397,6 +397,7 @@ Area references:
 ```text
 Company-scoped document.create
 → current ACTIVE Areas eligible for creation
+
 Area-scoped document.create
 → only matching current ACTIVE Areas
 ```
