@@ -13,26 +13,46 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-      - name: Verify clean-slate repository shape
+
+      - name: Verify architecture-first repository shape
         shell: bash
+        env:
+          PR_DRAFT: ${{ github.event.pull_request.draft }}
         run: |
           set -euo pipefail
+
+          allowed_path() {
+            [[ "$1" =~ ^(AGENTS\.md|CLAUDE\.md|README\.md|\.gitignore|\.gitattributes|\.github/.+\.ya?ml|docs/.+\.md)$ ]]
+          }
+
+          # Prove the guard can both accept the intended class and reject implementation.
+          allowed_path "docs/status.md"
+          allowed_path ".github/workflows/ci.yml"
+          if allowed_path "src/main.go"; then
+            echo "::error::clean-slate allowlist accepted executable implementation path"
+            exit 1
+          fi
+
+          invalid=0
+          while IFS= read -r path; do
+            if ! allowed_path "$path"; then
+              echo "::error file=$path::tracked path is outside the architecture-first allowlist"
+              invalid=1
+            fi
+          done < <(git ls-files)
+          test "$invalid" -eq 0
+
           test -f AGENTS.md
           test -f docs/index.md
           test -f docs/status.md
           test -f docs/development/documentation.md
-          test ! -e wiki
-          test ! -e docs/superpowers
-          test ! -e api
-          test ! -e apps
-          test ! -e cmd
-          test ! -e db
-          test ! -e deploy
-          test ! -e frontend
-          test ! -e internal
-          test ! -e packages
-          test ! -e scripts
-          test ! -e tests
-          test ! -e tools
-          test ! -e vendor
-          git diff --check
+          test -f docs/development/engineering-rules.md
+          test -f docs/decisions/stage-program.md
+          test -f docs/decisions/forward-obligations.md
+          test -f docs/decisions/api-operation-census.md
+          test -f docs/reference/t8e-checkpoint.md
+
+          if [[ "$PR_DRAFT" != "true" ]] && [[ -e docs/work ]]; then
+            echo "::error::docs/work must not exist once a governance/architecture PR is Ready"
+            exit 1
+          fi
