@@ -25,15 +25,14 @@ Docker's `FROM` instruction resolves its image reference at parse time, from
 a literal or from an `ARG` supplied via `--build-arg` — it cannot read
 `go.mod` to compute its own value, so true derivation (the kind
 `go-version-file: go.mod` gives CI for free) is not available inside a
-Dockerfile. Each of the three Dockerfiles carries a `FROM golang:1.26.5-alpine`
-line, restated by hand, and each is preceded by a comment block naming this
-as a TRANSITIONAL local maximum under CLAUDE.md's "Global Maximum, Not Local
-Maximum" rule: the global-maximum structure is one parameterized multi-stage
-Dockerfile shared by api/jobs/worker with `GO_VERSION` threaded from `go.mod`
-through the compose `build:` stanza (planned A7.4/A7.5, out of scope for the
-fix that added this runbook) — that consolidation deletes the restatement
-outright. Until then, `dockerfile-go-version-drift` is the check that keeps
-the restatement honest.
+Dockerfile. The current Go-builder Dockerfiles carry a
+`FROM golang:1.26.7-alpine` line, restated by hand. The api/jobs/worker files
+also carry a comment block naming this as a TRANSITIONAL local maximum under
+CLAUDE.md's "Global Maximum, Not Local Maximum" rule: the global-maximum
+structure is one parameterized multi-stage Dockerfile shared by the Go
+binaries with `GO_VERSION` threaded from `go.mod` through the compose build
+stanza. That consolidation is outside the security-baseline patch; until it
+happens, `dockerfile-go-version-drift` keeps the restatement honest.
 
 ## What `dockerfile-go-version-drift` does
 
@@ -45,14 +44,14 @@ declares a `FROM golang:<version>` builder stage, fails if that version is
 less than `go.mod`'s. `scripts/testdata/guard-fixtures/` is excluded from
 discovery, because that directory deliberately contains a drifted-on-purpose
 fixture Dockerfile the check must reject in isolation but must never treat
-as a real file in the tree it's checking.
+as a real file in the tree it is checking.
 
 ## When it goes red
 
 - **A real Dockerfile pins a `golang:` version below `go.mod`'s `go`
   directive.** This is the check working as intended — bump that
   Dockerfile's `FROM golang:X.Y.Z-alpine` line to match (or exceed) `go.mod`,
-  in the same commit that changed `go.mod` if that's what caused the drift.
+  in the same commit that changed `go.mod` if that is what caused the drift.
 - **`go.mod`'s `go` directive changed and no Dockerfile was touched.** Same
   fix: bump every `deploy/docker/*.Dockerfile` (and
   `apps/docx-renderer/Dockerfile` if it ever grows a `golang:` builder stage
@@ -66,19 +65,17 @@ as a real file in the tree it's checking.
   read its `DOCKERFILE-GO-VERSION-DRIFT:` lines. A prior version of this
   script had exactly this failure mode: its discovery glob matched the
   fixture's own `.txt` file by substring, so it went red on a clean checkout
-  for the wrong reason — that is why the fixture directory is excluded (see
-  above).
+  for the wrong reason — that is why the fixture directory is excluded.
 
 ## How to confirm an image actually builds after fixing a drift
 
 This check is static and does not build anything. To prove the real defect
-this runbook exists for is gone, build one of the affected images from repo
-root:
+this runbook exists for is gone, build the affected images from repo root:
 
 ```sh
-docker compose -f deploy/compose/docker-compose.yml --env-file .env build worker jobs
+docker compose -f deploy/compose/docker-compose.yml --env-file .env build db-provision api worker jobs
 ```
 
 A pre-fix tree fails inside `go mod download` with the `GOTOOLCHAIN=local`
-error quoted above; a post-fix tree completes and `docker images` shows
-freshly built `metaldocs-worker` / `compose-jobs` images.
+error quoted above; a post-fix tree completes and `docker images` shows the
+freshly built MetalDocs Go-service images.
