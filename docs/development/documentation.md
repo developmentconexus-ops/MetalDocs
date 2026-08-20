@@ -1,14 +1,14 @@
 ---
 id: development-documentation
 kind: authority
-status: current
+status: active
 owner: engineering
 summary: Defines MetalDocs documentation placement, naming, lifecycle, agent routing, review, and pull-request governance.
 ---
 
 # Documentation and agent-context governance
 
-> This page becomes authority only after PR #132 is independently reviewed, operator-ratified, and merged.
+> Candidate authority. Promote `status` to `current` only after independent review, operator ratification, and merge.
 
 ## Purpose
 
@@ -36,21 +36,11 @@ ONE docs/ ROOT
 - duplicated status and authority
 ```
 
-Method outcome:
-
-```text
-RESTRUCTURE NOW
-```
-
-Updating isolated indexes would preserve the defect class: current truth, active work, and historical archive would still compete in the same tree.
+Method outcome: **RESTRUCTURE NOW**. Updating isolated indexes would preserve the defect class: current truth, active work, and historical archive would still compete in one tree.
 
 ## Documentation root
 
-First-party maintained documentation lives under:
-
-```text
-docs/
-```
+First-party maintained documentation lives under `docs/`.
 
 Platform-conventional files may remain at repository root:
 
@@ -65,9 +55,9 @@ mkdocs.yml
 .github/*
 ```
 
-Third-party-managed documentation may remain under `vendor/` or `third_party/` and is not MetalDocs authority.
+Third-party-managed documentation may remain under `vendor/` or `third_party/`; it is not MetalDocs authority.
 
-The live tree does not retain:
+The final live tree does not retain:
 
 ```text
 wiki/
@@ -81,17 +71,7 @@ Git history and closed pull requests preserve provenance.
 
 ## Naming and metadata
 
-Durable filenames describe stable subjects.
-
-Use:
-
-```text
-lowercase
-kebab-case
-short semantic nouns or noun phrases
-```
-
-Examples:
+Durable filenames use lowercase kebab-case and describe stable subjects:
 
 ```text
 product/contract.md
@@ -99,20 +79,7 @@ architecture/persistence.md
 operations/runbooks/restore.md
 ```
 
-Durable filenames do not contain:
-
-```text
-dates
-R10/T-stage codes
-v1/v2/revision numbers
-final/new/old
-candidate/corrected
-review/adjudication
-amendment/tombstone
-legacy/historical
-```
-
-Explicit exceptions are limited to numbered ADRs, dated incidents, and release notes where the number/date is part of the document identity.
+They do not carry dates, R10/T-stage codes, versions, `final/new/old`, `candidate/corrected`, `review/adjudication`, `amendment/tombstone`, or `legacy/historical`. Explicit exceptions are limited to numbered ADRs, dated incidents, and release notes where the number or date is part of the document identity.
 
 Every maintained Markdown page under `docs/` has unique frontmatter:
 
@@ -133,35 +100,21 @@ kind: authority | guide | reference | work
 status: current | active
 ```
 
-A replacement repairs links and deletes the previous page. It does not keep a compatibility stub unless a real external consumer or unchangeable tool requires the old path.
+A replacement repairs links and deletes the previous page. A compatibility stub requires a real external consumer or unchangeable tool.
 
 ## Authority and navigation
 
 One meaning has one current authority.
 
-`docs/index.md` maps reader intent to the owning page. It is not a second summary of those pages.
-
-`mkdocs.yml` defines publishable navigation. It includes every durable maintained page exactly once and excludes `docs/work/`.
-
-Current status lives only in:
-
-```text
-docs/status.md
-```
-
-Indexes, README, AGENTS, PR bodies, and active-work files point to that status instead of copying it.
-
-The compact decision registry lives in:
-
-```text
-docs/decisions/index.md
-```
-
-It records decision ID, status, authority link, provenance, and reopen trigger. It does not duplicate the full decision prose.
+- `docs/index.md` maps reader intent to the owning page; it does not repeat decisions.
+- `mkdocs.yml` lists every publishable durable page exactly once and excludes `docs/work/`.
+- `docs/status.md` is the sole current stage and implementation-gate authority.
+- `docs/decisions/index.md` records compact decision identity, status, authority link, provenance, and reopen trigger without duplicating decision prose.
+- README, AGENTS, indexes, PR bodies, and work files point to authorities instead of copying them.
 
 ## Agent context
 
-Root `AGENTS.md` is a bounded bootstrap containing only:
+Root `AGENTS.md` contains only:
 
 ```text
 repository purpose
@@ -174,9 +127,9 @@ stable Git/security rules
 canonical Method and Fable pointers
 ```
 
-It does not copy architecture, stage summaries, decision ledgers, review history, or task prompts.
+It does not copy architecture, stage summaries, decision ledgers, review history, or prompts.
 
-Routine orientation is:
+Routine orientation:
 
 ```text
 AGENTS.md
@@ -186,19 +139,13 @@ AGENTS.md
 → current code evidence only for concrete claims
 ```
 
-Nested `AGENTS.md` files require repeated evidence of genuinely path-specific needs. `CLAUDE.md` remains a minimal pointer to root `AGENTS.md` and owns no independent meaning.
+Nested `AGENTS.md` files require repeated evidence of path-specific needs. `CLAUDE.md` remains a minimal pointer to root `AGENTS.md` and owns no independent meaning.
 
-Material engineering decisions apply:
-
-```text
-developmentconexus-ops/conexus-methodology/METHOD.md
-```
-
-Repository/product authority remains local. External practices are evidence, not product requirements.
+Material engineering decisions apply `developmentconexus-ops/conexus-methodology/METHOD.md`. Repository and product authority remain local; external practices are evidence, not product requirements.
 
 ## Active work and AI dialogue
 
-A governed architecture/governance PR may maintain:
+A governed architecture or governance PR may maintain:
 
 ```text
 docs/work/current/index.md
@@ -212,25 +159,16 @@ Rules:
 - one active proposal per coherent gate;
 - proposal and plan are edited in place;
 - no permanent corrected-candidate, review-request, delta-review, adjudication, or tombstone files;
-- `ai-dialog.md` is created only when the proposal is ready for final independent review;
+- `ai-dialog.md` appears only for the final independent review;
 - Fable review, Lead adjudication, bounded Round 2, and operator decision remain in that one file;
 - Round 2 occurs only when a material contradiction survives;
 - all temporary work files are deleted before the PR becomes merge-ready.
 
-Fable chat handoff stays short:
-
-```text
-repository / branch / PR / expected HEAD
-read AGENTS.md
-review docs/work/current/proposal.md
-write only docs/work/current/ai-dialog.md
-```
-
-The canonical Fable workflow is referenced from `developmentconexus-ops/conexus-methodology/README.md`; it is not copied into a repository-local skill.
+Fable handoff contains only repository, branch, PR, expected HEAD, and pointers to `AGENTS.md`, `proposal.md`, and `ai-dialog.md`. The canonical workflow lives in `developmentconexus-ops/conexus-methodology/README.md`; it is not copied into a local skill.
 
 ## Pull-request lifecycle
 
-One coherent, ratifiable gate uses:
+One coherent ratifiable gate uses:
 
 ```text
 one branch
@@ -257,30 +195,22 @@ branch from current main
 → next gate starts from updated main
 ```
 
-A stage may be split only into independently coherent, ratifiable, merge-safe gates—not by conversation or review round.
-
-PR body and branch names may carry stage/provenance identifiers. Durable filenames do not.
+A stage may be split only into independently coherent, ratifiable, merge-safe gates—not by conversation or review round. Stage/provenance identifiers belong in PR metadata and decision provenance, not durable filenames.
 
 ## Deletion and retention
 
 A document survives only when all are true:
 
 1. A named current consumer exists.
-2. The document has unique current meaning.
+2. It has unique current meaning.
 3. Its authority class is explicit.
 4. It is reachable from navigation.
 5. Its owner is named.
 6. Its lifecycle or deletion trigger is clear.
 
-Otherwise:
+Otherwise: **delete it from the live tree**.
 
-```text
-DELETE FROM LIVE TREE
-```
-
-Current-runtime references or runbooks may survive while the running implementation still consumes them. They must state that current consumer and deletion trigger; they do not become target architecture authority.
-
-No local archive is created for deleted material.
+Current-runtime references or runbooks may survive while the running implementation still consumes them. They must state that consumer and deletion trigger; they do not become target architecture authority. No local archive is created.
 
 ## Mechanical proof obligations
 
@@ -302,11 +232,11 @@ temporary work files in a merge-ready PR
 
 Every repository-authored blocking guard includes a negative fixture or an accepted classified waiver under the existing verifier rules.
 
-A documentation consolidation is complete only when:
+A consolidation is complete only when:
 
 1. every accepted authority is preserved;
-2. every retained operational page has a named current consumer;
-3. all live links/tool consumers are repaired;
+2. each retained operational page has a named current consumer;
+3. all live links and tool consumers are repaired;
 4. temporary work files are absent;
 5. the hygiene guard is proven to fire;
 6. required CI is green;
@@ -314,16 +244,16 @@ A documentation consolidation is complete only when:
 
 ## Reopen triggers
 
-Reopen this profile only on material evidence that:
+Reopen only on material evidence that:
 
 - a real external consumer requires historical documentation URLs;
 - a required tool cannot operate with one documentation root;
-- safe parallel gates cannot use the proposed work lifecycle;
+- safe parallel gates cannot use the work lifecycle;
 - deleting a current-state page makes the running system unsafe to operate;
 - another Conexus product cannot use the common structure without semantic distortion;
 - measured agent routing remains materially ambiguous or expensive.
 
-Preference for the former tree or hypothetical future compatibility is not a reopen trigger.
+Preference for the former tree or hypothetical compatibility is not a reopen trigger.
 
 ## Related documents
 
