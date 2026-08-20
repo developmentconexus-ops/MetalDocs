@@ -312,7 +312,8 @@ Preference for the former tree or hypothetical compatibility is not a reopen tri
 
 - Gate: repository documentation profile / G0.
 - Pull request: #132.
-- Independent review: Fable review committed at PR #132 HEAD `3b8a25488e1aed5edc6c2b83d64e802b8d66c1c0`.
+- Independent review: Fable review preserved at PR #132 commit `3b8a25488e1aed5edc6c2b83d64e802b8d66c1c0`.
+- Lead adjudication: preserved in subsequent PR #132 history and temporary `docs/work/current/ai-dialog.md` until merge cleanup.
 - Operator ratification: pending.
 - Consolidation successor: G1 Product/R10 documentation rebaseline.
 - Canonical engineering method: `developmentconexus-ops/conexus-methodology/METHOD.md`.
