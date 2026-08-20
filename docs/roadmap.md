@@ -15,7 +15,7 @@ REPOSITORY RESET                      MERGED / OPERATOR-RATIFIED
 REPOSITORY STANDARD V1 ALIGNMENT      MERGED
 PRODUCT / OWNERSHIP                   OPERATOR-APPROVED
 T1 → T8-D                             CLOSED / OPERATOR-RATIFIED
-T8-E EXECUTABLE WIRE CONTRACT         ACTIVE / DRAFT PR PENDING
+T8-E EXECUTABLE WIRE CONTRACT         ACTIVE / DRAFT PR #136
 T8-F → T12                            NOT OPEN
 IMPLEMENTATION                        BLOCKED
 LEGACY IMPLEMENTATION                 ABSENT FROM LIVE TREE
@@ -23,7 +23,7 @@ LEGACY IMPLEMENTATION                 ABSENT FROM LIVE TREE
 
 ## Current gate
 
-T8-E — Executable Wire Contract.
+T8-E — Executable Wire Contract, active in Draft PR #136 on branch `arch/t8e-wire-contract`.
 
 Accepted work through the previous four T8-E layers is preserved at `docs/reference/t8e-checkpoint.md`. The current application census is 78 operations and is owned by `docs/product/journeys.md` plus `docs/decisions/api-operation-census.md`.
 
