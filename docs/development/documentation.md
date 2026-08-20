@@ -7,7 +7,7 @@ summary: Defines MetalDocs documentation placement, naming, lifecycle, agent rou
 
 # Documentation and agent-context governance
 
-> Candidate authority. It becomes current only after independent review, operator ratification, temporary-work cleanup, required checks, and merge of PR #132.
+> Operator-ratified candidate authority. It becomes current only after temporary-work cleanup, required checks, and merge of PR #132.
 
 ## Purpose
 
@@ -314,6 +314,6 @@ Preference for the former tree or hypothetical compatibility is not a reopen tri
 - Pull request: #132.
 - Independent review: Fable review preserved at PR #132 commit `3b8a25488e1aed5edc6c2b83d64e802b8d66c1c0`.
 - Lead adjudication: preserved in subsequent PR #132 history and temporary `docs/work/current/ai-dialog.md` until merge cleanup.
-- Operator ratification: pending.
+- Operator ratification: approved on 2026-08-20; merge remains gated on S0, temporary-work cleanup, and required green checks.
 - Consolidation successor: G1 Product/R10 documentation rebaseline.
 - Canonical engineering method: `developmentconexus-ops/conexus-methodology/METHOD.md`.
