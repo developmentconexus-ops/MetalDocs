@@ -2,91 +2,61 @@
 id: engineering-rules
 kind: authority
 owner: engineering
-summary: Defines repository-local engineering, Git, review, decision-consumption, and proof rules for the clean-slate rebuild.
+summary: MetalDocs-specific engineering, Git, CI, provenance, and implementation-gate rules layered on organizational standards.
 ---
 
 # Engineering rules
 
-## Method
+Canonical reasoning: `developmentconexus-ops/conexus-methodology/METHOD.md` v1.0.0.
 
-Material decisions use the canonical DevelopmentConexus Engineering Method in `developmentconexus-ops/conexus-methodology/METHOD.md`.
+Canonical repository operation: `developmentconexus-ops/conexus-methodology/REPOSITORY-STANDARD.md` v1.0.0.
 
-Required posture:
-
-```text
-root cause before patch
-smallest sustainable solution
-one semantic authority per meaning
-mechanism != authority
-proof before implementation
-unknown remains unknown
-prepare the seam, not dormant implementation
-```
+This page contains only MetalDocs-specific controls.
 
 ## Implementation gate
 
-`docs/status.md` decides whether implementation is allowed. While implementation is blocked:
+`docs/roadmap.md` decides whether implementation is allowed. While blocked:
 
-- do not create application code or schemas;
-- do not create deployment/runtime infrastructure;
-- do not resurrect old implementation for convenience;
-- do not prebuild future capabilities.
+- do not add application code, schema/migrations, executable OpenAPI/generated code, frontend/runtime/deploy, dependency manifests, or dormant capability;
+- do not restore removed implementation for convenience;
+- historical mechanism reuse must pass the proof-backed gate in `docs/architecture/technical-baseline.md`.
 
-## Decision consumption
+Before the first future implementation/code/schema/runtime commit is authorized, restore a secret-scanning control appropriate to the new repository shape.
 
-Before a remaining T-stage, read its current owning authorities plus `docs/decisions/forward-obligations.md`.
+## Forward decision obligations
+
+Remaining architecture stages consume current owning authorities plus `docs/decisions/forward-obligations.md`:
 
 ```text
-PRESERVE → baseline evidence unless materially disproved
+PRESERVE → proof-backed baseline unless materially disproved
 REOPEN   → owning stage must decide deliberately
-DEFERRED → preserve seam/counterexample; create no dormant implementation
+DEFERRED → preserve seam/counterexample; no dormant implementation
 ```
 
-Current semantic authorities outrank older forward-obligation wording. When a stage closes a forward obligation, update the durable obligation page rather than creating an amendment chain.
+When an obligation closes or materially refines, update the durable register rather than creating amendment chains.
 
-## Evidence and reuse
+## Repository protection
 
-Historical code may be inspected only for a concrete technical question. A removed unit is reusable only when all are true:
-
-1. a current ratified consumer exists;
-2. its public contract carries no superseded semantic authority;
-3. its dependency direction fits the target;
-4. its proof asserts the target property rather than the old shape;
-5. reuse is simpler than rewrite after transition cost.
-
-## Pull requests
-
-Use one coherent ratifiable gate per branch/PR. Architecture/governance PRs remain Draft while temporary work exists.
-
-Final architecture review uses one temporary `docs/work/current/ai-dialog.md`. Fable challenges; Lead adjudicates; operator ratifies. Reviewer output never becomes authority by itself.
-
-Repository rules currently require:
+Current external repository binding:
 
 ```text
-status context: required
-ruleset id: 20560142
-all review conversations resolved before merge
+required aggregate status context: required
+GitHub ruleset id:                 20560142
+review conversations:              resolved before merge
 ```
 
-Renaming/removing the `required` job without updating the repository ruleset would silently un-gate `main` and is prohibited.
+Do not rename/remove `required` without deliberately updating repository protection.
 
-## Git and provenance
+Normal governance/architecture integration uses squash merge after explicit operator merge authorization. No direct commits to `main`; no force-push or shared-history rewrite.
 
-- no direct commits to `main`;
-- no force-push/rewrite of shared history;
-- prefer squash merge for architecture/governance gates;
-- do not create live-tree archive/tombstone directories;
-- destructive cleanup is allowed only when replacement truth or deliberate absence is explicit;
-- an unmerged authority branch that is the only reachable provenance ref MUST remain reachable until an equivalent immutable archival ref/tag exists.
+Repository settings still permit merge-commit and rebase methods at the GitHub repository level; after this governance alignment is later merge-authorized and merged, settings should be tightened to squash-only normal integration, PR-only protected `main`, no force-push/delete, automatic head-branch deletion, and the required aggregate gate, as supported by the hosting configuration.
 
-Current protected provenance refs for the reset are recorded in `docs/status.md` and `docs/decisions/repository-reset.md`.
+## Provenance
+
+Unique unmerged Product/R10 governance provenance is protected by explicit archive refs recorded in `docs/decisions/repository-reset.md`. Do not delete those refs while a current authority names the byte-level provenance as required.
 
 ## Verification
 
-The repository is intentionally architecture-first while implementation is blocked. The current CI must prove the **allowed tree shape**, not enumerate known legacy names.
+`.github/workflows/ci.yml` owns the current executable repository-conformance proof. A control counts only when its negative path is demonstrably capable of firing.
 
-A failing legacy check is not a reason to restore legacy machinery. First ask whether the check protects a current target property. If not, retire it; if yes, replace it with the smallest check that proves that property.
-
-## Closure
-
-Do not claim `done`, `green`, or `merged` without revalidating current remote HEAD, required status, unresolved review threads, and the final changed-file/tree shape.
+A failing retired/legacy check is not a reason to restore old machinery; first prove the check still protects a current property.
