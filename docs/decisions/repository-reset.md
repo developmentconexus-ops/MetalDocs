@@ -2,104 +2,75 @@
 id: repository-reset
 kind: authority
 owner: architecture
-summary: Authorizes removing the superseded MetalDocs implementation from the live repository before new implementation begins.
+summary: Ratified clean-slate repository reset and its durable provenance/reopen contract.
 ---
 
 # Repository clean-slate reset
 
 ## Decision
 
-The MetalDocs repository is reset to an architecture-first baseline before new implementation.
+The MetalDocs live repository is architecture-first and excludes the superseded implementation.
 
 ```text
 PRESERVE CURRENT PRODUCT / ARCHITECTURE TRUTH
 +
-REACHABLE GIT PROVENANCE
+REACHABLE REQUIRED PROVENANCE
 +
 MINIMAL DOCUMENTATION + AGENT + CI SPINE
 -
-SUPERSEDED APPLICATION CODE
+SUPERSEDED APPLICATION / DB / OPENAPI / FRONTEND / DEPLOY
 -
-SUPERSEDED DATABASE / MIGRATIONS
--
-SUPERSEDED OPENAPI / GENERATED CLIENTS
--
-SUPERSEDED FRONTEND
--
-SUPERSEDED DEPLOY / CONTAINERS / ENVIRONMENT FILES
--
-SUPERSEDED SCRIPTS / TESTS / VERIFIERS / QUALITY BASELINES
--
-SUPERSEDED ROADMAP / HARNESS / QA / REVIEW ARTIFACTS
+SUPERSEDED SCRIPTS / TESTS / VERIFIERS / ROADMAP / HARNESS / QA / REVIEW ESTATE
 ```
+
+The reset direction is operator-ratified and is not reopened by Repository Standard alignment.
 
 ## Why
 
-The ratified technical posture already establishes:
+The ratified technical posture establishes clean-slate physical freedom, no historical-business migration requirement, and implementation blocked until later architecture/readiness gates close. Keeping the old implementation live created false constraints and context bloat.
 
-- clean-slate physical target freedom;
-- current implementation is evidence, not target authority;
-- current DEV/test data has no historical-business compatibility consumer;
-- implementation remains blocked while T8-E and later realization gates are unfinished.
+## Durable unmerged provenance refs
 
-Maintaining the old implementation during architecture rederivation creates false constraints, context bloat, stale CI obligations, and pressure to preserve shapes that have already lost architectural authority.
+PR #131 and PR #132 were never merged to `main`; therefore their exact required bytes need explicit reachable refs.
 
-## Scope
-
-The live tree removes the old implementation including its application code, API specification, generated code, database schema/migrations, frontend, workers/jobs, deployment configuration, container definitions, package manifests, scripts, tests, verifier registry, runbooks tied only to that implementation, local skills, roadmaps, QA reports, and historical documentation.
-
-Deletion from the live tree is not permission to lose provenance. The Product/R10 corpus in PR #131 and G0 review history in PR #132 were never merged to `main`; therefore closed PR state alone is insufficient as the rollback guarantee.
-
-## Protected provenance refs
-
-The following source branches remain reachable and MUST NOT be deleted until equivalent immutable archival tags/refs are created and this section is updated:
+The GitHub connector available to this execution does not expose annotated-tag creation. Repository Standard v1 §10 permits "a durable annotated tag or another explicit durable ref". The following explicit archive refs were therefore created and remotely proven byte-identical to the reviewed heads:
 
 ```text
-docs/a8-authz-approval-redesign-ledger
-@ d8b1c6d31e704e9552a14faa7764c634a29b081d
+archive/r10-pr131-pre-reset-20260820
+→ d8b1c6d31e704e9552a14faa7764c634a29b081d
 
-  preserves PR #131 ratified authority/review corpus and source blobs
-
-docs/repository-information-architecture
-@ b0ebe54cb010e9837a25f7b778f3d9814d283cb8
-  preserves PR #132 documentation-governance review provenance
+archive/repository-governance-pr132-20260820
+→ b0ebe54cb010e9837a25f7b778f3d9814d283cb8
 ```
 
-Git history on `main` preserves the removed legacy implementation. The refs above specifically preserve **unmerged** authority/review objects until immutable archival refs replace them.
+Proof: GitHub compare reports each archive ref `identical` to its exact source SHA with `ahead_by=0` and `behind_by=0`.
+
+These archive refs MUST NOT be deleted while this page or another current authority names their byte-level provenance as required. The original source branches may be removed only after equivalent reachability has been independently re-proven.
+
+Git history on `main` preserves the removed legacy implementation; the archive refs above preserve the **unmerged** authority/review lineages.
 
 ## What survives
 
-Only current truth with a named consumer survives:
+Only named current consumers survive in the live tree:
 
 ```text
-Product Contract
-Whole-product alignment
-Ownership topology
+Product Contract / whole-product alignment / ownership
 T1 → T8-D ratified authorities
-paused accepted T8-E checkpoint
-remaining stage program
+accepted T8-E checkpoint
 52 forward decision obligations
-repository documentation governance
-minimal engineering / agent routing
-minimal required CI context
+Repository Standard-aligned documentation / Git / CI envelope
 ```
 
-A historical mechanism can return only through a current proof-backed reuse decision. Copying legacy because it already works is not sufficient.
+Historical mechanisms return only through the proof-backed reuse gate in `docs/architecture/technical-baseline.md`.
 
-## Relationship to T10
+## Relationship to transition
 
-This decision advances **source-tree cleanup**, not a production or business-data cutover.
-
-The deleted implementation and its data are DEV/test/throwaway and are not a Launch compatibility contract. Reachable Git history provides source rollback.
-
-T10 continues to own any future runtime/data cutover that exists once a new implementation has actually been built. T10 does not require the superseded source tree to remain live until then.
+This was source-tree cleanup, not production/business-data cutover. Any future runtime/data transition remains owned by the stage progression in `docs/roadmap.md`.
 
 ## Retired controls and reopen triggers
 
-The old dependency/security/implementation CI was retired because the live repository contains no executable application/dependency graph while implementation is blocked.
+Old implementation/dependency CI was retired because its protected implementation population is zero in the architecture-first tree.
 
-Secret scanning is intentionally not an active clean-tree job now. **Before the first implementation/code/schema/runtime commit is allowed, T11/T12 or an earlier explicit security gate MUST restore an appropriate secret-scanning control for the new repository shape.**
+Secret scanning is not currently active because executable implementation/dependency surfaces are absent. **Before the first future implementation/code/schema/runtime commit is authorized, an appropriate secret-scanning control must be restored and proved capable of firing.**
 
-Reopen this reset only if concrete evidence proves that a removed file or mechanism is an externally binding compatibility contract or is independently the smallest sustainable implementation of a current ratified requirement.
-
-Sunk cost, historical test coverage, old roadmap status, or old CI expectations are not reopen triggers.
+Reopen this reset only if concrete evidence proves a removed mechanism is an externally binding compatibility contract or independently the smallest sustainable realization of a current ratified requirement. Sunk cost, old test coverage, roadmap status, or old CI expectations are not reopen triggers.
