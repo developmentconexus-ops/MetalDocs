@@ -88,4 +88,14 @@ Not required. No material contradiction survives Lead adjudication and no correc
 
 ## Operator decision
 
-**PENDING — explicit operator ratification of the corrected G0 profile is the next gate.**
+**APPROVED — operator ratified the corrected G0 repository documentation profile on 2026-08-20.**
+
+This approval authorizes the agreed sequence only:
+
+```text
+S0 restores a trustworthy verification baseline
+→ PR #132 is cleaned, verified, marked ready and squash-merged
+→ G1 performs the complete documentation census/consolidation/deletion gate
+```
+
+It does not authorize G1 changes inside PR #132, legacy deletion before the G1 proofs, Product/R10 semantic changes, product implementation, or resumption of T8-E before the clean baseline is merged.
