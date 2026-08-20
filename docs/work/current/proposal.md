@@ -383,7 +383,7 @@ load semantic descriptor
 -> ONLY THEN commit HTTP 200 headers/body
 ```
 
-The implementation may use a bounded temporary spool or a provider-neutral equivalent proof, but it may not stream unverified provider bytes to the client and discover a hash mismatch after the 200 has begun. Existing visible semantic record with missing/corrupt bytes -> `500 internal.content_integrity` with zero success bytes; temporary content-store dependency failure ->503. Provider checksum/ETag may be optimization evidence but never replaces semantic SHA-256 authority.
+The implementation may use a bounded temporary spool or provider-neutral equivalent proof, but it may not stream unverified provider bytes to the client and discover a hash mismatch after the 200 has begun. Existing visible semantic record with missing/corrupt bytes -> `500 internal.content_integrity` with zero success bytes; temporary content-store dependency failure ->503. Provider checksum/ETag may be optimization evidence but never replaces semantic SHA-256 authority.
 
 ## 2.10 Direct DRAFT upload — exact-length create-only capability
 
@@ -400,32 +400,49 @@ StartDraftUploadRequest
   expected_size_bytes: integer 1..DOC_RAW_MAX_BYTES
 ```
 
-This does **not** become `ExactContentDescriptor.size_bytes`. Server validates it only to mint a bounded capability.
+This does **not** become `ExactContentDescriptor.size_bytes`. Server first proves `expected_size_bytes <= DOC_RAW_MAX_BYTES`, then calls the already-ratified T8-C seam as:
+
+```text
+PresignCreate(handle, maxBytes=expected_size_bytes, ttl=15 minutes)
+```
+
+No T8-C signature or authority reopen is required: the current `maxBytes` contract is consumed with the exact intended body size as its maximum, and the Launch direct-PUT provider profile is allowed to be stricter by binding that value as exact HTTP `Content-Length`.
 
 Allocation response:
 
 ```text
 DraftUploadAllocation
-  upload_id: Uuid
-  upload_url: URI capability
-  expires_at: UtcInstant = allocation_time + 15 minutes
-  max_bytes: DOC_RAW_MAX_BYTES
-  required_headers: map<string,string>
+  upload_id:Uuid
+  upload_url:URI capability
+  expires_at:UtcInstant = allocation_time + 15 minutes
+  max_bytes:DOC_RAW_MAX_BYTES
+  required_headers:map<string,string>
 ```
 
-Capability property:
+`upload_url` is opaque capability data. Its syntax may necessarily contain provider mechanism material, but no separate provider/account/bucket/key/version/storage-ETag fields are Product contract and the client must not parse the URL for semantic identity.
+
+Capability/admission law:
 
 ```text
 create-only (`If-None-Match:*` or provider-equivalent)
 + exact HTTP body length == expected_size_bytes
-+ expiry == expires_at
++ one shared expires_at for provider capability and unconsumed admission claim
 ```
 
 For browser PUT, `Content-Length` is user-agent generated from the exact Blob/body and is part of the signed/provider-enforced request constraint; it is not placed in `required_headers` as a script-settable header. `required_headers` contains only exact browser-settable provider headers.
 
-Completion independently `Stat/OpenExact`s the stored object, requires actual size == expected size, derives SHA-256/actual format/actual size, performs structural validation, and only then establishes READY. Any client-declared type/hash/name is non-authoritative. Exact READY repeat is recognized before expiry handling; known uncompleted expired handle ->410.
+Completion independently `Stat/OpenExact`s the object, requires actual size == expected size, derives SHA-256/actual format/actual size, performs structural validation, and only then establishes READY. Client-declared type/hash/name is non-authoritative.
 
-This preserves direct PUT and avoids switching to S3 POST/multipart solely to obtain a maximum-size policy: application first proves `expected_size_bytes <= DOC_RAW_MAX_BYTES`, then the provider capability enforces that exact body length. The current AWS S3 reference supports create-only conditional PutObject and signed `content-length` constraints; POST `content-length-range` therefore supplies no property we still need.
+Expiry semantics are closed:
+
+```text
+now < expires_at + OPEN                        completion may proceed
+now < expires_at + READY/unconsumed            exact completion repeat ->204; DRAFT attach may proceed
+now >= expires_at + OPEN or READY/unconsumed   410 state.upload_expired; content reclaimable
+consumed attachment                            upload claim is no longer an attachable resource
+```
+
+This preserves direct PUT and closes max-size resource consumption without S3 POST or multipart. S3 POST `content-length-range` supplies no additional required property once application validates the global maximum and the PUT capability binds one exact body length.
 
 ---
 
@@ -436,37 +453,13 @@ All fixed objects are closed. Unless marked `?`, members are required.
 ## 3.1 References / enums / unions
 
 ```text
-UserReference
-  user_id:Uuid
-  display_name?:string
-
-AreaReference
-  area_id:Uuid
-  code:CodeToken
-  name:nonblank string
-
-DocumentTypeReference
-  document_type_id:Uuid
-  code:CodeToken
-  name:nonblank string
-
-DocumentReference
-  document_id:Uuid
-  code:DocumentCode
-  // title absent: title belongs Revision
-
-RevisionIdentity
-  revision_id:Uuid
-  ordinal:RevisionOrdinal
-
-RevisionReference
-  revision:RevisionIdentity
-  title:nonblank string
-
-ContentSummary
-  sha256:Sha256Hex
-  size_bytes:ByteCount
-  content_format:ContentFormat
+UserReference { user_id:Uuid, display_name?:string }
+AreaReference { area_id:Uuid, code:CodeToken, name:nonblank string }
+DocumentTypeReference { document_type_id:Uuid, code:CodeToken, name:nonblank string }
+DocumentReference { document_id:Uuid, code:DocumentCode } // title belongs Revision
+RevisionIdentity { revision_id:Uuid, ordinal:RevisionOrdinal }
+RevisionReference { revision:RevisionIdentity, title:nonblank string }
+ContentSummary { sha256:Sha256Hex, size_bytes:ByteCount, content_format:ContentFormat }
 ```
 
 Closed enums:
@@ -506,129 +499,63 @@ True unions:
 RoleAssignmentSubject
   {kind:user,user_id}
   {kind:group,group_id}
-
 RoleAssignmentScope
   {kind:company}
   {kind:area,area_id}
-
 GovernanceSelector
   {kind:named_user,user_id}
   {kind:group,group_id}
-
 GovernancePolicy
   {mode:no_human_approval}
   {mode:use_governance_route,steps:[GovernanceRouteStep,...]}
-
 GovernanceRouteStep
   label:nonblank string
   selector:GovernanceSelector
   // array order is route order; ordinal is not wire data
-
 RepresentationPolicy
   {kind:source_only}
   {kind:require_official_rendition,format:pdf}
 ```
 
-Pagination:
-
-```text
-Page
-  next_cursor:OpaqueCursor|null
-  has_more:boolean
-```
+Pagination: `Page { next_cursor:OpaqueCursor|null, has_more:boolean }`.
 
 ## 3.2 Session / Organization
 
 ```text
-SessionView
-  user:UserReference
-  csrf_token:CsrfToken
+SessionView { user:UserReference, csrf_token:CsrfToken }
+ProviderSubjectOption { provider_subject_ref:ProviderSubjectRef, display_hints:string[] }
+  display_hints maxItems3; each nonblank <=256
+ProviderSubjectSearchView { items:ProviderSubjectOption[] } // maxItems20, provider order
 
-ProviderSubjectOption
-  provider_subject_ref:ProviderSubjectRef
-  display_hints:string[] // maxItems3; each nonblank <=256
+CompanyView { company_id:Uuid, display_name:nonblank string }
+ReplaceCompanyRequest { display_name:nonblank string }
 
-ProviderSubjectSearchView
-  items:ProviderSubjectOption[] // maxItems20, provider order
+UserProfileInput { display_name:nonblank string, email?:EmailAddress }
+CreateUserRequest { provider_subject_ref:ProviderSubjectRef, profile:UserProfileInput }
+CreateUserResult { user_id:Uuid }
+UserView { user:UserReference, eligibility:UserEligibilityState }
+UserPage { items:UserView[], page:Page }
+UserProfileView { user_id:Uuid, display_name:nonblank string, email?:EmailAddress }
+ReplaceUserProfileRequest { display_name:nonblank string, email?:EmailAddress }
+UserProviderBindingView { user_id:Uuid, provider_subject_ref:ProviderSubjectRef }
+ReplaceUserProviderBindingRequest { provider_subject_ref:ProviderSubjectRef }
+UserEligibilityView { user_id:Uuid, state:UserEligibilityState }
+ReplaceUserEligibilityRequest { state:UserEligibilityState }
 
-CompanyView
-  company_id:Uuid
-  display_name:nonblank string
-ReplaceCompanyRequest
-  display_name:nonblank string
+AreaView { area_id:Uuid, code:CodeToken, name:nonblank string }
+AreaSummary { area:AreaReference, state:AreaLifecycleState }
+AreaPage { items:AreaSummary[], page:Page }
+CreateAreaRequest { code:CodeInput, name:nonblank string }
+CreateAreaResult { area_id:Uuid }
+ReplaceAreaRequest { name:nonblank string }
+AreaLifecycleView { area_id:Uuid, state:AreaLifecycleState }
+ReplaceAreaLifecycleRequest { state:AreaLifecycleState }
 
-UserProfileInput
-  display_name:nonblank string
-  email?:EmailAddress
-CreateUserRequest
-  provider_subject_ref:ProviderSubjectRef
-  profile:UserProfileInput
-CreateUserResult
-  user_id:Uuid
-
-UserView
-  user:UserReference
-  eligibility:UserEligibilityState
-UserPage
-  items:UserView[]
-  page:Page
-
-UserProfileView
-  user_id:Uuid
-  display_name:nonblank string
-  email?:EmailAddress
-ReplaceUserProfileRequest
-  display_name:nonblank string
-  email?:EmailAddress // omitted => resulting profile has no email
-
-UserProviderBindingView
-  user_id:Uuid
-  provider_subject_ref:ProviderSubjectRef
-ReplaceUserProviderBindingRequest
-  provider_subject_ref:ProviderSubjectRef
-
-UserEligibilityView
-  user_id:Uuid
-  state:UserEligibilityState
-ReplaceUserEligibilityRequest
-  state:UserEligibilityState
-
-AreaView
-  area_id:Uuid
-  code:CodeToken
-  name:nonblank string
-AreaSummary
-  area:AreaReference
-  state:AreaLifecycleState
-AreaPage
-  items:AreaSummary[]
-  page:Page
-CreateAreaRequest
-  code:CodeInput
-  name:nonblank string
-CreateAreaResult
-  area_id:Uuid
-ReplaceAreaRequest
-  name:nonblank string
-AreaLifecycleView
-  area_id:Uuid
-  state:AreaLifecycleState
-ReplaceAreaLifecycleRequest
-  state:AreaLifecycleState
-
-GroupView
-  group_id:Uuid
-  name:nonblank string
-GroupPage
-  items:GroupView[]
-  page:Page
-CreateGroupRequest / ReplaceGroupRequest
-  name:nonblank string
-CreateGroupResult
-  group_id:Uuid
-GroupMemberPage
-  items:UserReference[]
-  page:Page
+GroupView { group_id:Uuid, name:nonblank string }
+GroupPage { items:GroupView[], page:Page }
+CreateGroupRequest / ReplaceGroupRequest { name:nonblank string }
+CreateGroupResult { group_id:Uuid }
+GroupMemberPage { items:UserReference[], page:Page }
 ```
 
 CreateUser establishes enabled User + required profile + binding atomically. New Area starts active. Area code is immutable and absent from replacement. Profile DELETE removes the profile subresource; already absent ->404 rather than inventing `ensure absent` semantics.
@@ -647,27 +574,12 @@ governance_viewer  scopes[company,area]  document.read_effective,document.read_h
 ```
 
 ```text
-RoleView
-  code:RoleCode
-  permissions:unique PermissionCode[] in bundle order above
-  allowed_scope_kinds:unique RoleAssignmentScopeKind[] in order above
-RoleListView
-  items in order governance_admin,area_manager,author,approver,viewer,governance_viewer
-
-RoleAssignmentView
-  assignment_id:Uuid
-  subject:RoleAssignmentSubject
-  role:RoleCode
-  scope:RoleAssignmentScope
-RoleAssignmentPage
-  items:RoleAssignmentView[]
-  page:Page
-CreateRoleAssignmentRequest
-  subject:RoleAssignmentSubject
-  role:RoleCode
-  scope:RoleAssignmentScope
-CreateRoleAssignmentResult
-  assignment_id:Uuid
+RoleView { code:RoleCode, permissions:unique PermissionCode[], allowed_scope_kinds:unique RoleAssignmentScopeKind[] }
+RoleListView { items in order governance_admin,area_manager,author,approver,viewer,governance_viewer }
+RoleAssignmentView { assignment_id:Uuid, subject:RoleAssignmentSubject, role:RoleCode, scope:RoleAssignmentScope }
+RoleAssignmentPage { items:RoleAssignmentView[], page:Page }
+CreateRoleAssignmentRequest { subject:RoleAssignmentSubject, role:RoleCode, scope:RoleAssignmentScope }
+CreateRoleAssignmentResult { assignment_id:Uuid }
 ```
 
 No editable Role/Permission policy API.
@@ -675,163 +587,50 @@ No editable Role/Permission policy API.
 ## 3.4 Document Governance
 
 ```text
-DocumentTypeView
-  document_type_id:Uuid
-  code:CodeToken
-  name:nonblank string
-  numbering_scope:NumberingScope
-  active:boolean
-DocumentTypePage
-  items:DocumentTypeView[]
-  page:Page
-
-CreateDocumentTypeRequest
-  code:CodeInput
-  name:nonblank string
-  numbering_scope:NumberingScope
-  active:boolean
-  governance:GovernancePolicy
-  representation:RepresentationPolicy
-  // eligible templates start empty
-CreateDocumentTypeResult
-  document_type_id:Uuid
-
-ReplaceDocumentTypeRequest
-  code:CodeInput
-  name:nonblank string
-  numbering_scope:NumberingScope
-  active:boolean
-
-DocumentTypeGovernanceView / ReplaceDocumentTypeGovernanceRequest
-  governance:GovernancePolicy
-  representation:RepresentationPolicy
-
-EligibleTemplatesView
-  templates:DocumentReference[] // code,id order; stable refs only for ETag domain
-ReplaceEligibleTemplatesRequest
-  template_document_ids:unique Uuid[] // empty valid
-
-NumberingPreviewView
-  preview_code:DocumentCode
-  reservation:false
-
-TemplateConfigurationItem
-  document:DocumentReference
-  template_role:boolean
-  has_effective_revision:boolean
-  current_effective_title?:nonblank string
-  eligible_document_type_ids:unique Uuid[]
-TemplateConfigurationPage
-  items:TemplateConfigurationItem[]
-  page:Page
+DocumentTypeView { document_type_id:Uuid, code:CodeToken, name:nonblank string, numbering_scope:NumberingScope, active:boolean }
+DocumentTypePage { items:DocumentTypeView[], page:Page }
+CreateDocumentTypeRequest { code:CodeInput, name:nonblank string, numbering_scope:NumberingScope, active:boolean, governance:GovernancePolicy, representation:RepresentationPolicy }
+CreateDocumentTypeResult { document_type_id:Uuid }
+ReplaceDocumentTypeRequest { code:CodeInput, name:nonblank string, numbering_scope:NumberingScope, active:boolean }
+DocumentTypeGovernanceView / ReplaceDocumentTypeGovernanceRequest { governance:GovernancePolicy, representation:RepresentationPolicy }
+EligibleTemplatesView { templates:DocumentReference[] } // code,id order; stable refs only
+ReplaceEligibleTemplatesRequest { template_document_ids:unique Uuid[] } // empty valid
+NumberingPreviewView { preview_code:DocumentCode, reservation:false }
+TemplateConfigurationItem { document:DocumentReference, template_role:boolean, has_effective_revision:boolean, current_effective_title?:nonblank string, eligible_document_type_ids:unique Uuid[] }
+TemplateConfigurationPage { items:TemplateConfigurationItem[], page:Page }
 ```
 
-Create explicitly supplies initial governance/representation because T8-D requires current values and no accepted default exists. Base replacement rejects normalized code/numbering-scope change after first committed Document with409.
+Create explicitly supplies initial governance/representation because T8-D requires current values and no accepted default exists. Eligible-template set starts empty. Base replacement rejects normalized code/numbering-scope change after first committed Document with409.
 
 ## 3.5 Controlled Documents — create/read/work/upload
 
 ```text
-TemplateCreationOption
-  document:DocumentReference
-  effective_revision:RevisionReference
-
-DocumentCreationOptionsView
-  areas:AreaReference[]
-  document_types:DocumentTypeReference[]
-  templates:TemplateCreationOption[]
-  default_responsible_owner:UserReference
-  responsible_owner_candidates?:UserReference[]
-
-CreateDocumentRequest
-  document_type_id:Uuid
-  area_id:Uuid
-  title:nonblank string
-  template_document_id?:Uuid
-  responsible_owner_user_id?:Uuid
-CreateDocumentResult
-  document_id:Uuid
-  revision_id:Uuid
-
-DocumentSummary
-  document:DocumentReference
-  document_type:DocumentTypeReference
-  area:AreaReference
-  responsible_owner:UserReference
-  status:DocumentCatalogStatus
-  official_revision?:RevisionReference
-DocumentPage
-  items:DocumentSummary[]
-  page:Page
-
-ReleasedRevisionView
-  revision:RevisionIdentity
-  title:nonblank string
-  release_id:Uuid
-  released_at:UtcInstant
-  source:ContentSummary
-  representation:
-    {kind:source_only}
-    {kind:official_rendition,official_rendition_id:Uuid,content:ContentSummary}
-
-DocumentOfficialView
-  document:DocumentReference
-  document_type:DocumentTypeReference
-  area:AreaReference
-  responsible_owner:UserReference
-  status:DocumentOfficialStatus
-  official?:ReleasedRevisionView
+TemplateCreationOption { document:DocumentReference, effective_revision:RevisionReference }
+DocumentCreationOptionsView { areas:AreaReference[], document_types:DocumentTypeReference[], templates:TemplateCreationOption[], default_responsible_owner:UserReference, responsible_owner_candidates?:UserReference[] }
+CreateDocumentRequest { document_type_id:Uuid, area_id:Uuid, title:nonblank string, template_document_id?:Uuid, responsible_owner_user_id?:Uuid }
+CreateDocumentResult { document_id:Uuid, revision_id:Uuid }
+DocumentSummary { document:DocumentReference, document_type:DocumentTypeReference, area:AreaReference, responsible_owner:UserReference, status:DocumentCatalogStatus, official_revision?:RevisionReference }
+DocumentPage { items:DocumentSummary[], page:Page }
+ReleasedRevisionView { revision:RevisionIdentity, title:nonblank string, release_id:Uuid, released_at:UtcInstant, source:ContentSummary, representation:{kind:source_only}|{kind:official_rendition,official_rendition_id:Uuid,content:ContentSummary} }
+DocumentOfficialView { document:DocumentReference, document_type:DocumentTypeReference, area:AreaReference, responsible_owner:UserReference, status:DocumentOfficialStatus, official?:ReleasedRevisionView }
 ```
 
-`official` is present iff at least one Release exists; obsolete retains last released official. A newer cancelled/open Revision never replaces older EFFECTIVE official truth. Before first Release, status may be draft/submitted/cancelled and `official` is absent.
+`official` is present iff at least one Release exists; obsolete retains last released official. Newer cancelled/open work never replaces older EFFECTIVE official truth. Before first Release, status may be draft/submitted/cancelled and `official` is absent.
 
 ```text
-ResponsibleOwnerView
-  document_id:Uuid
-  responsible_owner_user_id:Uuid
-ReplaceResponsibleOwnerRequest
-  user_id:Uuid
-
-TemplateRoleView
-  document_id:Uuid
-  is_template:boolean
-ReplaceTemplateRoleRequest
-  is_template:boolean
-
-CreateRevisionResult
-  revision_id:Uuid
-
-RevisionView
-  revision:RevisionIdentity
-  document:DocumentReference
-  title:nonblank string
-  state:RevisionState
-  created_at:UtcInstant
-  current_submission_id?:Uuid // iff submitted
-
-DocumentWorkView
-  document:DocumentReference
-  revision:RevisionIdentity
-  title:nonblank string
-  content:ContentSummary
-  updated_at:UtcInstant
-
-UpdateDraftRequest
-  title?:nonblank string
-  source_upload_id?:Uuid
-  minProperties=1; null forbidden; omitted=unchanged
-
-StartDraftUploadRequest
-  expected_size_bytes:integer minimum1 maximum DOC_RAW_MAX_BYTES
-
-DraftUploadAllocation
-  upload_id:Uuid
-  upload_url:URI
-  expires_at:UtcInstant
-  max_bytes:ByteCount
-  required_headers:map<string,string>
+ResponsibleOwnerView { document_id:Uuid, responsible_owner_user_id:Uuid }
+ReplaceResponsibleOwnerRequest { user_id:Uuid }
+TemplateRoleView { document_id:Uuid, is_template:boolean }
+ReplaceTemplateRoleRequest { is_template:boolean }
+CreateRevisionResult { revision_id:Uuid }
+RevisionView { revision:RevisionIdentity, document:DocumentReference, title:nonblank string, state:RevisionState, created_at:UtcInstant, current_submission_id?:Uuid }
+DocumentWorkView { document:DocumentReference, revision:RevisionIdentity, title:nonblank string, content:ContentSummary, updated_at:UtcInstant }
+UpdateDraftRequest { title?:nonblank string, source_upload_id?:Uuid } // minProperties1; null forbidden; omitted unchanged
+StartDraftUploadRequest { expected_size_bytes:integer minimum1 maximum DOC_RAW_MAX_BYTES }
+DraftUploadAllocation { upload_id:Uuid, upload_url:URI, expires_at:UtcInstant, max_bytes:ByteCount, required_headers:map<string,string> }
 ```
 
-Raw WorkingContent generation is never public; ETag is wire OCC authority. Upload capability exposes no provider account/bucket/key/version/ETag.
+Raw WorkingContent generation is never public; ETag is wire OCC authority.
 
 ## 3.6 Submission / representation gate
 
@@ -840,82 +639,51 @@ SubmissionCreateResult
   {state:governance_pending,submission_id:Uuid,governance_attempt_id:Uuid}
   {state:rendition_pending,submission_id:Uuid}
   {state:released,submission_id:Uuid,release_id:Uuid}
-
-SubmissionHumanGate
-  required:boolean
-  satisfied:boolean
-SubmissionRepresentationGate
-  required:boolean
-  satisfied:boolean
-  attention_required:boolean
-
-SubmissionView
-  submission_id:Uuid
-  revision:RevisionIdentity
-  title:nonblank string // frozen snapshot
-  submitter:UserReference
-  submitted_at:UtcInstant
-  content:ContentSummary
-  governance_mode:GovernanceMode
-  representation:RepresentationPolicy
-  human_gate:SubmissionHumanGate
-  representation_gate:SubmissionRepresentationGate
-  governance_attempt_id?:Uuid
-  release_id?:Uuid
-  termination?:SubmissionTerminationKind
+SubmissionHumanGate { required:boolean, satisfied:boolean }
+SubmissionRepresentationGate { required:boolean, satisfied:boolean, attention_required:boolean }
+SubmissionView { submission_id:Uuid, revision:RevisionIdentity, title:nonblank string, submitter:UserReference, submitted_at:UtcInstant, content:ContentSummary, governance_mode:GovernanceMode, representation:RepresentationPolicy, human_gate:SubmissionHumanGate, representation_gate:SubmissionRepresentationGate, governance_attempt_id?:Uuid, release_id?:Uuid, termination?:SubmissionTerminationKind }
 ```
 
 Cross-field law:
 
 ```text
-governance_attempt_id iff governance_mode=use_governance_route
+governance_attempt_id iff governance route
 human_gate.required iff governance route; not-required => satisfied
 representation_gate.required iff require_official_rendition; not-required => satisfied
 attention_required only while rendition required + unsatisfied + terminal renderer attention exists
 release_id and termination mutually exclusive
 ```
 
-Representation execution is exact and subtractive:
+Representation execution:
 
 ```text
 SourceOnly + DOCX/PDF
   representation gate satisfied by absence
 
-RequireOfficialRendition(PDF) + submitted source PDF
-  establish OfficialRendition semantic fact over the exact same admitted PDF bytes/descriptor
+RequireOfficialRendition(PDF) + submitted PDF
+  establish OfficialRendition semantic fact over the exact same already-admitted PDF handle/descriptor
   no physical duplicate, renderer job, or provider copy
-  representation gate satisfied synchronously
+  gate satisfied synchronously
 
-RequireOfficialRendition(PDF) + submitted source DOCX
-  durable renderer intent required
+RequireOfficialRendition(PDF) + submitted DOCX
+  durable renderer intent
   gate pending until exact admitted OfficialRendition PDF exists
 ```
 
-This consumes T5's existing PDF-direct-view law and avoids generating a duplicate PDF solely to satisfy a representation label.
-
-Submission creation result selects the next Product state, not a job state:
+Creation result:
 
 ```text
-human governance required                           -> governance_pending
-no human + DOCX rendition still required           -> rendition_pending
-all gates synchronously satisfied                   -> released
+human governance required                  governance_pending
+no human + DOCX rendition pending          rendition_pending
+all gates synchronously satisfied          released
 ```
 
-A human-governed DOCX may render concurrently in mechanism space; initial result remains `governance_pending`, while `SubmissionView` exposes both orthogonal gates.
+Human-governed DOCX may render concurrently in mechanism space; initial result remains `governance_pending` while `SubmissionView` exposes orthogonal gates.
 
 ```text
-SubmissionWithdrawalView
-  submission_id:Uuid
-  actor:UserReference
-  withdrawn_at:UtcInstant
-
-RevisionCancellationRequest
-  reason:nonblank string
-RevisionCancellationView
-  revision_id:Uuid
-  actor:UserReference
-  reason:nonblank string
-  cancelled_at:UtcInstant
+SubmissionWithdrawalView { submission_id:Uuid, actor:UserReference, withdrawn_at:UtcInstant }
+RevisionCancellationRequest { reason:nonblank string }
+RevisionCancellationView { revision_id:Uuid, actor:UserReference, reason:nonblank string, cancelled_at:UtcInstant }
 ```
 
 Cancellation singleton: first201; exact same reason repeat200; different later reason409.
@@ -923,64 +691,24 @@ Cancellation singleton: first201; exact same reason repeat200; different later r
 ## 3.7 Governance / history / work
 
 ```text
-GovernanceFeedbackView
-  feedback_id:Uuid
-  actor:UserReference
-  message:nonblank string
-  created_at:UtcInstant
-GovernanceFeedbackPage
-  items:GovernanceFeedbackView[]
-  page:Page
-CreateGovernanceFeedbackRequest
-  message:nonblank string
-CreateGovernanceFeedbackResult
-  feedback_id:Uuid
-
-GovernanceDecisionRequest
-  {outcome:accept}
-  {outcome:return_for_changes,reason:nonblank string}
-GovernanceDecisionView
-  {decision_id:Uuid,outcome:accept,actor:UserReference,decided_at:UtcInstant}
-  {decision_id:Uuid,outcome:return_for_changes,actor:UserReference,decided_at:UtcInstant,reason:nonblank string}
-
-GovernanceStepView
-  {step_id:Uuid,label:nonblank string,state:pending}
-  {step_id:Uuid,label:nonblank string,state:active}
-  {step_id:Uuid,label:nonblank string,state:decided,decision:GovernanceDecisionView}
+GovernanceFeedbackView { feedback_id:Uuid, actor:UserReference, message:nonblank string, created_at:UtcInstant }
+GovernanceFeedbackPage { items:GovernanceFeedbackView[], page:Page }
+CreateGovernanceFeedbackRequest { message:nonblank string }
+CreateGovernanceFeedbackResult { feedback_id:Uuid }
+GovernanceDecisionRequest {outcome:accept} | {outcome:return_for_changes,reason:nonblank string}
+GovernanceDecisionView {decision_id:Uuid,outcome:accept,actor:UserReference,decided_at:UtcInstant} | {decision_id:Uuid,outcome:return_for_changes,actor:UserReference,decided_at:UtcInstant,reason:nonblank string}
+GovernanceStepView {step_id:Uuid,label:nonblank string,state:pending} | {step_id:Uuid,label:nonblank string,state:active} | {step_id:Uuid,label:nonblank string,state:decided,decision:GovernanceDecisionView}
 ```
 
 Step array order is frozen route order; persistence ordinal/candidate snapshots/Group membership/grants/provider claims are not exposed.
 
 ```text
-SubmissionGovernanceSubject
-  kind:submission
-  submission_id:Uuid
-  document:DocumentReference
-  revision:RevisionIdentity
-  title:nonblank string
-  submitter:UserReference
-  submitted_at:UtcInstant
-  content:ContentSummary
-
-ObsolescenceGovernanceSubject
-  kind:obsolescence
-  request_id:Uuid
-  document:DocumentReference
-  target_revision:RevisionReference
-  initiator:UserReference
-  reason:nonblank string
-  requested_at:UtcInstant
-
-GovernanceCaseView
-  governance_attempt_id:Uuid
-  state:GovernanceAttemptState
-  subject:SubmissionGovernanceSubject|ObsolescenceGovernanceSubject
-  steps:GovernanceStepView[] in route order
-  feedback:GovernanceFeedbackPage // first20; cursor targets listGovernanceFeedback
-  allowed_actions:unique GovernanceCaseAction[]
+SubmissionGovernanceSubject { kind:submission, submission_id:Uuid, document:DocumentReference, revision:RevisionIdentity, title:nonblank string, submitter:UserReference, submitted_at:UtcInstant, content:ContentSummary }
+ObsolescenceGovernanceSubject { kind:obsolescence, request_id:Uuid, document:DocumentReference, target_revision:RevisionReference, initiator:UserReference, reason:nonblank string, requested_at:UtcInstant }
+GovernanceCaseView { governance_attempt_id:Uuid, state:GovernanceAttemptState, subject:SubmissionGovernanceSubject|ObsolescenceGovernanceSubject, steps:GovernanceStepView[], feedback:GovernanceFeedbackPage, allowed_actions:unique GovernanceCaseAction[] }
 ```
 
-`allowed_actions` canonical order is `accept, return_for_changes, add_feedback`, filtered from the same current T3 + Controlled Documents decisions used by commands; array may be empty. Every command rechecks canonical truth.
+Embedded feedback is first20 and any cursor targets `listGovernanceFeedback`. `allowed_actions` canonical order is `accept, return_for_changes, add_feedback`, filtered from the same current T3 + Controlled Documents decisions used by commands; may be empty.
 
 Decision singleton: first201; exact same outcome+reason repeat200; any later different outcome/reason ->409 `state.governance_step_already_decided`.
 
@@ -1017,14 +745,9 @@ ReleaseView
     representation:{kind:source_only,source:ContentSummary}
   official-rendition:
     same core,
-    representation:{kind:official_rendition,source:ContentSummary,
-                    official_rendition_id:Uuid,official_rendition:ContentSummary}
-
-ObsolescenceRequestCreateRequest
-  reason:nonblank string
-ObsolescenceCreateResult
-  {state:governance_pending,request_id:Uuid,governance_attempt_id:Uuid}
-  {state:obsolete,request_id:Uuid}
+    representation:{kind:official_rendition,source:ContentSummary,official_rendition_id:Uuid,official_rendition:ContentSummary}
+ObsolescenceRequestCreateRequest { reason:nonblank string }
+ObsolescenceCreateResult {state:governance_pending,request_id:Uuid,governance_attempt_id:Uuid} | {state:obsolete,request_id:Uuid}
 ```
 
 `ObsolescenceRequestView` state union:
@@ -1038,12 +761,7 @@ completed-no-human
   same core + state=completed + ended_at; governance_attempt_id absent
 ```
 
-```text
-ObsolescenceWithdrawalView
-  request_id:Uuid
-  actor:UserReference
-  withdrawn_at:UtcInstant
-```
+`ObsolescenceWithdrawalView { request_id:Uuid, actor:UserReference, withdrawn_at:UtcInstant }`.
 
 Release remains immutable/system-owned; no publish mutation.
 
@@ -1054,12 +772,8 @@ Release remains immutable/system-owned; no publish mutation.
 Audit projects T3 evidence only; raw JSONB facts and operational correlation metadata are not exposed.
 
 ```text
-AuditActor
-  {kind:user,user_id:Uuid}
-  {kind:system,system_actor_code:metaldocs}
-AuditVisibility
-  {kind:company}
-  {kind:area,area_id:Uuid}
+AuditActor {kind:user,user_id:Uuid} | {kind:system,system_actor_code:metaldocs}
+AuditVisibility {kind:company} | {kind:area,area_id:Uuid}
 ```
 
 Reachable Launch `AuditOperationCode` set:
@@ -1119,45 +833,17 @@ GroupMembership has no invented UUID/resource kind: membership events use `resou
 Typed wire facts only when operation/resource identity is insufficient:
 
 ```text
-GroupMembershipAuditFacts
-  user_id:Uuid
-
-RoleAssignmentAuditFacts
-  subject:RoleAssignmentSubject
-  role:RoleCode
-  scope:RoleAssignmentScope
-
-GovernanceDecisionAuditFacts
-  governance_attempt_id:Uuid
-  step_id:Uuid
-  subject_kind:GovernanceSubjectKind
-  subject_id:Uuid
-  outcome:GovernanceDecisionOutcome
-
-ReleaseAuditFacts
-  document_id:Uuid
-  revision_id:Uuid
-  submission_id:Uuid
-  predecessor_revision_id?:Uuid
-
-RevisionCancellationAuditFacts
-  document_id:Uuid
-  revision_id:Uuid
-
-ObsolescenceAuditFacts
-  document_id:Uuid
-  target_revision_id:Uuid
+GroupMembershipAuditFacts { user_id:Uuid }
+RoleAssignmentAuditFacts { subject:RoleAssignmentSubject, role:RoleCode, scope:RoleAssignmentScope }
+GovernanceDecisionAuditFacts { governance_attempt_id:Uuid, step_id:Uuid, subject_kind:GovernanceSubjectKind, subject_id:Uuid, outcome:GovernanceDecisionOutcome }
+ReleaseAuditFacts { document_id:Uuid, revision_id:Uuid, submission_id:Uuid, predecessor_revision_id?:Uuid }
+RevisionCancellationAuditFacts { document_id:Uuid, revision_id:Uuid }
+ObsolescenceAuditFacts { document_id:Uuid, target_revision_id:Uuid }
 ```
 
 `resource_id` supplies group/assignment/decision/release/obsolescence evidence identity; duplicate IDs are not repeated inside facts.
 
-`AuditEventView` is a closed `operation_code`-discriminated union with common:
-
-```text
-event_id, occurred_at, actor, operation_code, resource_kind, resource_id, visibility
-```
-
-Simple branches have no facts member; typed branches require the matching facts above. No free-form feedback/reason/profile/provider payload.
+`AuditEventView` is a closed `operation_code`-discriminated union with common `event_id,occurred_at,actor,operation_code,resource_kind,resource_id,visibility`. Simple branches have no `facts`; typed branches require the matching facts. No free-form feedback/reason/profile/provider payload.
 
 `AuditEventPage={items:AuditEventView[],page:Page}` ordered `occurred_at DESC,event_id DESC`. `GET /audit/events` accepts only cursor/limit; `audit.read` historical visibility filtering occurs before pagination. No inferred Audit filter.
 
@@ -1242,7 +928,7 @@ All path `*_id` parameters are required `Uuid`. `PAGED` means §2.7. JSON reques
 |8|`getUser`|`GET /api/v1/users/{user_id}`|`SAFE_READ`|`200 UserView`|`JSON_NO_STORE`|none|`A + N`|
 |9|`getUserProfile`|`GET /api/v1/users/{user_id}/profile`|`SAFE_READ`|`200 UserProfileView`|`JSON_ETAG`|none|`A + N`|
 |10|`replaceUserProfile`|`PUT /api/v1/users/{user_id}/profile`|`ReplaceUserProfileRequest` / `PROFILE_REPLACE`|`200` replace or `201` recreate, `UserProfileView`|`JSON_ETAG_MUTATION`|none|`U + J + N + P`|
-|11|`deleteUserProfile`|`DELETE /api/v1/users/{user_id}/profile`|no body / `UNSAFE_CSRF`|`204` first delete|`NO_STORE`|absent profile ->404|`U + N`|
+|11|`deleteUserProfile`|`DELETE /api/v1/users/{user_id}/profile`|no body / `UNSAFE_CSRF`|`204` first delete|`NO_STORE`|absent profile->404|`U + N`|
 |12|`getUserProviderBinding`|`GET /api/v1/users/{user_id}/provider-binding`|`SAFE_READ`|`200 UserProviderBindingView`|`JSON_ETAG`|none|`A + N`|
 |13|`replaceUserProviderBinding`|`PUT /api/v1/users/{user_id}/provider-binding`|`ReplaceUserProviderBindingRequest` / `IF_MATCH_MUTATION`|`200 UserProviderBindingView`|`JSON_ETAG_MUTATION`|none|`U + J + N + P + S`|
 |14|`getUserEligibility`|`GET /api/v1/users/{user_id}/eligibility`|`SAFE_READ`|`200 UserEligibilityView`|`JSON_ETAG`|none|`A + N`|
@@ -1298,7 +984,7 @@ Rows35/38/39 are promotion-blocked by §8.1.
 |57|`getRevisionDraft`|`GET /api/v1/revisions/{revision_id}/draft`|`SAFE_READ`|`200 DocumentWorkView`|`JSON_ETAG`|none|`A + N`|
 |58|`updateRevisionDraft`|`PATCH /api/v1/revisions/{revision_id}/draft`|`UpdateDraftRequest` / `IF_MATCH_MUTATION`|`200 DocumentWorkView`|`JSON_ETAG_MUTATION`|none|`U + J + N + D + S + state.upload_expired`|
 |59|`startRevisionDraftUpload`|`POST /api/v1/revisions/{revision_id}/draft/uploads`|`StartDraftUploadRequest` / `UNSAFE_CSRF`|`201 DraftUploadAllocation`|`JSON_NO_STORE`|none|`U + J + N + S`|
-|60|`completeRevisionDraftUpload`|`POST /api/v1/revisions/{revision_id}/draft/uploads/{upload_id}/complete`|no body / `UNSAFE_CSRF`|`204`, including READY repeat|`NO_STORE`|none|`U + N + S + state.upload_expired + validation.content_invalid`|
+|60|`completeRevisionDraftUpload`|`POST /api/v1/revisions/{revision_id}/draft/uploads/{upload_id}/complete`|no body / `UNSAFE_CSRF`|`204` live READY repeat|`NO_STORE`|none|`U + N + S + state.upload_expired + validation.content_invalid`|
 |61|`getRevisionDraftSource`|`GET /api/v1/revisions/{revision_id}/draft/source`|`SAFE_READ`|`200 exact bytes`|`EXACT_BYTES`|none|`A + N + X`|
 |62|`createSubmission`|`POST /api/v1/revisions/{revision_id}/submissions`|no body / `SUBMISSION_CREATE`|`201 SubmissionCreateResult`|`JSON_NO_STORE`|none|`U + N + I + D + S + validation.failed + validation.content_malicious + dependency.malware_inspector_unavailable`|
 |63|`getSubmission`|`GET /api/v1/submissions/{submission_id}`|`SAFE_READ`|`200 SubmissionView`|`JSON_NO_STORE`|none|`A + N`|
@@ -1317,7 +1003,7 @@ Rows35/38/39 are promotion-blocked by §8.1.
 |76|`getObsolescenceRequest`|`GET /api/v1/obsolescence-requests/{request_id}`|`SAFE_READ`|`200 ObsolescenceRequestView`|`JSON_NO_STORE`|none|`A + N`|
 |77|`withdrawObsolescenceRequest`|`PUT /api/v1/obsolescence-requests/{request_id}/withdrawal`|no body / `UNSAFE_CSRF`|`201 ObsolescenceWithdrawalView` first; `200` exact repeat|`JSON_NO_STORE`|none|`U + N + S`|
 
-Rows59 and67 are promotion-blocked by bounded upstream prerequisites in §8.
+Row67 is promotion-blocked by §8.1. Row59 is fully expressible through existing T8-C after §2.10 consumer precision.
 
 ## 6.3 Audit — 78
 
@@ -1351,20 +1037,21 @@ DOCX_EXPANDED_MAX_BYTES
 DOCX_MAX_ZIP_ENTRIES
 ```
 
-Closed structural laws independent of the final numbers:
+Closed structural laws independent of final numbers:
 
 ```text
-DOCX = valid top-level OOXML/OPC ZIP package with WordprocessingML main document
-no recursive archive expansion of embedded payloads
-no absolute/parent-traversal ZIP paths
-no symlink entry extraction
+DOCX = valid top-level OOXML/OPC ZIP with WordprocessingML main document
+duplicate canonical ZIP part names rejected
+absolute/parent-traversal paths rejected
+symlink entry extraction rejected
+no recursive expansion of embedded archives
 stream expansion while enforcing cumulative expanded-byte + entry-count ceilings
-PDF = structurally parseable PDF, not extension/Content-Type trust
+encrypted/password-protected or macro-enabled/non-DOCX Office packages rejected as DOCX
+PDF = structurally parseable PDF; encrypted/password-protected PDF rejected at Launch
 client filename/Content-Type never decides actual ContentFormat
-encrypted/macro-enabled/non-DOCX Office packages are not accepted as DOCX
 ```
 
-Because validation does not recursively unpack arbitrary embedded archives, application archive depth is exactly one and no generic nested-archive framework/ratio limit is added. Malware inspection remains a separate exact-byte governed-boundary control.
+Validation does not recursively unpack arbitrary embedded archives, so application archive depth is exactly one and no generic nested-archive framework/ratio limit is added. Malware inspection remains a separate exact-byte governed-boundary control.
 
 Measurement protocol:
 
@@ -1404,7 +1091,6 @@ Smallest correction if operator ratifies:
 ```text
 controlled_docs.document_type_governance_steps
   + label TEXT NOT NULL
-
 controlled_docs.governance_attempt_steps
   + label_snapshot TEXT NOT NULL
 ```
@@ -1425,25 +1111,19 @@ OUTCOME   bounded T3 precision: remove disabled from required binding Audit cens
 
 No Product operation/persistence field/replacement behavior changes. Wire exposes only `provider_binding.accepted|replaced` pending operator adjudication.
 
-## 8.3 T8-C — direct PUT max-size contract cannot remain max-only
+## 8.3 Subtractive result — no T8-C reopen for direct PUT
 
-T8-C currently sketches:
-
-```text
-PresignCreate(handle,maxBytes,ttl)
-```
-
-Accepted T8-E requires create-only direct provider PUT. S3's range-size constraint belongs POST policy; a PUT can instead be bounded by signing/enforcing one exact `Content-Length`. A max-only PUT URL without a client-known expected length would allow a malicious caller to send a larger object before completion detects it, defeating the purpose of `maxBytes` as an ingress resource bound.
-
-T8-E closes the public request with `expected_size_bytes` (§2.10). Smallest bounded T8-C precision if operator ratifies:
+The Lead initially treated exact PUT length as a possible T8-C signature gap. Structural inversion removed that reopen:
 
 ```text
-PresignCreate(handle,expectedBytes,ttl)
+current seam: PresignCreate(handle,maxBytes,ttl)
+consumer call: maxBytes = expected_size_bytes
+provider PUT profile: exact Content-Length = maxBytes
 ```
 
-Caller validates `1 <= expectedBytes <= DOC_RAW_MAX_BYTES` before the mechanism call; provider contract enforces exact body length + create-once. Completion still derives authoritative actual size/hash/format independently. No POST form, multipart, provider identity, semantic descriptor from client, or new API operation.
+A capability that allows exactly `maxBytes` bytes is a valid, stricter realization of an at-most-`maxBytes` contract. Therefore the current seam is sufficient; no new parameter or durable authority is needed. This is retained as an explicit subtractive finding so a later Writer does not reintroduce a pointless T8-C change.
 
-T8-E cannot promote until §8.1→§8.3 are explicitly reconciled with their owning durable authorities.
+T8-E cannot promote until §8.1/§8.2 are explicitly reconciled with their owning durable authorities.
 
 ---
 
@@ -1491,7 +1171,7 @@ raw HTTP
 Required negative fixtures additionally cover:
 
 ```text
-all 78 operation rows and no 79th
+all 78 rows and no 79th
 role bundles/scope matrix
 wrong-domain/stale ETags + exact-current PUT exception
 stale DRAFT always412
@@ -1499,7 +1179,7 @@ PROFILE_REPLACE matrix
 Idempotency-Key replay/different fingerprint/24h expiry
 cursor tamper/filter replay
 complete creation/options arrays
-upload exact Content-Length/create-once/15min expiry + completion size re-proof
+upload exact Content-Length/create-once/shared15min expiry + completion size re-proof
 Audit operation/resource/facts combinations
 router404/405 without implicit HEAD/OPTIONS
 exact bytes verified before response commit
@@ -1513,9 +1193,9 @@ all measured document ceilings
 
 No generic production response-buffer validator is added. Generated typed output + contract tests remain accepted minimum.
 
-Current execution environment used by this Lead pass does not contain the pinned generator binaries/toolchains and has no direct package-network access; therefore the executable generation/compile probe remains **OPEN**, never papered over by documentation evidence.
+Current Lead execution environment has Go1.23.2/Node22 but not the pinned generator binaries and no direct package-network access; executable generation/compile probe remains **OPEN**, never papered over by documentation evidence.
 
-External evidence checked: OpenAPI3.0.3 schema semantics; RFC9110; RFC9457; RFC9530; OWASP upload/archive resource controls; AWS S3 PutObject/conditional-write/SigV4 content-length behavior; current `oapi-codegen` and `openapi-typescript` docs.
+External evidence checked: OpenAPI3.0.3; RFC9110; RFC9457; RFC9530; OWASP upload/archive resource controls; AWS S3 PutObject/conditional-write/SigV4 content-length behavior; current `oapi-codegen` and `openapi-typescript` docs.
 
 ---
 
@@ -1543,7 +1223,8 @@ editable Role/Permission/policy engine
 separate Approval API
 operation79
 server-side cursor state
-POST-form/multipart without measured need
+new T8-C presign signature
+S3 POST-form/multipart without measured need
 Range/HEAD/304 baseline
 arbitrary Problem extension/default response
 generator-specific Product fields
@@ -1553,7 +1234,7 @@ duplicate PDF rendition bytes for PDF source
 dormant future capability
 ```
 
-The three upstream findings in §8 are bounded completeness/contract contradictions. None justifies reopening Product, lifecycle, ownership, topology, or the 78-operation census.
+The two material upstream findings in §8.1/§8.2 are bounded completeness contradictions. Neither justifies reopening Product, lifecycle, ownership, topology, or the 78-operation census.
 
 ---
 
@@ -1562,17 +1243,16 @@ The three upstream findings in §8 are bounded completeness/contract contradicti
 ```text
 A. operator adjudication + durable reconciliation of §8.1 T8-D Step label
 B. operator adjudication + durable reconciliation of §8.2 T3 binding-disabled Audit census
-C. operator adjudication + durable reconciliation of §8.3 T8-C exact-length presign seam
-D. representative DOCX/PDF measurement -> freeze §7 numeric ceilings
-E. disposable pinned Go+TS generation/compile/type probe
-F. exact contract fixtures over all 78 rows
-G. final whole-candidate Structural Inversion / YAGNI / overengineering / global-coherence pass
-H. only then create `review/t8e-fable` from exact candidate HEAD
-I. Lead adjudication
-J. explicit operator ratification
+C. representative DOCX/PDF measurement -> freeze §7 numeric ceilings
+D. disposable pinned Go+TS generation/compile/type probe
+E. exact contract fixtures over all 78 rows
+F. final whole-candidate Structural Inversion / YAGNI / overengineering / global-coherence pass
+G. only then create review/t8e-fable from exact candidate HEAD
+H. Lead adjudication
+I. explicit operator ratification
 ```
 
-Until A→G converge:
+Until A→F converge:
 
 ```text
 T8-E ACTIVE
