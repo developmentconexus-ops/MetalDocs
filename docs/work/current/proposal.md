@@ -180,10 +180,10 @@ The ledger must contain exactly the current authority's 78 operations and no mor
 
 ```text
 Session/AuthN support               3
-Organization                       24
+Organization                       26
 Authorization                       4
 Document Governance config         10
-Controlled Documents / Work        36
+Controlled Documents / Work        34
 Audit                               1
 TOTAL                              78
 ```
