@@ -2,108 +2,67 @@
 id: documentation-governance
 kind: authority
 owner: engineering
-summary: Defines MetalDocs documentation placement, naming, lifecycle, navigation, checkpoint, and temporary-work rules.
+summary: MetalDocs-specific documentation placement, provenance-routing, and checkpoint rules layered on Repository Standard v1.0.0.
 ---
 
 # Documentation governance
 
-## One root
+Canonical repository organization/lifecycle is defined by `developmentconexus-ops/conexus-methodology/REPOSITORY-STANDARD.md` v1.0.0. This page contains only MetalDocs-specific specialization.
 
-First-party maintained documentation lives under `docs/`.
+## Local semantic layout
 
-Platform-conventional files may remain at repository root: `README.md`, `AGENTS.md`, `CLAUDE.md`, `.gitignore`, `.gitattributes`, and `.github/*`.
-
-The live tree does not contain a second `wiki/` root, documentation archives, tombstones, superseded candidates, completed review artifacts, or historical roadmaps.
-
-Git history, closed PRs, and explicitly retained provenance refs preserve historical process; they are not part of routine agent routing.
-
-## Names
-
-Durable paths use lowercase kebab-case semantic subjects, for example:
+MetalDocs currently has named consumers for:
 
 ```text
-product/contract.md
-architecture/persistence.md
-decisions/repository-reset.md
+docs/product/
+docs/architecture/
+docs/decisions/
+docs/development/
+docs/reference/
+docs/work/            temporary branch-only work only
 ```
 
-Durable filenames do not encode dates, R10/T-stage identifiers, versions, `final`, `candidate`, `review`, `adjudication`, `amendment`, `legacy`, or `historical` unless that token is genuinely part of the subject identity.
+Do not add another documentation root, live archive/tombstone tree, or new category without a real consumer.
 
-Ratified authorities imported during the clean-slate reset may retain their existing internal title/status/provenance block until the owning subject is next substantively rewritten. Their new semantic path is the current navigation identity; cosmetic rewriting must not risk decision loss during reset.
+Durable paths use lowercase kebab-case semantic names. Existing imported Product/R10 authorities may retain their historical internal title/provenance blocks until substantively rewritten; cosmetic normalization must not risk decision loss.
 
-New or substantively rewritten maintained Markdown pages use minimal frontmatter:
+## Local metadata deviation — checkpoint
+
+Repository Standard permits local semantic surfaces when a real consumer exists. MetalDocs uses minimal frontmatter:
 
 ```yaml
----
-id: unique-document-id
+id: unique-id
 kind: authority | checkpoint | work
 owner: owner-name
-summary: One-sentence purpose.
----
+summary: one sentence
 ```
 
-Meanings:
+`checkpoint` is a MetalDocs-specific durable, non-authoritative accepted-work snapshot. Current consumer: `docs/reference/t8e-checkpoint.md`, which preserves already-accepted T8-E design across repository-governance gates without promoting it to final authority.
 
-- `authority` — durable current truth for its declared subject;
-- `checkpoint` — durable, non-authoritative accepted work snapshot intentionally preserved across merges until its owning gate resumes or is ratified;
-- `work` — temporary, non-authoritative material inside a Draft PR and deleted before merge.
+Removal trigger: when the owning stage is ratified and its durable authority fully absorbs the checkpoint.
 
-A checkpoint is never edited as active work. Resume by copying it into `docs/work/current/` and let the later ratified authority supersede it.
+`work` remains temporary and branch-only under `docs/work/`; it never enters a merge candidate or `main`.
 
-## Navigation
+## Carried pre-reset provenance strings
 
-- `docs/index.md` is the human/agent intent router.
-- `docs/status.md` is the sole stage / implementation-gate authority.
-- `docs/decisions/index.md` routes durable decisions, remaining-stage ownership, and forward obligations.
-- `docs/reference/` may contain explicitly routed durable checkpoints or bounded reference truth with a named consumer.
-- `docs/work/` is temporary and excluded from durable navigation.
+Some ratified authorities imported by the clean-slate reset still contain historical `wiki/...` strings. They are non-navigational provenance, even when old prose calls them current/program/decision authority.
 
-No static-site navigation manifest survives without a named publication/build consumer. `docs/index.md` is the current durable navigation surface.
-
-Indexes point to authority/checkpoint; they do not copy detailed decision prose.
-
-## Carried pre-reset authority text
-
-Copied ratified authorities intentionally retain some old provenance strings. Any embedded `wiki/...` path is **non-navigational provenance**, even if old prose calls it `current`, `program authority`, or `decision baseline`.
-
-Current routing replacements are:
+Current routing is only through `docs/index.md`, `docs/roadmap.md`, and `docs/decisions/index.md`. Important replacements include:
 
 ```text
-wiki/architecture/r10-technical-architecture.md
-→ docs/status.md
-
-wiki/architecture/r10-post-t6-implementation-readiness-program.md
-→ docs/decisions/stage-program.md
-
-wiki/architecture/rebaseline-decision-registry.md
-→ current semantic authorities + docs/decisions/forward-obligations.md
+old technical-architecture router → docs/roadmap.md
+old post-T6 stage program          → docs/roadmap.md
+old decision registry              → current semantic authorities + docs/decisions/forward-obligations.md
 ```
 
-Agents MUST NOT follow deleted `wiki/...` paths to determine current truth. This centralized routing law is stronger than rewriting thousands of provenance-only citations during the reset.
+Do not recursively repair provenance-only strings unless a live consumer depends on them.
 
-## Active work
+## Temporary work and review
 
-A governed architecture PR may use:
+Temporary work follows Repository Standard v1. Future independent Fable review uses an isolated `review/<gate>-fable` branch whose only delta from the candidate is `docs/work/current/ai-dialog.md`; the candidate branch and `main` never absorb that review artifact.
 
-```text
-docs/work/current/index.md
-docs/work/current/proposal.md
-docs/work/current/plan.md
-docs/work/current/ai-dialog.md
-```
+The reset review predates this standard and remains historical provenance; do not fabricate a second historical review branch.
 
-Use only the files actually needed by the gate. Proposal/plan are edited in place. `ai-dialog.md` exists only for the final independent review, Lead adjudication, bounded Round 2 when necessary, and operator decision.
+## Source of current status
 
-Temporary work files are deleted before a governance/architecture PR is merged. Review provenance remains in Git/PR history.
-
-## One meaning, one authority
-
-A new durable page must own a unique current meaning or a uniquely named durable checkpoint. Do not keep compatibility stubs unless a real external consumer cannot be repaired in the same gate.
-
-Generated maintained pages, if introduced later, receive metadata from their generator and are not hand-edited.
-
-## Repository reset consequence
-
-The previous documentation estate was intentionally removed together with the superseded implementation. Old paths, accepted ADR labels, QA artifacts, or roadmap statuses do not regain authority from Git history.
-
-Only a current authority may name historical material as evidence.
+Only `docs/roadmap.md` owns mutable stage/gate/implementation status and exact next action. README, AGENTS, indexes, Product/Architecture pages, checkpoints, and PR descriptions must not become parallel mutable status authorities.
