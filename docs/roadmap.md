@@ -27,27 +27,26 @@ T8-E — Executable Wire Contract, active in Draft PR #136 on branch `arch/t8e-w
 
 Accepted work through the previous four T8-E layers is preserved at `docs/reference/t8e-checkpoint.md`. The current application census is 78 operations and is owned by `docs/product/journeys.md` plus `docs/decisions/api-operation-census.md`.
 
+The active candidate now contains the closed 78-operation request/success/header/problem/filter/action ledger. Final promotion is blocked only by evidence-triggered bounded upstream reconciliation and the remaining executable/measurement proofs recorded in `docs/work/current/proposal.md`.
+
 ## Exact next action
 
 ```text
-freeze the remaining executable ledger for all 78 operations
-→ exact request and success schemas
-→ required / optional / nullable fields
-→ closed enum vocabularies
-→ success status + response-header matrix
-→ operation-specific RFC 9457 problem-code matrix
-→ list filters + deterministic ordering
-→ allowed_actions vocabularies
-→ request/body/document limits from evidence
-→ Go + TypeScript generation feasibility
-→ runtime contract-conformance proof design
-→ subtractive / global-coherence pass
-→ isolated final Fable review
+adjudicate the three bounded contradictions exposed by the executable ledger
+→ T8-D Governance Step label + immutable label snapshot
+→ T3 unreachable ProviderSubjectBinding-disabled Audit census entry
+→ T8-C direct-PUT presign seam: exact expected bytes + max guard
+→ reconcile only the implicated durable authorities after explicit operator approval
+→ measure representative DOCX/PDF corpus and freeze raw/expanded/ZIP ceilings
+→ run pinned Go + TypeScript generation/compile/type probe
+→ prove exact request/response fixtures across all 78 operation rows
+→ final Structural Inversion / YAGNI / overengineering / global-coherence pass
+→ only then create isolated review/t8e-fable from exact candidate HEAD
 → Lead adjudication
 → explicit operator ratification
 ```
 
-Do not reopen the accepted T8-E checkpoint by preference. A material contradiction follows the DevelopmentConexus Engineering Method reopen law.
+Do not reopen the accepted T8-E checkpoint or any completed T1→T8-D decision by preference. Only the three named material contradictions above are bounded reopen candidates; Product/T6 operation census remains closed at 78.
 
 ## Remaining architecture program
 
