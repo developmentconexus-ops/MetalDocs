@@ -2,7 +2,7 @@
 id: decision-registry
 kind: authority
 owner: architecture
-summary: Routes current ratified decisions, forward obligations, stage ownership, and the paused T8-E checkpoint.
+summary: Routes current ratified decisions, forward obligations, stage ownership, and the active T8-E checkpoint.
 ---
 
 # Decision registry
@@ -29,8 +29,8 @@ This page is an index. Detailed current truth remains in the owning Product/arch
 | Persistence realization | ratified | `../architecture/persistence.md` |
 | Remaining T8-F→T12 program | ratified | `stage-program.md` |
 | Cross-stage forward obligations | ratified baseline | `forward-obligations.md` |
-| Repository clean-slate reset | review gate | `repository-reset.md` |
-| T8-E executable wire contract | paused accepted checkpoint | `../reference/t8e-checkpoint.md` |
+| Repository clean-slate reset | operator-ratified | `repository-reset.md` |
+| T8-E executable wire contract | active accepted checkpoint | `../reference/t8e-checkpoint.md` |
 
 ## Consumption law
 
