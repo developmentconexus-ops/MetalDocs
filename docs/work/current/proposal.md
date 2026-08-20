@@ -31,15 +31,13 @@ ONE docs/ ROOT
 - duplicated current authority
 ```
 
-The target durable authority is `docs/development/documentation.md`.
+The durable target is `docs/development/documentation.md`.
 
-## Why restructure
+## Corrected model
 
-The present repository mixes current truth, active work, and process history across `wiki/`, `docs/`, indexes, handoffs, candidates, reviews, and old routing files. The result is authority ambiguity, agent context bloat, stale routing, oversized PRs, and avoidable Git conflicts.
+The live tree contains current maintained truth plus bounded Draft-PR work; Git and closed PRs retain history.
 
-Repairing a few indexes would preserve that defect class. The live tree must instead contain only current maintained truth and bounded active work; Git and closed PRs retain history.
-
-## Target shape
+Target shape:
 
 ```text
 README.md
@@ -56,24 +54,12 @@ docs/
   development/
   operations/
   reference/
-  work/current/        # temporary only while PR is Draft
+  work/current/        # temporary only while Draft
 ```
 
-Durable files are named by stable subject, for example:
+Durable paths use stable subjects, not R10/T-stage/date/version labels.
 
-```text
-docs/product/contract.md
-docs/architecture/persistence.md
-docs/development/engineering-rules.md
-docs/reference/current-system.md
-docs/reference/problem-codes.md
-```
-
-R10/T-stage identifiers remain in PR and decision provenance, not durable paths.
-
-## Minimal metadata
-
-Durable and temporary Markdown use:
+Metadata is intentionally small:
 
 ```yaml
 ---
@@ -84,40 +70,20 @@ summary: Defines target relational persistence and concurrency rules.
 ---
 ```
 
-Closed kinds:
-
-```text
-authority
-work
-```
-
-A page is current because it is the live durable authority for its subject. Temporary candidacy is represented by `kind: work` and Draft-PR placement, not by a separate status field.
-
-Generated durable pages receive frontmatter from their generator.
-
-## Navigation
-
-`docs/index.md` maps reader intent to authorities. `docs/status.md` owns stage/status. `mkdocs.yml` is the durable navigation manifest; publishing is out of scope.
-
-Large governed collections such as ADRs, generated references, and database-table pages may be reachable through one indexed collection page rather than one top-level navigation row per member.
+Closed kinds are only `authority` and `work`; no separate status field exists.
 
 ## Agent routing
 
-`AGENTS.md` becomes a short bootstrap pointing to:
+Before root agent files are reduced, surviving rules move to:
 
 ```text
-docs/index.md
-docs/status.md when stage matters
-docs/work/current/ when active governed work exists
-docs/development/engineering-rules.md for repository-specific safety law
-docs/reference/current-system.md for current implementation orientation
+docs/development/engineering-rules.md
+docs/reference/current-system.md
 ```
 
-`CLAUDE.md` remains a minimal pointer to `AGENTS.md`.
+Then `AGENTS.md` routes to `docs/index.md`, `docs/status.md`, active work when present, and 1–3 task-specific authorities. `CLAUDE.md` remains a minimal pointer.
 
-## Active work and Fable
-
-A governed design PR may use only:
+## Active-work protocol
 
 ```text
 docs/work/current/index.md
@@ -126,15 +92,13 @@ docs/work/current/plan.md
 docs/work/current/ai-dialog.md
 ```
 
-The proposal/plan are edited in place. `ai-dialog.md` holds the final Fable review, Lead adjudication, optional bounded Round 2, and operator decision. No permanent review-request, corrected-candidate, delta-review, adjudication, or tombstone documents are created.
+The same proposal/plan are edited in place. The single `ai-dialog.md` carries final Fable review, Lead adjudication, any bounded Round 2, and operator decision. `docs/work/**` may exist only while the PR is Draft and is deleted before Ready.
 
-`docs/work/**` may exist only while the PR is Draft and must be deleted before the PR is marked ready.
+## Deletion and retention
 
-## Deletion model
+G1 does not delete by root allowlist and does not require zero textual old-path references.
 
-Deletion is **not** a root allowlist and is **not** a zero-text-occurrence grep.
-
-G1 must start from a complete tracked-document census. Every path receives exactly one disposition:
+Every tracked document gets exactly one disposition:
 
 ```text
 KEEP → target path
@@ -143,79 +107,66 @@ GENERATED → generator + target path
 DELETE → reason + proof no current consumer remains
 ```
 
-An undispositioned path blocks deletion.
+Undispositioned documentation blocks the gate.
 
-A live executable consumer—script, generator, workflow/config, verifier, maintained link, or navigation path—must be repaired or retired in the same PR. Historical/provenance citations in comments, applied migrations, generated history, or commit-pinned security allowlists need not be rewritten merely because the old live path disappears.
-
-## Verification-subject preservation
-
-Machine-consumed documentation is first-class retained truth until its consumer is moved or retired. G1 must explicitly handle at least:
+Path occurrences are classified:
 
 ```text
-problem-code registry/docs
-requirement-trace sources/report
+EXECUTABLE CONSUMER
+→ repair or retire
+
+PROVENANCE/HISTORY CITATION
+→ no forced churn unless also executable
+```
+
+History-pinned secret-scan fingerprints may retain deleted paths while the full-history scanner consumes them.
+
+## Gate-subject preservation
+
+No verification gate's documentation subject may be deleted without repointing or retiring that gate in the same PR and re-proving the affected check.
+
+G1 explicitly handles current machine-consumed classes such as:
+
+```text
+problem codes
+requirement traceability
 ADRs
-current database table dictionary/ownership docs
-module-debt registers if their gate survives
+database table dictionary/ownership docs
+module debt when its gate survives
 current runbooks and engineering rules
 ```
 
-No verification gate's declared documentation subject may be deleted without repointing or retiring that gate in the same PR and re-running the relevant negative proof.
+Generated durable pages receive metadata from their generator.
 
 ## Product/R10 parity
 
-G1 reads accepted Product/R10 authority from immutable PR #131 provenance and must prove:
+G1 uses a closed source-to-target authority map from immutable PR #131 provenance. A filesystem-capable normative census supports the semantic review, must be non-empty, and covers the actual normative vocabulary. It is never treated as a substitute for semantic mapping review.
 
-1. every accepted source authority is present in a closed source-to-target map;
-2. normative source census is non-empty and uses filesystem-capable search over temporary extracted files;
-3. the census includes the repository's actual normative vocabulary (`MUST`, `SHOULD`, `MAY`, `SHALL`, `REQUIRE`, `FORBID`, `PROHIBIT`, `NEVER`, `ALWAYS`, `ONLY`, `SELECT`, `REJECT`, `BLOCKED`, `CLOSED` where normative);
-4. semantic contradictions stop the Writer instead of being silently reconciled;
-5. accepted T8-E checkpoint decisions already reached in PR #131 are carried into the fresh T8-E proposal after G1.
-
-The text census supports parity; it does not replace semantic review of the closed mapping.
+Any contradiction stops the Writer; cleanup cannot silently choose a new Product/R10 decision.
 
 ## PR sequence
 
 ```text
-S0  trustworthy green verification baseline
- ↓
-G0  repository documentation profile — PR #132
- ↓
-G1  complete documentation census + authority consolidation + consumer repair + legacy deletion + docs verifier
- ↓
-close PR #131 as superseded provenance
- ↓
-fresh T8-E executable API-contract PR
+S0 trustworthy green verification baseline
+→ G0 PR #132
+→ G1 complete census + consolidation + consumer repair + legacy deletion + verifier
+→ close PR #131 as superseded provenance
+→ fresh T8-E PR
 ```
 
-G0/G1 do not authorize product implementation or Product/R10 semantic changes.
+No G0/G1 product implementation is authorized.
 
-## Independent review adjudication
+## Independent review result
 
-Fable reviewed the original G0 profile at commit `3b8a25488e1aed5edc6c2b83d64e802b8d66c1c0` and returned:
+Fable reviewed the original profile and returned:
 
 ```text
 APPROVE REPOSITORY DOCUMENTATION PROFILE WITH MATERIAL FIXES
 BLOCKER 3 / MAJOR 8 / LOW 6
 ```
 
-Lead accepted the defect classes and selected the bounded corrections now reflected in this proposal, the durable candidate, and the execution plan:
-
-- complete disposition replaces hand-written allowlists;
-- gate-subject preservation is a hard invariant;
-- executable consumers are repaired while provenance citations are not churned;
-- history-pinned secret-scan allowlists may retain deleted paths;
-- generated durable docs get generator-owned frontmatter;
-- repository safety law and current-system orientation receive durable homes before AGENTS/CLAUDE shrink;
-- local proof mirrors actual CI, including `--require-infra`, lint, and affected non-PR governance checks;
-- `ready_for_review` must trigger the temporary-work guard;
-- G0/G1 provenance is retained before temporary work is deleted;
-- ADR/reference collections may be indexed collections instead of one nav row per member;
-- no unrelated `.claude` permission cleanup is part of this gate;
-- metadata is reduced to `id`, `kind`, `owner`, `summary`, with `kind = authority | work`.
-
-No Product/R10 or one-docs-root reopen is required. No second Fable round is required because no material contradiction survives adjudication.
+Lead accepted all defect classes with bounded corrections now reflected in the durable candidate and plan. The selected one-docs-root, semantic naming, AI-dialog, and PR-gate architecture remains unchanged. No Product/R10 reopen or second Fable round is required.
 
 ## Current gate
 
-No legacy deletion starts in PR #132. Explicit operator ratification of the corrected G0 profile is next. Only after ratification and a green S0 prerequisite may G0 be cleaned for merge and G1 begin from updated `main`.
+No legacy deletion has started. Explicit operator ratification of the corrected G0 profile is next. After ratification, S0 must restore the trustworthy green baseline before G0 can be cleaned and merged; G1 begins only from the updated clean `main`.
