@@ -1,0 +1,338 @@
+name: T8-E Fable Adjudication
+
+on:
+  pull_request:
+    types: [edited]
+
+permissions:
+  contents: write
+
+jobs:
+  adjudicate:
+    if: github.actor != 'github-actions[bot]' && github.event.pull_request.head.ref == 'arch/t8e-wire-contract'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: arch/t8e-wire-contract
+          fetch-depth: 0
+      - name: Apply Lead-adjudicated Fable corrections
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p = Path('docs/work/current/proposal.md')
+          s = p.read_text()
+
+          def repl(old, new, count=1):
+              global s
+              n = s.count(old)
+              if n != count:
+                  raise SystemExit(f'proposal anchor mismatch expected={count} got={n}: {old[:140]!r}')
+              s = s.replace(old, new, count)
+
+          # F-5 + O-6: finite human text and referenced scalar definitions.
+          repl(
+          '''Sha256Hex
+            ^[0-9a-f]{64}$
+
+          SearchQuery''',
+          '''Sha256Hex
+            ^[0-9a-f]{64}$
+
+          ShortText
+            nonblank, maxLength=256
+
+          LongText
+            nonblank, maxLength=4096
+
+          Rfc6901Pointer
+            RFC6901 pointer rooted at /path, /query, /header, or /body
+
+          URI
+            string, OpenAPI format=uri
+
+          SearchQuery''')
+          repl(
+          '''EmailAddress
+            nonblank human text
+            no trim/case-fold/canonicalization, deliverability, uniqueness or verification claim
+            no OpenAPI `format: email` Launch gate because no current email-delivery/identity consumer exists
+            profile/contact enrichment only; never authentication or Authorization identity''',
+          '''EmailAddress
+            nonblank human text, maxLength=256
+            no trim/case-fold/canonicalization, deliverability, uniqueness or verification claim
+            no OpenAPI `format: email` Launch gate because no current email-delivery/identity consumer exists
+            profile/contact enrichment only; never authentication or Authorization identity''')
+          repl(
+          '''Except for scalars that explicitly define normalization above (`CodeInput`, `SearchQuery`), accepted human text is **not** silently trimmed, case-folded or Unicode-normalized by convention. `nonblank` means the supplied value contains at least one non-whitespace code point. Human text is bounded by the aggregate JSON ceiling rather than unrelated guessed per-field maxima.''',
+          '''Except for scalars that explicitly define normalization above (`CodeInput`, `SearchQuery`), accepted human text is **not** silently trimmed, case-folded or Unicode-normalized by convention. `nonblank` means the supplied value contains at least one non-whitespace code point. `ShortText` and `LongText` are the only ordinary human-text wire ceilings; the 65,536-byte JSON request ceiling remains an additional aggregate bound. The 256/4,096 split is a conservative controlled-document Launch bound, not a claim about theoretical text limits or a generic rich-text platform.''')
+
+          # F-7: close the missing profile conditional cell.
+          repl(
+          '''existing profile           If-Match required
+          absent profile recreation  If-None-Match:* required
+          both / neither             400
+          If-None-Match:* + existing profile -> 412''',
+          '''existing profile           If-Match required
+          absent profile recreation  If-None-Match:* required
+          both / neither             400
+          If-None-Match:* + existing profile -> 412
+          If-Match + absent profile       -> 412 precondition.resource_changed''')
+
+          # O-8: embedded cursor continuation rule.
+          repl(
+          '''Cursor authenticates `operationId + normalized filters + ordering + seek position`; current AuthZ is rechecked every page. Limit may change on a subsequent page and is not cursor authority.''',
+          '''Cursor authenticates `operationId + normalized filters + ordering + seek position`; current AuthZ is rechecked every page. Limit may change on a subsequent page and is not cursor authority. For an embedded first page whose continuation is a standalone list operation, the cursor authenticates the **standalone continuation operationId**; current Launch instance: `GovernanceCaseView.feedback` continues through `listGovernanceFeedback`.''')
+
+          # O-2: no optional Retry-After contract with no Product consumer.
+          repl(
+          '''Problem responses: `application/problem+json` + `Cache-Control:no-store`; 401 adds `WWW-Authenticate: MetalDocsSession`; 405 adds exact `Allow`; 429 may add truthful non-negative delta-seconds `Retry-After` but never fabricates one.''',
+          '''Problem responses: `application/problem+json` + `Cache-Control:no-store`; 401 adds `WWW-Authenticate: MetalDocsSession`; 405 adds exact `Allow`. No `Retry-After` header is part of the Launch application contract; frontend branching remains on `Problem.code`.''')
+
+          # O-1: preserve complete-response integrity without freezing spool/double-read mechanics.
+          repl(
+          '''## 2.9 Exact-byte delivery — verify before commit''',
+          '''## 2.9 Exact-byte delivery — complete-response integrity''')
+          repl(
+          '''Correctness law:
+
+          ```text
+          load semantic descriptor
+          -> OpenExact
+          -> verify actual byte count + SHA-256 + format coherence
+          -> ONLY THEN commit HTTP 200 headers/body
+          ```
+
+          The implementation may use a bounded temporary spool or provider-neutral equivalent proof, but it may not stream unverified provider bytes to the client and discover a hash mismatch after the 200 has begun. Existing visible semantic record with missing/corrupt bytes -> `500 internal.content_integrity` with zero success bytes; temporary content-store dependency failure ->503. Provider checksum/ETag may be optimization evidence but never replaces semantic SHA-256 authority.''',
+          '''Correctness law:
+
+          ```text
+          load semantic descriptor
+          -> OpenExact
+          -> verify actual byte count + SHA-256 + format coherence while reading
+          -> a 200 response may reach its declared Content-Length ONLY after the complete exact-byte proof succeeds
+          ```
+
+          T8-E does not choose the buffering/read strategy. Pre-verification, double-read, bounded spool, or streaming that withholds a final bounded tail until full verification may satisfy the property. If a mismatch is detected after headers or partial bytes have begun, the server MUST terminate the response before the declared `Content-Length` is satisfied; it must never complete a successful 200 with bytes that disagree with the semantic descriptor. Existing visible semantic content whose corruption is known before response commitment -> `500 internal.content_integrity` with zero success bytes; temporary content-store dependency failure ->503. Provider checksum/ETag may be optimization evidence but never replaces semantic SHA-256 authority.''')
+
+          # F-3: close OAS branch-vs-fixture choices and Audit union strategy.
+          repl(
+          '''# 3. Shared schema registry
+
+          All fixed objects are closed. Unless marked `?`, members are required.
+
+          ## 3.1 References / enums / unions''',
+          '''# 3. Shared schema registry
+
+          All fixed objects are closed. Unless marked `?`, members are required.
+
+          OAS encoding is itself closed; a Writer does not choose branch-vs-flat representation:
+
+          ```text
+          OAS_BRANCH
+            true semantic variant with one required closed-enum member that is a TOTAL discriminator
+            -> oneOf + discriminator
+
+          FIXTURE_PRESENCE
+            cross-field presence/value relation without one total discriminator
+            -> one closed flat object with schema-optional correlated members
+            -> one NAMED contract fixture enforces each required/forbidden relation
+          ```
+
+          Current `OAS_BRANCH` families are the explicit semantic unions in §3.1, `SubmissionCreateResult`, `GovernanceDecisionRequest/View`, `GovernanceStepView`, `GovernanceCaseView.subject`, `DocumentHistoryItem`, `ReleaseView`, `ObsolescenceCreateResult`, and `AuditEventView` using the exact §4 mapping. Current `FIXTURE_PRESENCE` laws are `TemplateConfigurationItem.current_effective_title`, `DocumentSummary.official_revision`, `DocumentOfficialView.official`, `RevisionView.current_submission_id`, all `SubmissionView` correlated members, `DocumentHistoryItem.governance_decision.reason`, and `ObsolescenceRequestView` attempt/end-state correlations. No generator-specific union is introduced merely to encode a relational fixture.
+
+          ## 3.1 References / enums / unions''')
+          repl(
+          '''Required/forbidden-member and discriminator laws in this registry are encoded as closed OAS branches where OAS 3.0.3 can represent them; value-relational laws that would require distortion remain explicit contract-fixture assertions.''',
+          '''Required/forbidden-member laws use the closed `OAS_BRANCH` / `FIXTURE_PRESENCE` classification above; no per-Writer encoding choice remains.''')
+
+          # Human text type application across registry.
+          repl('display_name?:string', 'display_name?:ShortText')
+          repl('display_name:nonblank string', 'display_name:ShortText', 4)
+          repl('name:nonblank string', 'name:ShortText', 8)
+          repl('label:nonblank string', 'label:ShortText', 2)
+          repl('current_effective_title?:nonblank string', 'current_effective_title?:LongText')
+          repl('title:nonblank string', 'title:LongText', 10)
+          repl('title?:nonblank string', 'title?:LongText')
+          repl('reason:nonblank string', 'reason:LongText', 7)
+          repl('reason?:nonblank string', 'reason?:LongText')
+          repl('message:nonblank string', 'message:LongText', 3)
+          repl('ProblemError { pointer:Rfc6901Pointer, detail:nonblank string }', 'ProblemError { pointer:Rfc6901Pointer, detail:LongText }')
+
+          # F-2: subtract non-semantic renderer attention field.
+          repl(
+          'SubmissionRepresentationGate { required:boolean, satisfied:boolean, attention_required:boolean }',
+          'SubmissionRepresentationGate { required:boolean, satisfied:boolean }')
+          repl(
+          '''representation_gate.required iff require_official_rendition; not-required => satisfied
+          attention_required only while rendition required + unsatisfied + terminal renderer attention exists
+          release_id and termination mutually exclusive''',
+          '''representation_gate.required iff require_official_rendition; not-required => satisfied
+          release_id and termination mutually exclusive''')
+
+          # F-3 + O-9: flatten ObsolescenceRequestView correlations into named fixtures.
+          repl(
+          '''`ObsolescenceRequestView` state union:
+
+          ```text
+          active
+            request_id,document,target_revision,initiator,reason,state=active,requested_at,governance_attempt_id
+          returned / withdrawn / completed-human
+            same core + matching state + governance_attempt_id + ended_at
+          completed-no-human
+            same core + state=completed + ended_at; governance_attempt_id absent
+          ```''',
+          '''`ObsolescenceRequestView` is a closed flat object under `FIXTURE_PRESENCE`:
+
+          ```text
+          { request_id, document, target_revision, initiator, reason:LongText,
+            state:ObsolescenceRequestState, requested_at,
+            governance_attempt_id?:Uuid, ended_at?:UtcInstant }
+          ```
+
+          Named fixture laws:
+
+          ```text
+          state=active                 -> governance_attempt_id required; ended_at absent
+          state=returned|withdrawn     -> governance_attempt_id + ended_at required
+          state=completed              -> ended_at required;
+                                          governance_attempt_id present iff human governance existed
+          ```
+
+          `ObsolescenceCreateResult.state=obsolete` means the request completed synchronously and the target Revision became OBSOLETE; a subsequent `ObsolescenceRequestView` for that request uses `state=completed`.''')
+
+          # F-6: preserve T3 auditability with small closed facts, never generic diffs.
+          repl(
+          '''ObsolescenceAuditFacts { document_id:Uuid, target_revision_id:Uuid }
+          ```
+
+          `resource_id` supplies the stable event/resource evidence identity; duplicate ids are not repeated inside facts. T3-required bounded DocumentType/configuration facts remain internal owner-authored Audit evidence at Launch: the wire exposes the closed operation code + resource identity rather than inventing a generic configuration-diff bag without a named UI consumer.''',
+          '''ObsolescenceAuditFacts { document_id:Uuid, target_revision_id:Uuid }
+          DocumentTypeCreatedAuditFacts { code:CodeToken, numbering_scope:NumberingScope, active:boolean, governance_mode:GovernanceMode, representation_kind:RepresentationKind }
+          DocumentTypeBaseAspect code | name | numbering_scope | active
+          DocumentTypeReconfigurationAuditFacts { changed:unique DocumentTypeBaseAspect[] } // non-empty, enum order
+          DocumentGovernanceAspect governance_mode | governance_route | representation_policy
+          DocumentGovernanceAuditFacts { changed:unique DocumentGovernanceAspect[] } // non-empty, enum order
+          TemplateEligibilityAuditFacts { added_document_ids:unique Uuid[], removed_document_ids:unique Uuid[] } // each UUID ASC; at least one non-empty
+          ```
+
+          `resource_id` supplies the stable event/resource evidence identity; duplicate ids are not repeated inside facts. T3-required DocumentType/configuration evidence is exposed through the closed fact shapes above. No generic before/after JSON, arbitrary configuration bag, labels, reasons, governed content, or provider data is projected.''')
+          repl(
+          '''| `document_type.created`, `document_type.reconfigured`, `document_type.activated`, `document_type.inactivated`, `document_governance.changed`, `template_eligibility.changed` | `document_type` / document_type id | none |''',
+          '''| `document_type.created` | `document_type` / document_type id | `DocumentTypeCreatedAuditFacts` |
+          | `document_type.reconfigured` | `document_type` / document_type id | `DocumentTypeReconfigurationAuditFacts` |
+          | `document_type.activated`, `document_type.inactivated` | `document_type` / document_type id | none |
+          | `document_governance.changed` | `document_type` / document_type id | `DocumentGovernanceAuditFacts` |
+          | `template_eligibility.changed` | `document_type` / document_type id | `TemplateEligibilityAuditFacts` |''')
+          repl(
+          '''`AuditEventView` is a closed `operation_code`-discriminated union with common `{event_id:Uuid,occurred_at:UtcInstant,actor:AuditActor,operation_code:AuditOperationCode,resource_kind,resource_id:Uuid,visibility:AuditVisibility}`. Simple wire branches forbid `facts`; typed branches require exactly the matching exposed facts schema. No free-form feedback/reason/profile/provider/config-diff payload.''',
+          '''`AuditEventView` is a closed `operation_code`-discriminated union with common `{event_id:Uuid,occurred_at:UtcInstant,actor:AuditActor,operation_code:AuditOperationCode,resource_kind,resource_id:Uuid,visibility:AuditVisibility}`. It uses exactly **20 oneOf branch schemas**, one per row of the matrix above after the DocumentType split, plus a full **37-entry discriminator mapping**. Multiple operation codes map to one branch only when `resource_kind` and exposed `facts` schema are identical. Simple branches forbid `facts`; typed branches require exactly the matching facts schema. No free-form feedback/reason/profile/provider/config-diff payload.''')
+
+          # F-4: obey current T6 namespace rather than silently overriding it.
+          repl('`type=https://errors.conexus.fun/metaldocs/{code}`.', '`type=https://errors.metaldocs.io/{code}`.')
+
+          # O-5: rows 3 and 45 have no semantic 422 trigger; pure query normalization is 400.
+          repl('|`A + validation.failed`|', '|`A`|', 2)
+
+          # O-4: correct rationale without reopening the approved stateful CSRF choice.
+          repl(
+          '''No second cookie, localStorage credential, global CSRF-HMAC rotation subsystem or new endpoint is introduced.''',
+          '''No second cookie, localStorage credential or new endpoint is introduced. A keyed derivation could also be designed, but Launch already has server-side ApplicationSession state and requires no second CSRF key/rotation dependency, so the per-session synchronizer secret remains the smaller selected realization.''')
+
+          # F-7 fixture reminder in proof list.
+          repl(
+          'PROFILE_REPLACE If-Match/If-None-Match matrix',
+          'PROFILE_REPLACE full If-Match/If-None-Match matrix including If-Match+absent ->412')
+
+          # O-8 continuation fixture wording.
+          repl(
+          '''Embedded feedback is first20 and any cursor targets `listGovernanceFeedback`.''',
+          '''Embedded feedback is first20 and its continuation cursor authenticates/targets `listGovernanceFeedback` per §2.7.''')
+
+          # Fable adjudication closes remaining candidate work and opens promotion.
+          repl(
+          '''The measurement, generated-boundary feasibility, provider presign feasibility, strict-request validator split, 78-row ledger-census fixture obligations and all evidence-triggered upstream reconciliations are closed at candidate level.
+
+          Remaining Lead gate:
+
+          ```text
+          A. rerun whole-candidate Structural Inversion / YAGNI / overengineering / global-coherence exact-delta check
+          B. revalidate main/base + exact candidate HEAD + intended authority/work diff + required CI
+          C. only if A→B converge, create review/t8e-fable from that exact candidate HEAD
+          D. independent Fable challenge
+          E. Lead adjudication of Fable evidence
+          F. explicit operator ratification
+          ```
+
+          Until A→B converge:
+
+          ```text
+          T8-E ACTIVE
+          T8-F NOT OPEN
+          implementation BLOCKED
+          Fable NOT STARTED
+          ```''',
+          '''The measurement, generated-boundary feasibility, provider presign feasibility, strict-request validator split, 78-row ledger-census fixture obligations and evidence-triggered upstream reconciliations are closed at candidate level. Independent Fable review PR #137 found seven material issues; Lead adjudication accepted the durable-promotion finding, removed the unrealizable rendition-attention field, closed OAS presence encoding, restored the T6 Problem namespace, bounded human text, preserved T3 configuration Audit through closed typed facts, and closed the profile conditional matrix. No new Product operation, owner, lifecycle, permission or generic framework was introduced.
+
+          Remaining Lead gate:
+
+          ```text
+          A. execute durable promotion: proposal -> docs/architecture/wire-contract.md
+          B. route the new authority from docs/index.md + docs/decisions/index.md
+          C. consume/remove DOC-12 from forward-obligations and update its mechanical count proof
+          D. delete docs/reference/t8e-checkpoint.md + docs/work/current/** before merge candidacy
+          E. rerun whole-candidate Global Coherence + required CI on the promoted tree
+          F. close/delete review PR #137 / review branch as Evidence-only history
+          G. explicit operator ratification
+          ```
+
+          Until A→F converge:
+
+          ```text
+          T8-E ACTIVE
+          T8-F NOT OPEN
+          implementation BLOCKED
+          ```''')
+
+          p.write_text(s)
+
+          # Roadmap: Fable adjudicated; promotion is now exact next action.
+          r = Path('docs/roadmap.md')
+          x = r.read_text()
+          old = '''## Exact next action
+
+          ```text
+          rerun exact whole-candidate Structural Inversion / YAGNI / overengineering / global-coherence delta
+          → revalidate main/base + exact candidate HEAD + intended authority/work diff + required CI
+          → if and only if the Lead delta converges, create isolated review/t8e-fable from exact candidate HEAD
+          → independent Fable challenge
+          → Lead adjudication
+          → explicit operator ratification
+          ```'''
+          new = '''Independent Fable review PR #137 completed against candidate `ef329534fc9d5df3254d59c3787197fefa8435e6`. Lead adjudication accepted the material promotion/presence/bounds/profile findings, restored the current T6 Problem namespace rather than reopening it, and preserved T3 configuration Audit via closed typed facts rather than deleting auditability. The surviving corrections add no Product operation, owner, lifecycle, permission, table family or generic framework.
+
+          ## Exact next action
+
+          ```text
+          promote the reconciled T8-E wire contract to durable docs/architecture authority
+          → route it from docs/index.md and docs/decisions/index.md
+          → consume DOC-12 in docs/decisions/forward-obligations.md + update mechanical count proof
+          → delete docs/reference/t8e-checkpoint.md and docs/work/current/** before merge candidacy
+          → rerun exact whole-candidate Global Coherence + required CI
+          → close/delete PR #137 review branch as Evidence-only history
+          → explicit operator ratification
+          ```'''
+          if x.count(old) != 1:
+              raise SystemExit(f'roadmap anchor mismatch: {x.count(old)}')
+          r.write_text(x.replace(old, new, 1))
+          PY
+          git diff --check
+          git diff -- docs/work/current/proposal.md docs/roadmap.md
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add docs/work/current/proposal.md docs/roadmap.md
+          git commit -m 'docs(architecture): adjudicate T8-E Fable findings'
+          git push origin HEAD:arch/t8e-wire-contract
