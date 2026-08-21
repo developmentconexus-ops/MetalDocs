@@ -1,0 +1,112 @@
+name: T8-E Global Coherence Proof
+
+on:
+  pull_request:
+    types: [edited]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - name: Verify exact T8-E candidate
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          git diff --check "$BASE_SHA...$HEAD_SHA"
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          proposal = Path('docs/work/current/proposal.md').read_text()
+          roadmap = Path('docs/roadmap.md').read_text()
+          t4 = Path('docs/architecture/content-integrity.md').read_text()
+          t5 = Path('docs/architecture/async-and-search.md').read_text()
+          t8c = Path('docs/architecture/interfaces.md').read_text()
+          t8d = Path('docs/architecture/persistence.md').read_text()
+
+          ledger = proposal.split('# 6. Closed 78-operation ledger',1)[1].split('# 7. Document admission limits',1)[0]
+          rows=[]
+          for line in ledger.splitlines():
+              m=re.match(r'^\|(\d+)\|`([^`]+)`\|`([^`]+)`\|(.*)$', line)
+              if m:
+                  rows.append((int(m.group(1)),m.group(2),m.group(3),line))
+          assert len(rows)==78, len(rows)
+          assert [r[0] for r in rows]==list(range(1,79))
+          assert len({r[1] for r in rows})==78
+          assert len({r[2] for r in rows})==78
+          assert 'operation79' not in ledger
+
+          idem={r[1] for r in rows if 'IDEMPOTENT_CREATE' in r[3] or 'SUBMISSION_CREATE' in r[3]}
+          expected_idem={
+            'createUser','createArea','createGroup','createRoleAssignment','createDocumentType',
+            'createDocument','createDocumentRevision','createSubmission','createGovernanceFeedback',
+            'createObsolescenceRequest'}
+          assert idem==expected_idem,(idem,expected_idem)
+
+          assert sum('`JSON_ETAG`' in r[3] for r in rows)==13
+          assert sum('`JSON_ETAG_MUTATION`' in r[3] for r in rows)==13
+          exact=[r[1] for r in rows if 'exact bytes`' in r[3] or 'exact PDF bytes`' in r[3]]
+          assert exact==['getRevisionDraftSource','getSubmissionSource','getReleaseSource','getOfficialRenditionContent'],exact
+
+          for heading in [
+            '## 8.4 T8-D — transaction-census + idempotency precision — RESOLVED',
+            '## 8.5 T4/T5/T8-C/T8-D — required PDF rendition when source is already PDF — RESOLVED',
+            '## 8.6 T8-C/T8-D — session CSRF bootstrap reversibility — RESOLVED']:
+              assert heading in proposal
+          assert not re.search(r'^## 8\.[456].*OPEN',proposal,re.M)
+
+          assert 'no durable rendition intent' in t4
+          assert 'PDF + RequireOfficialRendition(PDF)' in t5 and 'no renderer, provider copy or durable rendition job' in t5
+          assert 'already-PDF + required PDF establishes the semantic OfficialRendition synchronously' in t8c
+          assert 'per-session CSRF token material' in t8c
+
+          assert 'csrf_secret         BYTEA NOT NULL' in t8d
+          assert 'csrf_secret_digest' not in t8d
+          assert 'key UUID NOT NULL' in t8d
+          assert 'payload BYTEA NOT NULL CHECK(octet_length(payload) <= 2048)' in t8d
+          assert 'expires_at = completed_at + 24 hours' in t8d
+          assert 'User re-enable' in t8d and 'no prior session/membership/grant resurrection' in t8d
+          assert 'Company version CAS; no mandatory semantic Audit' in t8d
+          assert 'no mandatory Launch semantic Audit' in t8d
+          assert 'no duplicate semantic Audit' in t8d
+          assert 'no provider copy/renderer/River intent' in t8d
+          assert 'all and only' in t8d.lower()
+
+          assert 'operator adjudicates the bounded coherence package' not in roadmap
+          assert 'rerun exact whole-candidate Structural Inversion / YAGNI / overengineering / global-coherence delta' in roadmap
+
+          print('ledger_rows=78')
+          print('operation_ids=78_unique')
+          print('method_paths=78_unique')
+          print('idempotent_creations=10_exact')
+          print('etag_gets=13 etag_mutations=13')
+          print('exact_byte_resources=4_exact')
+          print('bounded_findings=8.4-8.6_resolved')
+          print('authority_parity=PASS')
+          PY
+
+          mapfile -t changed < <(git diff --name-only "$BASE_SHA...$HEAD_SHA" | grep -v '^.github/workflows/t8e-global-coherence.yml$')
+          expected=(
+            docs/architecture/async-and-search.md
+            docs/architecture/authorization-and-audit.md
+            docs/architecture/content-integrity.md
+            docs/architecture/interfaces.md
+            docs/architecture/persistence.md
+            docs/roadmap.md
+            docs/work/current/index.md
+            docs/work/current/proposal.md
+          )
+          printf '%s\n' "${changed[@]}" > /tmp/changed
+          printf '%s\n' "${expected[@]}" > /tmp/expected
+          diff -u /tmp/expected /tmp/changed
+          echo 'global_coherence=PASS'
