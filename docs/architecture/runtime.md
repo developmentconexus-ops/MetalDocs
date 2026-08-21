@@ -7,13 +7,13 @@ summary: Operator-ratified T8-G authority for runtime shells, process/deployment
 
 # R10 T8-G — Runtime / Process / Deployment
 
-> **Ratification:** OPERATOR-RATIFIED on 2026-08-21 after required CI #1066 and independent Fable Round 2 CONVERGED. Integration through PR #144 remains pending; program stage/status and implementation permission remain exclusively in `../roadmap.md`.
+> **Ratification:** OPERATOR-RATIFIED on 2026-08-21 after required CI #1066 and independent Fable Round 2 CONVERGED. Current program stage, integration status, implementation permission and exact next action remain exclusively in `../roadmap.md`.
 
 This document is the ratified T8-G authority for the smallest runtime, process and deployment realization capable of serving the operator-ratified T8-A→T8-F architecture.
 
 It owns runtime shells, long-lived process placement, deployment artifacts, startup/readiness/shutdown, configuration and secrets, trust/network boundaries, runtime observability, renderer/scanner placement, exact-byte buffering realization, operational controls and the runtime side of backup/restore readiness.
 
-It does **not** reopen Product meaning, semantic ownership, lifecycle, Authorization, persistence semantics, the 78-operation application wire, frontend route meaning or transition/cutover sequencing. T8-H, T9, T10, T11, T12 and Product implementation remain outside this gate.
+It does **not** reopen Product meaning, semantic ownership, lifecycle, Authorization, persistence semantics, the 78-operation application wire, frontend route meaning or transition/cutover sequencing. Later gates and Product implementation remain outside this authority.
 
 ---
 
@@ -919,7 +919,7 @@ Prepare the seam; do not ship dormant infrastructure.
 
 ## 25. T9 proof handoff
 
-T8-G hands T9 falsifiable properties, not Product implementation permission. T9 should be able to prove at least:
+T8-G hands the later validation stage falsifiable properties, not Product implementation permission. That stage should be able to prove at least:
 
 ```text
 bad config / missing required secret → serve fails closed
@@ -944,13 +944,13 @@ component census → every surviving component has a named consumer
 selected third-party adapters → exercised against real mechanisms rather than mocks-only
 ```
 
-Exact executable proof shape belongs to T9.
+Exact executable proof shape belongs to the later validation stage.
 
 ---
 
-## 26. Ratified integration gate
+## 26. Ratification record
 
-This authority is **OPERATOR-RATIFIED / INTEGRATION PENDING**.
+This section preserves immutable T8-G ratification evidence; it is not current program-status authority.
 
 Ratification evidence:
 
@@ -962,18 +962,6 @@ Round 3 NOT JUSTIFIED
 explicit operator ratification on 2026-08-21
 ```
 
-Remaining sequence:
-
-```text
-ratification record + status promotion
-→ Repository Standard required CI on exact ratification-carrier HEAD while Draft
-→ explicit operator integration authorization
-→ mark PR #144 ready
-→ required post-ready CI on the exact authorized HEAD
-→ squash-merge the exact authorized HEAD
-→ fresh main/tree/CI revalidation
-```
-
 Evidence PRs are never authority and never merge.
 
-T8-H remains NOT OPEN until T8-G is integrated and receives its own explicit operator authorization. Product implementation remains BLOCKED.
+Current integration, stage progression, implementation permission and exact next action are owned exclusively by `../roadmap.md`.
