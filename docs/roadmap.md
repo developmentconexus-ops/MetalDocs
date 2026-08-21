@@ -14,8 +14,8 @@ REPOSITORY MODE                       CLEAN-SLATE / ARCHITECTURE-FIRST
 REPOSITORY RESET                      MERGED / OPERATOR-RATIFIED
 REPOSITORY STANDARD V1 ALIGNMENT      MERGED
 PRODUCT / OWNERSHIP                   OPERATOR-APPROVED
-T1 → T8-E                             CLOSED / OPERATOR-RATIFIED
-T8-F FRONTEND REALIZATION             OPEN / ACTIVE
+T1 → T8-E                             CLOSED / OPERATOR-RATIFIED / INTEGRATED
+T8-F FRONTEND REALIZATION             CLOSED / OPERATOR-RATIFIED / INTEGRATION PENDING
 T8-G → T12                            NOT OPEN
 IMPLEMENTATION                        BLOCKED
 LEGACY IMPLEMENTATION                 ABSENT FROM LIVE TREE
@@ -23,24 +23,19 @@ LEGACY IMPLEMENTATION                 ABSENT FROM LIVE TREE
 
 ## Current gate
 
-T8-F — Frontend Realization is **OPEN / ACTIVE** as of 2026-08-21 on isolated branch `arch/t8f-frontend-realization`, opened from revalidated `main @ 6443986672f4f183cff90b76e96e48ebe1c34594`.
+T8-F — Frontend Realization is **CLOSED / OPERATOR-RATIFIED** as of 2026-08-21 on `arch/t8f-frontend-realization`. Integration into `main` remains pending through Draft PR #139 and requires a separate explicit operator merge authorization.
 
-The bounded T8-F authority is `docs/architecture/frontend.md`, derived from accepted Product/frontend journeys plus the ratified T8-E wire. Its derivation order is:
+Ratified authority:
 
 ```text
-coverage
-→ human goals/flows
-→ screens/routes
-→ vertical traces
-→ state/transport/read-model/editor boundaries
-→ package topology
-→ adversarial subtraction
+docs/architecture/frontend.md
++ docs/decisions/frontend-read-symmetry.md   // bounded T8-E-FR precision discovered by T8-F
 ```
 
-Initial candidate proof remains:
+The ratified frontend result remains:
 
 ```text
-accepted application operations      78 / 78 have frontend consumers
+accepted application operations      78 / 78 covered
 orphaned operations                  0
 invented application operations      0
 operation 79                         absent
@@ -49,27 +44,17 @@ frontend semantic owner added        none
 server-state authority               TanStack Query / server truth
 parallel global server store         absent
 manual parallel DTO/API authority    absent
-generic frontend Authorization       absent
+frontend Authorization engine        absent
 interactive DOCX runtime             one adapter boundary
 T8-G                                 not open
 implementation                       blocked
 ```
 
-### Fable Round 1 / Lead adjudication
+### Independent challenge and adjudication
 
-Independent Evidence PR #140 challenged candidate `a32ba8b58f5574336f825f46bd552dd96246de7f` and returned 3 MATERIAL + 3 MINOR findings.
+Fable Round 1 Evidence PR #140 challenged candidate `a32ba8b58f5574336f825f46bd552dd96246de7f` and returned F1–F6. Lead adjudication accepted all six and the operator approved the bounded correction package.
 
-Lead adjudication accepted all six. The three material findings reduced to one upstream class plus one T8-F precision:
-
-```text
-F1  stable /documents/:document_id/work lacked a direct current open-Revision identity
-F2  shell promised permission-filtered navigation but SessionView has no permission snapshot
-F3  Document Official lacked a discoverable active ObsolescenceRequest id
-```
-
-The operator approved the correction package explicitly on 2026-08-21.
-
-Bounded T8-E precision is now recorded in `docs/decisions/frontend-read-symmetry.md`:
+The only upstream precision was T8-E-FR:
 
 ```text
 DocumentOfficialView
@@ -77,39 +62,37 @@ DocumentOfficialView
   + active_obsolescence_request_id?: Uuid
 ```
 
-Both members are disclosure-safe derived read truth. They add no persisted Document pointer, no Permission, no Product capability and no application operation. T8-D already guarantees at most one current DRAFT/SUBMITTED Revision and at most one ACTIVE ObsolescenceRequest per Document.
+These are disclosure-safe derived routing references, not persisted pointers. They add no Product capability, Permission, lifecycle state, T8-C contract class or application operation. T8-D already guarantees uniqueness of the current DRAFT/SUBMITTED Revision and ACTIVE ObsolescenceRequest per Document.
 
-The T8-F candidate also now closes:
+T8-F additionally closed the Round-1 frontend findings:
 
 ```text
 navigation presence is not permission-filtering authority
 permission.csrf_failed -> session/CSRF re-bootstrap before safe same-command retry
-state.upload_expired -> preserve local bytes; allocate/upload/complete again; never revive expired capability
+state.upload_expired -> preserve local bytes; fresh allocation/upload/complete; no capability revival
 Audit -> inspection/paging only; no inferred filter
 History/My Work -> never current-resource identity resolvers
 ```
 
-Current bounded reopen result:
+Bounded Fable Round 2 Evidence PR #141 reviewed exact corrected candidate `e54986904063c982315129635191ebade8f9b9ed` and returned:
 
 ```text
-Product/T6 scope reopen               NO
-operation 79                          NO
-T8-C contract reopen                  NO
-T8-D persistence reopen               NO
-T8-E read-model precision             YES / OPERATOR-APPROVED
+CONVERGED
+MATERIAL findings = 0
+Round 3 = NOT JUSTIFIED
 ```
 
-T8-F is **not ratified yet**. A bounded Fable Round 2 must attack only the corrected read symmetry/disclosure, navigation behavior and minor recovery/subtraction corrections before operator ratification.
+Lead independently revalidated the Round-2 result. Required CI #1047 was SUCCESS on the exact corrected HEAD and `main` remained `6443986672f4f183cff90b76e96e48ebe1c34594` during adjudication.
+
+The operator explicitly ratified T8-F on **2026-08-21**.
 
 ## Ratified T8-E baseline
 
-T8-E — Executable Wire Contract remains **CLOSED / OPERATOR-RATIFIED / INTEGRATED** except for the bounded operator-approved T8-E-FR precision above.
+T8-E remains **CLOSED / OPERATOR-RATIFIED / INTEGRATED** with the bounded T8-E-FR member precision above.
 
-PR #136 was squash-merged into `main` as `5568788d6322396f230db82e0cd0da027778f55e`; its exact ratified tree passed required CI #1032.
+Application census remains exactly 78 operations. Operation 79 remains a material Product/T6 reopen.
 
-The ratified durable authority remains `docs/architecture/wire-contract.md`; the application census remains 78 operations. The T8-F-discovered member precision is owned by `docs/decisions/frontend-read-symmetry.md` and supersedes only the `DocumentOfficialView` member set.
-
-Ratified T8-E proof remains:
+T8-E proof remains:
 
 ```text
 ledger rows                         78 / exact 1..78
@@ -126,33 +109,33 @@ PROFILE_REPLACE If-Match+absent     412 precondition.resource_changed
 rows 3 / 45 validation.failed       absent
 row 42 validation.failed            present
 forward obligations                 21 / 3 / 27 = 51
-required CI                          #1032 SUCCESS on exact merged tree
 ```
 
-The T8-E-FR precision changes none of those counts.
+T8-E-FR changes none of those counts.
 
 ## Exact next action
 
 ```text
-revalidate corrected arch/t8f-frontend-realization candidate
-→ required repository CI on exact corrected HEAD
-→ close Round-1 Evidence PR #140 unmerged after adjudication preservation
-→ open isolated bounded Fable Round 2 against exact corrected candidate
-→ attack only F1–F6 corrections and regression of 78/78 / route / ownership / T8-G boundaries
-→ Lead adjudication
-→ if no material finding survives: explicit operator ratification of T8-F before integration
-→ do not open T8-G and do not implement Product code
+revalidate final ratification-recording HEAD of PR #139
+→ required repository CI SUCCESS on that exact HEAD
+→ explicit operator merge authorization
+→ mark PR #139 ready only when merge is authorized
+→ squash merge PR #139 into main
+→ revalidate main + merged tree + required CI + durable T8-F/T8-E-FR authorities
+→ close/delete absorbed candidate/review branches where tooling permits
+→ record T8-F integration closeout
+→ only then may T8-G become the next stage; do not open it without explicit operator authorization
 ```
 
-Do not reopen completed T1→T8-E or the 78-operation Product/T6 census by preference. New material evidence reopens only the authority it actually implicates.
+Do not reopen completed T1→T8-F or the 78-operation Product/T6 census by preference. New material evidence reopens only the authority it actually implicates.
 
 ## Remaining architecture program
 
 | Stage | Owns | Opens / exits |
 |---|---|---|
-| T8-E — Executable Wire Contract | Exact OpenAPI application wire, schemas, headers, problems, ETags, idempotency, pagination, upload/exact-byte contract, generated Go/TypeScript boundaries | CLOSED / OPERATOR-RATIFIED / INTEGRATED; bounded T8-E-FR read-model precision operator-approved |
-| T8-F — Frontend Realization | Route tree, feature/package topology, generated transport consumption, query/state behavior, read-model consumption, editor/viewer boundaries | OPEN / ACTIVE; Round 2 required before explicit operator ratification |
-| T8-G — Runtime / Process / Deployment | Binaries/processes, River workers, renderer/provider boundary, startup/readiness/shutdown, configuration/secrets, trust/network boundaries, observability, recovery/runtime profiles | Opens only after T8-F ratification |
+| T8-E — Executable Wire Contract | Exact OpenAPI application wire, schemas, headers, problems, ETags, idempotency, pagination, upload/exact-byte contract, generated Go/TypeScript boundaries | CLOSED / OPERATOR-RATIFIED / INTEGRATED; T8-E-FR precision ratified with T8-F |
+| T8-F — Frontend Realization | Route tree, feature/package topology, generated transport consumption, query/state behavior, read-model consumption, editor/viewer boundaries | CLOSED / OPERATOR-RATIFIED; integration pending PR #139 |
+| T8-G — Runtime / Process / Deployment | Binaries/processes, River workers, renderer/provider boundary, startup/readiness/shutdown, configuration/secrets, trust/network boundaries, observability, recovery/runtime profiles | NOT OPEN; may open only after T8-F integration/revalidation + explicit operator authorization |
 | T8-H — Whole-T8 Global Coherence Review | Cross-check backend, persistence, wire, frontend, and runtime realization as one system | Opens after T8-A→T8-G close |
 | T9 — Golden Flows & Validation Baseline | Falsifiable composed-system flows and proof classes | Opens after Whole T8 coherence |
 | T10 — Transition / Cutover | Real current→target transition and rollback barriers | Opens after T9 baseline |
