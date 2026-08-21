@@ -2,6 +2,7 @@
 
 > **Status:** CLOSED / OPERATOR-RATIFIED / PROMOTED  
 > **Ratified:** 2026-08-20  
+> **T8-E bounded correction:** 2026-08-20 — Governance Step label persistence + immutable attempt label snapshot  
 > **Repository:** `developmentconexus-ops/MetalDocs`  
 > **Branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131  
 > **Method:** DevelopmentConexus Engineering Method v1.0.0  
@@ -516,6 +517,7 @@ Each configured step stores:
 ```text
 document_type_id
 ordinal
+label TEXT NOT NULL
 selector_kind = NAMED_USER | GROUP
 named_user_id NULL
 group_id NULL
@@ -701,6 +703,7 @@ Each immutable selector snapshot has bounded mutable activation/decision state:
 id
 attempt_id
 ordinal
+label_snapshot TEXT NOT NULL
 selector_kind
 named_user_id NULL
 group_id_snapshot NULL
@@ -710,7 +713,7 @@ UNIQUE(attempt_id, ordinal)
 UNIQUE(attempt_id) WHERE state='ACTIVE'
 ```
 
-Snapshot selector columns are not serving-updateable after creation.
+Snapshot label/selector columns are not serving-updateable after creation.
 
 ### GROUP deletion / activation
 
@@ -1405,7 +1408,7 @@ Draft upload complete
   external exact-byte read/scan -> ManagedContent FOR UPDATE -> same live claim -> create-once proof -> immutable descriptor + terminal malware evidence -> OPEN->READY
 
 SUBMIT
-  Idempotency -> protected actor -> DocumentType config snapshot protection -> Document FOR UPDATE -> source handle FOR SHARE -> immutable Submission -> route/Step snapshot -> activate first candidate set -> Audit -> required River intent -> Replay
+  Idempotency -> protected actor -> DocumentType config snapshot protection -> Document FOR UPDATE -> source handle FOR SHARE -> immutable Submission -> route/Step snapshot including label_snapshot -> activate first candidate set -> Audit -> required River intent -> Replay
 
 Feedback
   Idempotency where required -> protected actor -> exact case validation -> append feedback + Audit/Replay as upstream requires
@@ -1568,6 +1571,7 @@ Revision ordinal and Document code non-reuse
 SUBMITTED iff current_submission_id
 Revision EFFECTIVE/SUPERSEDED/OBSOLETE only through Release/effectivity path
 DRAFT stale generation => zero mutation; successful mutation increments once
+GovernanceAttempt Step label_snapshot remains unchanged after current route relabel
 frozen Governance candidate FK blocks non-candidate and empty-set decision
 one GovernanceAttempt per governed subject
 Group deletion four live blockers and no historical fifth blocker
@@ -1607,7 +1611,7 @@ D12  immutable Release effectivity fact + partial one-EFFECTIVE barrier
 D13  partial one-open DRAFT/SUBMITTED Revision barrier
 D14  bounded current_submission_id with SUBMITTED biconditional and same-Revision FK
 
-D15  closed relational governance persistence; no generic workflow
+D15  closed relational governance persistence with configured Step label + immutable attempt label snapshot; no generic workflow
 D16  one ACTIVE Step structural uniqueness
 D17  live GROUP dependency separated from activated candidate snapshot
 D18  GovernanceDecision must FK to frozen candidate snapshot; candidates mandatory for NAMED_USER/GROUP activation
