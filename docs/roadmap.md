@@ -15,7 +15,7 @@ REPOSITORY RESET                      MERGED / OPERATOR-RATIFIED
 REPOSITORY STANDARD V1 ALIGNMENT      MERGED
 PRODUCT / OWNERSHIP                   OPERATOR-APPROVED
 T1 → T8-G                             CLOSED / OPERATOR-RATIFIED / INTEGRATED
-T8-H WHOLE-T8 GLOBAL COHERENCE        OPEN / ACTIVE / ROUND-1 MATERIAL CORRECTED
+T8-H WHOLE-T8 GLOBAL COHERENCE        OPEN / CONVERGED / AWAITING OPERATOR RATIFICATION
 T9 → T12                              NOT OPEN
 IMPLEMENTATION                        BLOCKED
 LEGACY IMPLEMENTATION                 ABSENT FROM LIVE TREE
@@ -23,7 +23,7 @@ LEGACY IMPLEMENTATION                 ABSENT FROM LIVE TREE
 
 ## Current gate
 
-T8-H — Whole-T8 Global Coherence Review is **OPEN / ACTIVE** as of 2026-08-21 after explicit operator authorization and fresh repository revalidation.
+T8-H — Whole-T8 Global Coherence Review is **OPEN / CONVERGED / AWAITING OPERATOR RATIFICATION** as of 2026-08-21.
 
 Opening base:
 
@@ -54,7 +54,7 @@ H3  accepted application/maintenance leaf omitted from T8-B topology projection
     -> reflect the existing T5-J GC consumer inside the existing application class
 ```
 
-H2 and H3 survived independent challenge. H1's first correction was real but incomplete: the independent Round-1 review found older durable Product/T8 authorities still carrying mutable progression snapshots.
+H2 and H3 survived independent challenge. H1's first correction was real but incomplete: the independent Round-1 review found older durable Product/T8 authorities still carrying mutable progression snapshots. That Round-1 MATERIAL was accepted, corrected and independently closed in bounded Round 2.
 
 No correction creates a new Product capability, semantic owner, Permission, persistence authority, dependency class, runtime component or application operation.
 
@@ -147,9 +147,43 @@ leftover merge-conflict marker      required failure
 
 The correction uses Git's own `git diff --check` diagnostic rather than inventing a second conflict-marker parser.
 
+## Fable Round 2 — PR #150
+
+The corrected technical candidate was frozen and proved before bounded independent review:
+
+```text
+corrected candidate HEAD       b940d4e105a8b837ecdac7f71233ff10d735cd5e
+candidate required CI          #1108 SUCCESS
+Evidence PR                    #150 / review/t8h-fable-r2
+final review HEAD              5564612d07dc0325ac9b81e441f551340872e59d
+review required CI             #1110 SUCCESS
+review delta                   docs/work/current/ai-dialog.md only
+verdict                        CONVERGED
+MATERIAL findings              0
+Round 3                        NOT JUSTIFIED
+```
+
+Round 2 independently re-derived and upheld:
+
+```text
+F1 / H1 closure                         CLOSED
+F2 conflict-marker gate                 CLOSED / empirically verified
+F3 no-broad-regex adjudication          UPHELD
+78-operation census                     PASS
+operation 79                            ABSENT
+new Permission / owner / persistence    NONE
+new runtime capability                  NONE
+H2 wire meaning                         UNCHANGED
+H3 maintenance-leaf meaning             UNCHANGED
+```
+
+Fable recorded one **MINOR / non-blocking** residue: two older durable authorities retain safe-direction bare `Implementation remains BLOCKED` echoes. They do not grant implementation, do not contradict current roadmap state, and the reviewer explicitly concluded they do not prevent T8-H ratification. The Lead does not mutate the independently converged technical candidate solely for that optional wording cleanup.
+
+PR #150 is **CLOSED / UNMERGED**. Round 3 is not justified.
+
 ## CI proportionality baseline
 
-The earlier operator-approved proportionality correction remains intact:
+The operator-approved proportionality correction remains intact:
 
 ```text
 KEEP BLOCKING
@@ -166,10 +200,11 @@ CORRECT
   review/* marked ready or violating isolation -> FAIL
   forward-obligation counts -> derive from document declarations, not workflow constants
   Markdown whitespace -> warning only, not architecture failure
+  leftover merge-conflict marker -> blocking failure
   superseded runs for the same PR -> cancel automatically
 ```
 
-Workflow correction commit `bb8164f1f8cc784268f5f1f7515614c4703a37af` passed required CI **#1096**. Valid review isolation then passed on #1099/#1100. F2 only restores the non-whitespace correctness class accidentally carried by `git diff --check`.
+Workflow correction commit `bb8164f1f8cc784268f5f1f7515614c4703a37af` passed required CI **#1096**. Valid review isolation passed on #1099, #1100, #1109 and #1110. F2 restores the non-whitespace correctness class accidentally carried by `git diff --check` without restoring cosmetic whitespace as a blocker.
 
 Active branch-only review ledger:
 
@@ -181,7 +216,7 @@ The ledger is temporary work, not authority, and must not enter `main`.
 
 ## Integrated T8 baseline
 
-T8-A→T8-G remain operator-ratified. T8-E/T8-F/T8-G remain integrated. Whole-T8 closure continues to preserve:
+T8-A→T8-G remain operator-ratified. T8-E/T8-F/T8-G remain integrated. Whole-T8 convergence preserves:
 
 ```text
 accepted application operations      78
@@ -210,14 +245,17 @@ The bounded T8-E-FR read-symmetry meaning remains unchanged; T8-H only consolida
 ## Exact next action
 
 ```text
-prove the exact Round-1-corrected T8-H candidate with required CI
-→ if green, open a fresh bounded Round-2 Evidence branch from that exact HEAD
-→ Round 2 attacks F1 closure, F2 conflict-marker behavior and the F3 no-broad-regex adjudication
-→ verify no Product/semantic/census regression; application operations remain exactly 78
-→ adjudicate any surviving material finding against the smallest owning authority
-→ if converged, prepare T8-H ratification/closure candidate
-→ do not begin T9 and do not implement Product code
+operator adjudication / ratification of the converged T8-H result
+→ if ratified, author the durable T8-H ratification record
+→ remove branch-only docs/work/current/t8h-global-coherence.md before merge candidacy
+→ run required CI on the exact closure candidate
+→ obtain explicit operator merge authorization
+→ squash-merge PR #148 only after that authorization
+→ revalidate integrated main before opening T9
+→ do not begin T9 and do not implement Product code before T8-H is ratified and integrated
 ```
+
+The post-review roadmap update is mutable status bookkeeping only; the exact technical candidate independently reviewed by Fable Round 2 remains `b940d4e105a8b837ecdac7f71233ff10d735cd5e`.
 
 Candidate/review branch cleanup is non-authoritative housekeeping and does not open or block T8-H.
 
@@ -230,8 +268,8 @@ Do not reopen completed T1→T8-G or the 78-operation Product/T6 census by prefe
 | T8-E — Executable Wire Contract | Exact OpenAPI application wire, schemas, headers, problems, ETags, idempotency, pagination, upload/exact-byte contract, generated Go/TypeScript boundaries | CLOSED / OPERATOR-RATIFIED / INTEGRATED; T8-E-FR meaning retained and executable representation consolidated in wire SSOT |
 | T8-F — Frontend Realization | Route tree, feature/package topology, generated transport consumption, query/state behavior, read-model consumption, editor/viewer boundaries | CLOSED / OPERATOR-RATIFIED / INTEGRATED |
 | T8-G — Runtime / Process / Deployment | Binaries/processes, River workers, renderer/scanner/provider boundaries, startup/readiness/shutdown, configuration/secrets, trust/network boundaries, observability, recovery/runtime profiles | CLOSED / OPERATOR-RATIFIED / INTEGRATED |
-| T8-H — Whole-T8 Global Coherence Review | Cross-check backend, persistence, wire, frontend, runtime and accepted upstream authorities as one system | OPEN / ACTIVE; Round-1 F1/F2 corrected; exact CI + bounded Round 2 pending |
-| T9 — Golden Flows & Validation Baseline | Falsifiable composed-system flows and proof classes | NOT OPEN; opens only after Whole-T8 coherence closes |
+| T8-H — Whole-T8 Global Coherence Review | Cross-check backend, persistence, wire, frontend, runtime and accepted upstream authorities as one system | OPEN / CONVERGED; Fable Round 2 MATERIAL=0; awaiting operator ratification |
+| T9 — Golden Flows & Validation Baseline | Falsifiable composed-system flows and proof classes | NOT OPEN; opens only after Whole-T8 coherence closes and integrates |
 | T10 — Transition / Cutover | Real current→target transition and rollback barriers | NOT OPEN; opens after T9 baseline |
 | T11 — Implementation Program & Execution Graph | Bounded work graph and proof obligations | NOT OPEN; opens after T1→T10 accepted |
 | T12 — Adversarial Implementation-Readiness | Independent implementation-readiness attack | NOT OPEN; opens after T11 |
