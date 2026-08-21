@@ -7,9 +7,9 @@ summary: Branch-only T8-H adversarial review ledger for cross-stage realization 
 
 # T8-H — Whole-T8 Global Coherence Review
 
-> **Status:** OPEN / ACTIVE / NOT RATIFIED  
-> **Opening base:** `main @ 0b4ef6ef891b01f907804cff4bd3c0022aebad80`  
-> **Implementation:** BLOCKED  
+> **Status:** OPEN / ACTIVE / NOT RATIFIED
+> **Opening base:** `main @ 0b4ef6ef891b01f907804cff4bd3c0022aebad80`
+> **Implementation:** BLOCKED
 > **Scope:** T8-A→T8-G coherence only; T9 is not open.
 
 This is temporary branch-only work under the repository documentation law. It records the active T8-H review and must not enter `main`. Durable corrections, if operator-approved, belong in the owning authorities; final stage/status remains exclusively in `docs/roadmap.md`.
