@@ -116,6 +116,7 @@ Success lane:
 
 ```text
 current Area / access / DocumentType-governance configuration
+→ whole-replacement governance/config mutation under its accepted ETag when the flow exercises configuration
 → creation options/numbering preview
 → createDocument with one logical Idempotency-Key
 → final number allocation + Document current truth + required Audit commit atomically
@@ -125,6 +126,7 @@ current Area / access / DocumentType-governance configuration
 Required falsifiers:
 
 ```text
+stale configuration ETag cannot silently overwrite newer governance/config truth
 concurrent duplicate logical create cannot create two Documents or two accepted semantic effects
 same key + changed semantic request is rejected
 required Audit append failure rolls back the business mutation
@@ -174,8 +176,8 @@ Submission
 → GovernanceAttempt + immutable Step configuration/candidate snapshot
 → actor-relevant governance work
 → feedback/Step Decision under current Authorization
-→ required owner mutation + Audit + durable rendition intent commit coherently
-→ River redelivery-safe processing
+→ required owner mutation + required Audit + any actually-required durable effect intent commit coherently
+→ when durable work exists, River redelivery-safe processing
 → conditional rendition path
 → canonical Release/EFFECTIVE truth
 → Document Official + History + official exact-byte read
@@ -192,6 +194,7 @@ submitted DOCX + required PDF
   → private renderer
   → candidate bytes re-admitted/verified
   → eligibility reloaded before OfficialRendition finalization
+  → selected renderer/font/config profile passes representative MetalDocs DOCX fidelity corpus
 ```
 
 Required falsifiers:
@@ -199,11 +202,14 @@ Required falsifiers:
 ```text
 GroupMembership drift after Step activation cannot rewrite the frozen candidate snapshot
 current Authorization denial cannot be bypassed by being in the snapshot
-required Audit/intent failure cannot leave a committed semantic transition
+required Audit/actually-required intent failure cannot leave a committed semantic transition
+PDF→PDF path cannot emit renderer intent merely for symmetry
 River duplicate/redelivery cannot create duplicate Release/Rendition semantic truth
 renderer failure cannot convert acceptance into false success
+representative DOCX corpus fidelity failure blocks production eligibility for that renderer profile
 provider byte corruption cannot produce a complete successful exact-byte response
 malicious/unscanned required governed bytes cannot cross the immutable governed boundary
+clean scan evidence must bind the exact bytes that are later admitted at the governed boundary
 ```
 
 Minimum evidence: E2 + E3 + E5 + E6; E4 for the browser governance/official lenses.
@@ -219,7 +225,9 @@ Library/Search official discovery
 → DocumentOfficialView
 → open_revision present only for the unique disclosable current DRAFT/SUBMITTED Revision
 → active_obsolescence_request_id present only for the unique disclosable ACTIVE request
-→ create/inspect/withdraw obsolescence through admitted operations
+→ create obsolescence request
+→ either withdraw through the admitted path
+   OR complete the accepted governance/system-owned obsolescence progression and observe resulting official/history truth
 → History remains semantic history, not a current-resource resolver
 → Audit remains evidence, not current business truth
 ```
@@ -231,6 +239,7 @@ absence of open_revision/request id cannot prove non-existence to an unauthorize
 official lens never renders DRAFT WorkingContent as official truth
 Search cannot acquire a second materialized/external current-truth authority
 History/Audit cannot be used to bypass current disclosure/AuthZ
+withdrawn/obsolete progression cannot leave a stale active request pointer as Product truth
 operation 79 cannot appear to repair a navigation/read-symmetry gap
 ```
 
@@ -336,7 +345,7 @@ Must prove stale whole-replacement semantics, stale DRAFT-specific semantics, pr
 
 ### V7 — Exact content, malware and rendition integrity
 
-Must prove semantic ExactContentDescriptor authority over provider identity, exact size/hash/format verification, clean-gate requirements, same-PDF zero-transformation path, DOCX conditional-render path, immutable accepted rendition bytes and failure-before-success-headers for corruption.
+Must prove semantic ExactContentDescriptor authority over provider identity, exact size/hash/format verification, clean-gate requirements, scan evidence binding to the exact admitted bytes, same-PDF zero-transformation path, DOCX conditional-render path, representative DOCX fidelity corpus eligibility, immutable accepted rendition bytes and failure-before-success-headers for corruption.
 
 ### V8 — Durable work / River semantics
 
