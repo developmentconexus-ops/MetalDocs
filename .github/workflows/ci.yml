@@ -221,8 +221,17 @@ jobs:
           [[ "$pr131" == "d8b1c6d31e704e9552a14faa7764c634a29b081d" ]]
           [[ "$pr132" == "b0ebe54cb010e9837a25f7b778f3d9814d283cb8" ]]
 
-          # Whitespace is useful hygiene but is not an architecture correctness gate.
-          whitespace_issues=$(git diff --check "$BASE_SHA...$HEAD_SHA" 2>&1 || true)
+          # Whitespace remains non-blocking hygiene, but git diff --check also
+          # detects unresolved merge-conflict markers; those remain correctness blockers.
+          diff_check=$(git diff --check "$BASE_SHA...$HEAD_SHA" 2>&1 || true)
+          conflict_issues=$(printf '%s\n' "$diff_check" | grep -F 'leftover conflict marker' || true)
+          if [[ -n "$conflict_issues" ]]; then
+            echo "::error::leftover merge-conflict marker in PR diff"
+            printf '%s\n' "$conflict_issues"
+            exit 1
+          fi
+
+          whitespace_issues=$(printf '%s\n' "$diff_check" | grep -v -F 'leftover conflict marker' || true)
           if [[ -n "$whitespace_issues" ]]; then
             echo "::warning::non-blocking whitespace findings in PR diff"
             printf '%s\n' "$whitespace_issues"
