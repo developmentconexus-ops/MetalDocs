@@ -41,7 +41,7 @@ VERIFIED EPHEMERAL EXACT-BYTE SPOOL
 +
 FAIL-CLOSED RECOVERY PROFILE
 +
-OPEN TELEMETRY / OTLP OBSERVABILITY BASELINE
+OPENTELEMETRY / OTLP OBSERVABILITY BASELINE
 +
 ONE-SHOT MIGRATION / JOB / RECOVERY OPERATIONS
 +
@@ -121,16 +121,15 @@ Baseline steady state:
                     │ River workers  │
                     │ GC scheduling  │
                     │ health + OTel  │
-                    └─┬──┬──┬──┬────┘
-                      │  │  │  │
-          ┌───────────┘  │  │  └──────────┐
-          ▼              ▼  ▼             ▼
-     PostgreSQL       Storage OIDC      Renderer
-        + River          │              PRIVATE
-                         │
-                         ▼
-                 MalwareInspector
-                     PRIVATE
+                    └───────┬────────┘
+                            │
+             ┌──────────────┼──────────────┬──────────────┬──────────────┐
+             ▼              ▼              ▼              ▼              ▼
+        PostgreSQL     ManagedContent     OIDC         Renderer       MalwareInspector
+         + River           Store        Provider       PRIVATE          PRIVATE
+                              ▲
+                              │ bounded signed PUT capability
+                           Browser
 ```
 
 Steady-state Launch process/deployment census:
@@ -388,7 +387,11 @@ bounded CPU / memory / request length / duration / queue/in-flight work
 no production bypass flag such as FORCE_CLEAN or scan-disabled governed admission
 ```
 
-ClamAV `clamd` is the reference production mechanism. Prefer same deployment locality / Unix-socket or otherwise protected transport because native clamd TCP is not an authenticated/encrypted public protocol. Signature database freshness is an explicit operations/security policy; inability to satisfy that policy makes required governed admission unavailable rather than implicitly CLEAN.
+ClamAV `clamd` is the reference production mechanism. Prefer same deployment locality / Unix-socket or otherwise protected transport because native clamd TCP is not an authenticated/encrypted public protocol.
+
+The content-scanning engine receives no arbitrary document-processing egress entitlement. Signature update is a separate bounded operational concern: the selected updater may have narrowly scoped egress to approved signature sources, or signatures may be delivered by the deployment platform. Signature-update network access never grants scanned document content general outbound access.
+
+Signature database freshness is an explicit operations/security policy. Inability to satisfy that policy makes required governed admission unavailable rather than implicitly CLEAN.
 
 False-positive recovery is provider/signature correction followed by rescan of the exact bytes, never semantic bypass.
 
@@ -417,7 +420,7 @@ spool Product authority             none
 
 Temporary spool/workspace may be discarded wholesale after process/container restart. Anything requiring crash survival belongs in ManagedContentStore, not spool storage.
 
-Renderer/scanner I/O follows the same bounded-spool principle where required. The renderer does not receive object-store credentials merely to save a copy step.
+Renderer/scanner I/O follows the same bounded-spool principle where required. The renderer and scanner do not receive object-store credentials merely to save a copy step.
 
 If accepted content cannot be handled sustainably by this spool profile, the buffering mechanism is falsified; the exact-content guarantee is not weakened.
 
@@ -481,7 +484,7 @@ load deployment config
 → READY
 ```
 
-Renderer, ManagedContentStore and OIDC availability are not global startup probes. They are dependency-scoped mechanisms and are exercised on paths that need them.
+Renderer, ManagedContentStore, MalwareInspector and OIDC availability are not global startup probes. They are dependency-scoped mechanisms and are exercised on paths that need them.
 
 ### `/livez`
 
