@@ -2,16 +2,18 @@
 id: decision-register
 kind: authority
 owner: architecture
-summary: Current MetalDocs decision/disposition register and entrypoint to forward obligations.
+summary: Compact current decision/disposition register for Product and R10.
 ---
 
-# Decision register
+# MetalDocs decision register
 
-A fresh actor uses this register to discover current material decisions without reconstructing review chronology. Detailed meaning remains in each owning authority.
+This is the compact current register. It points to the owning semantic authority instead of recreating the old historical ledger.
 
-| ID | Subject | Disposition | Current consequence | Owning authority / reopen source |
+## Current decisions
+
+| ID | Subject | Disposition | Current decision | Authority |
 |---|---|---|---|---|
-| PC | Product contract | CURRENT / APPROVED | Launch scope and Product concepts are binding | `../product/contract.md` |
+| PRODUCT | Launch Product contract | CURRENT / APPROVED | Controlled-document Launch scope is binding | `../product/contract.md` |
 | ALIGN | Whole-product alignment | CURRENT / APPROVED | Product-wide alignment baseline is binding | `../product/alignment.md` |
 | OWN | Semantic ownership | CURRENT / APPROVED | Authentication, Organization, Authorization, Controlled Documents + supporting Audit | `../architecture/ownership.md` |
 | T1 | Domain state/invariants | CURRENT / RATIFIED | Stable semantic state/lifecycle vocabulary | `../architecture/domain-model.md` |
@@ -27,8 +29,9 @@ A fresh actor uses this register to discover current material decisions without 
 | T8-B | Backend topology | CURRENT / RATIFIED | Owner-first modular monolith realization baseline | `../architecture/backend.md` |
 | T8-C | Internal contracts | CURRENT / RATIFIED | Authority-aligned owner/resolver contract model | `../architecture/interfaces.md` |
 | T8-D | Persistence | CURRENT / RATIFIED | Owner-namespaced PostgreSQL relational core and concurrency realization | `../architecture/persistence.md` |
+| T8-E | Executable wire contract | CURRENT / RATIFIED | Exact 78-operation OAS 3.0.3 application wire is binding; no operation 79 without material Product/T6 reopen | `../architecture/wire-contract.md` |
 | RESET | Repository clean-slate reset | CURRENT / OPERATOR-RATIFIED | Superseded implementation remains absent; required provenance stays reachable | `repository-reset.md` |
-| REPO-STD-V1 | Repository operating envelope | CURRENT ORGANIZATIONAL BASELINE / ALIGNMENT IN PROGRESS | Repository conforms to Repository Standard v1 through the active governance gate | `../roadmap.md` + `../development/documentation.md` + `../development/engineering-rules.md` |
+| REPO-STD-V1 | Repository operating envelope | CURRENT ORGANIZATIONAL BASELINE / ALIGNED | Repository Standard v1 alignment is merged; local repository controls preserve that operating envelope | `../roadmap.md` + `../development/documentation.md` + `../development/engineering-rules.md` |
 
 ## Forward obligations
 
@@ -36,9 +39,9 @@ The old decision corpus is intentionally not restored wholesale. Cross-stage obl
 
 ```text
 PRESERVE  21
-REOPEN     4
+REOPEN     3
 DEFERRED  27
-TOTAL     52
+TOTAL     51
 ```
 
 `CURRENT` semantics already live in the owning authorities above. `SUPERSEDED` mechanics remain deleted unless new material evidence explicitly reopens them.

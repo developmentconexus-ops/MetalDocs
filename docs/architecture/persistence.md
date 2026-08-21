@@ -2,6 +2,8 @@
 
 > **Status:** CLOSED / OPERATOR-RATIFIED / PROMOTED  
 > **Ratified:** 2026-08-20  
+> **T8-E bounded correction:** 2026-08-20 — Governance Step label persistence + immutable attempt label snapshot
+> **T8-E bounded correction:** 2026-08-21 — transaction/Audit/idempotency precision + same-PDF rendition + reconstructible CSRF session secret
 > **Repository:** `developmentconexus-ops/MetalDocs`  
 > **Branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131  
 > **Method:** DevelopmentConexus Engineering Method v1.0.0  
@@ -334,7 +336,7 @@ Offboarding preserves provider-binding history/current binding; disabled User el
 id                  UUID PRIMARY KEY
 user_id             UUID NOT NULL REFERENCES org.users(id)
 token_digest        BYTEA NOT NULL UNIQUE
-csrf_secret_digest  BYTEA NOT NULL
+csrf_secret         BYTEA NOT NULL
 created_at          TIMESTAMPTZ NOT NULL
 expires_at          TIMESTAMPTZ NOT NULL
 CHECK(expires_at > created_at)
@@ -350,7 +352,9 @@ binding replacement DELETE all for User
 restore readiness   purge all restored sessions before serving
 ```
 
-No raw token/IP/User-Agent/device/tenant selector/permission snapshot is persisted as target authority.
+Session issuance generates a cryptographically random per-session `csrf_secret`. Session resolution may return that opaque secret/token material only after the ApplicationSession cookie has authenticated through `token_digest`. Unsafe-request CSRF validation compares the supplied token to this server-side session secret in constant time. The CSRF secret is not an authentication bearer credential and grants nothing without the valid HttpOnly session cookie.
+
+No raw **authentication** token/IP/User-Agent/device/tenant selector/permission snapshot is persisted as target authority.
 
 ---
 
@@ -516,6 +520,7 @@ Each configured step stores:
 ```text
 document_type_id
 ordinal
+label TEXT NOT NULL
 selector_kind = NAMED_USER | GROUP
 named_user_id NULL
 group_id NULL
@@ -701,6 +706,7 @@ Each immutable selector snapshot has bounded mutable activation/decision state:
 id
 attempt_id
 ordinal
+label_snapshot TEXT NOT NULL
 selector_kind
 named_user_id NULL
 group_id_snapshot NULL
@@ -710,7 +716,7 @@ UNIQUE(attempt_id, ordinal)
 UNIQUE(attempt_id) WHERE state='ACTIVE'
 ```
 
-Snapshot selector columns are not serving-updateable after creation.
+Snapshot label/selector columns are not serving-updateable after creation.
 
 ### GROUP deletion / activation
 
@@ -814,7 +820,9 @@ UNIQUE(submission_id, required_format)
 
 Insert-only semantic exact-content fact. Renderer/provider identity is not semantic authority.
 
-Rendition bytes are prepared outside the semantic transaction; final admission uses the universal ManagedContent `FOR SHARE` rule plus exact descriptor/malware evidence as applicable, then revalidates the governed state before insert/release consequence.
+If a Submission already contains admitted PDF and its frozen policy requires OfficialRendition(PDF), the OfficialRendition row may reference the **same** `managed_content_id` and copy the same exact descriptor as the Submission after canonical eligibility/descriptor revalidation. No provider copy, renderer output or River intent is created.
+
+When transformation is required (current Launch: DOCX→PDF), rendition bytes are prepared outside the semantic transaction; final admission uses the universal ManagedContent `FOR SHARE` rule plus exact descriptor/malware evidence as applicable, then revalidates the governed state before insert/release consequence.
 
 ### `controlled_docs.obsolescence_requests`
 
@@ -1068,7 +1076,7 @@ Safe failure remains leaked bytes, never deleted governed truth.
 id UUID PRIMARY KEY
 actor_user_id UUID NOT NULL
 operation_id TEXT NOT NULL
-key TEXT NOT NULL
+key UUID NOT NULL
 semantic_fingerprint BYTEA NOT NULL CHECK(octet_length(semantic_fingerprint)=32)
 fingerprint_key_version INTEGER NOT NULL CHECK(fingerprint_key_version > 0)
 created_at TIMESTAMPTZ NOT NULL
@@ -1081,11 +1089,11 @@ UNIQUE(actor_user_id,operation_id,key)
 ```text
 key_id UUID PRIMARY KEY
 snapshot_version INTEGER NOT NULL
-payload BYTEA NOT NULL
+payload BYTEA NOT NULL CHECK(octet_length(payload) <= 2048)
 completed_at TIMESTAMPTZ NOT NULL
 ```
 
-ReplaySnapshot remains versioned, self-contained and PII-free by construction. Exact maximum payload size belongs T8-E after exact success-representation census; T8-D requires only a bounded representation.
+ReplaySnapshot remains versioned, self-contained and PII-free by construction. T8-E freezes the Launch maximum at 2,048 bytes and T8-D mirrors that bound structurally. The client `Idempotency-Key` is stored as UUID identity so textual UUID case/form cannot create parallel scoped uniqueness identities.
 
 ### Commit invariant
 
@@ -1102,6 +1110,10 @@ semantic mutation + Audit + required River intent + ReplaySnapshot commit atomic
 ```
 
 Winner path uses the immediate scoped unique with `INSERT ... ON CONFLICT DO NOTHING`; under READ COMMITTED a loser waits without poisoning Scope, then sees the winner's committed ReplaySnapshot on the next command. If winner rolls back, contender may become owner. Same key + different fingerprint is conflict/zero business mutation.
+
+Completion chooses one trusted `completed_at` and, before commit, sets the paired Key `expires_at = completed_at + 24 hours`. This is the semantic replay boundary; cleanup timing cannot extend it.
+
+A BeginIn conflict on an existing scoped key serializes on that row. If `now >= expires_at`, the transaction deletes the expired Replay then Key and retries claim establishment in the same Scope. If the row is still live, normal replay/fingerprint-conflict behavior applies. Concurrent post-expiry reuse still has one winner/loser path. The janitor remains cleanup only, never semantic expiry authority.
 
 ### Fingerprint privacy/equality
 
@@ -1332,6 +1344,8 @@ GC takes ManagedContent `FOR UPDATE` first and then performs downstream proofs a
 
 Every authenticated semantic mutation inherits actor `FOR SHARE`. Natural idempotent DELETEs need no durable Idempotency-Key unless T6 explicitly says otherwise.
 
+Each transaction appends **all and only** the T3-required semantic Audit evidence for the facts/effects it commits. One business transition may therefore append multiple Audit events; the singular `Audit` shorthand below never suppresses required companion evidence and never creates an event T3 does not require.
+
 Material mutation families include:
 
 ```text
@@ -1348,13 +1362,16 @@ Provider-binding replacement
   provider preflight -> actor/target ordering -> expected version -> replace binding -> purge sessions -> Audit
 
 UserProfile replacement/erasure
-  protected actor/target as applicable -> VersionToken/owner rule -> Audit when required
+  protected actor/target as applicable -> VersionToken/owner rule -> ordinary replacement has no mandatory semantic Audit; lawful erasure appends user_profile.erased evidence when T3 requires it
 
 Offboarding
-  ordered User locks -> target eligibility update root -> session purge + memberships/direct RoleAssignments removal + Audit
+  ordered User locks -> target eligibility update root -> session purge + memberships/direct RoleAssignments removal + all required teardown/offboarding Audit
+
+User re-enable
+  protected actor/target -> eligibility VersionToken/CAS -> DISABLED->ENABLED only -> user.reenabled Audit; no prior session/membership/grant resurrection
 
 Company replacement
-  protected actor -> Company version CAS -> Audit
+  protected actor -> Company version CAS; no mandatory semantic Audit
 
 Area create
   Idempotency -> protected actor -> Organization insert + Audit + Replay
@@ -1396,7 +1413,7 @@ Next Revision
   Idempotency -> protected actor -> Document FOR UPDATE -> source current EFFECTIVE revalidation -> seed attach FOR SHARE -> Revision + WorkingContent + Audit + Replay
 
 DRAFT PATCH
-  protected actor -> Document FOR SHARE -> new handle FOR SHARE if replacing source -> generation CAS -> title/source update -> claim consume if applicable -> Audit when required
+  protected actor -> Document FOR SHARE -> new handle FOR SHARE if replacing source -> generation CAS -> title/source update -> claim consume if applicable; no mandatory Launch semantic Audit
 
 Draft upload allocate
   protected actor/journey authorization -> ManagedContent OPEN + AdmissionClaim in/before same commit
@@ -1405,10 +1422,14 @@ Draft upload complete
   external exact-byte read/scan -> ManagedContent FOR UPDATE -> same live claim -> create-once proof -> immutable descriptor + terminal malware evidence -> OPEN->READY
 
 SUBMIT
-  Idempotency -> protected actor -> DocumentType config snapshot protection -> Document FOR UPDATE -> source handle FOR SHARE -> immutable Submission -> route/Step snapshot -> activate first candidate set -> Audit -> required River intent -> Replay
+  Idempotency -> protected actor -> DocumentType config snapshot protection -> Document FOR UPDATE -> source handle FOR SHARE -> immutable Submission -> route/Step snapshot including label_snapshot -> activate first candidate set
+  -> SourceOnly: no rendition work
+  -> RequireOfficialRendition(PDF) + source PDF: insert OfficialRendition over same handle/descriptor; no provider copy/renderer/River intent
+  -> RequireOfficialRendition(PDF) + source DOCX: enqueue required River rendition intent
+  -> append all T3-required evidence for Submission + any same-tx OfficialRendition/Release -> Replay
 
 Feedback
-  Idempotency where required -> protected actor -> exact case validation -> append feedback + Audit/Replay as upstream requires
+  Idempotency where required -> protected actor -> exact case validation -> append immutable feedback -> Replay; no duplicate semantic Audit
 
 Governance ACCEPT / RETURN
   protected actor -> Document FOR UPDATE -> exact active Step/candidate/Authorization/SoD -> insert Decision -> activate next candidates or RETURN/release consequence -> Audit
@@ -1432,7 +1453,7 @@ Obsolescence withdrawal/final completion
   protected actor -> Document FOR UPDATE -> request/attempt transition -> Revision OBSOLETE on success -> Audit
 
 OfficialRendition finalization
-  system/background path -> Document FOR UPDATE -> rendition handle FOR SHARE -> exact descriptor/proof -> insert OfficialRendition -> release consequence when gates satisfied
+  renderer/background transformation path -> Document FOR UPDATE -> rendition handle FOR SHARE -> exact descriptor/proof -> insert OfficialRendition -> official_rendition.completed Audit -> release consequence when gates satisfied -> release.completed Audit when Release is established in the same commit
 
 Backup pin acquire/release
   handle FOR SHARE for new pin -> pin insert; bounded delete/expiry for release
@@ -1568,6 +1589,7 @@ Revision ordinal and Document code non-reuse
 SUBMITTED iff current_submission_id
 Revision EFFECTIVE/SUPERSEDED/OBSOLETE only through Release/effectivity path
 DRAFT stale generation => zero mutation; successful mutation increments once
+GovernanceAttempt Step label_snapshot remains unchanged after current route relabel
 frozen Governance candidate FK blocks non-candidate and empty-set decision
 one GovernanceAttempt per governed subject
 Group deletion four live blockers and no historical fifth blocker
@@ -1581,6 +1603,11 @@ same-key READ COMMITTED winner/loser path does not poison Scope
 idempotency HMAC rotation drain prevents honest-retry false conflict
 River self-REINDEX disabled on PG16 while runtime is non-owner
 Audit historical visibility filters before pagination
+ApplicationSession resolve can reproduce the per-session CSRF token from server-side session state; constant-time validation requires the authenticated session and token alone grants nothing
+Idempotency UUID textual variants map to one scoped key identity
+Idempotency ReplaySnapshot >2048 bytes is structurally rejected
+Idempotency post-expiry reuse succeeds correctly even when janitor cleanup lags
+already-PDF required PDF rendition reuses the exact Submission handle/descriptor and creates zero provider copy/renderer/River intent; DOCX→PDF still enqueues the required intent
 ```
 
 Controls whose firing only becomes meaningful after a future pooled-tenancy reopen are documented as seam structure, not claimed as current multi-tenant proof.
@@ -1607,7 +1634,7 @@ D12  immutable Release effectivity fact + partial one-EFFECTIVE barrier
 D13  partial one-open DRAFT/SUBMITTED Revision barrier
 D14  bounded current_submission_id with SUBMITTED biconditional and same-Revision FK
 
-D15  closed relational governance persistence; no generic workflow
+D15  closed relational governance persistence with configured Step label + immutable attempt label snapshot; no generic workflow
 D16  one ACTIVE Step structural uniqueness
 D17  live GROUP dependency separated from activated candidate snapshot
 D18  GovernanceDecision must FK to frozen candidate snapshot; candidates mandatory for NAMED_USER/GROUP activation

@@ -2,6 +2,7 @@
 
 > **Status:** CLOSED / OPERATOR-RATIFIED / PROMOTED  
 > **Ratified:** 2026-08-19  
+> **T8-E bounded correction:** 2026-08-21 — same-PDF rendition emits no renderer intent + session resolve exposes per-session CSRF token material
 > **Repository:** `developmentconexus-ops/MetalDocs`  
 > **Branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131  
 > **Method:** DevelopmentConexus Engineering Method v1.0.0  
@@ -729,9 +730,11 @@ Provider roles/groups/permissions/raw claim bags do not cross as Organization/Au
 
 Authentication public capabilities cover browser login/callback preflight, binding resolution/create/replace, session issue/resolve/revoke and current provider-subject search required by T6.
 
+Session resolution returns the current authenticated User identity plus the opaque **per-session CSRF token material** required by T6 `GET /api/v1/session` and unsafe-request validation. The token is session-bound server state, not a second authentication credential: it grants nothing without the valid HttpOnly ApplicationSession cookie. Authentication owns generation/comparison semantics; exact persistence belongs T8-D.
+
 Provider/network exchange occurs outside the local semantic transaction; binding/session state mutations occur in caller-provided Scope.
 
-Session issuance requires protected current enabled-User truth from Organization.
+Session issuance requires protected current enabled-User truth from Organization and creates fresh per-session CSRF token material.
 
 ---
 
@@ -946,7 +949,7 @@ Renderer/provider job ids never become semantic identity.
 
 ### 17.2 Durable intent
 
-When a frozen Submission requires OfficialRendition, Controlled Documents returns a named intent containing only the stable Submission identity and required format.
+When a frozen Submission requires **renderer transformation** to establish OfficialRendition (current Launch: DOCX→PDF), Controlled Documents returns a named intent containing only the stable Submission identity and required format. If the exact submitted source is already PDF and the required format is PDF, Controlled Documents establishes the OfficialRendition semantic fact over the same admitted handle/descriptor and returns **no** rendition intent.
 
 The submitting application leaf owns:
 
@@ -966,9 +969,12 @@ The platform River adapter obtains the native `*sql.Tx` only through `txscope.SQ
 Atomicity law:
 
 ```text
-required-rendition Submission semantic transition commits
+Submission transition that activates renderer work commits
 <=>
 required durable rendition intent commits in the same Scope
+
+already-PDF + required PDF establishes the semantic OfficialRendition synchronously
+=> zero rendition intent
 ```
 
 No generic EventBus/outbox is added.

@@ -2,7 +2,7 @@
 id: documentation-governance
 kind: authority
 owner: engineering
-summary: MetalDocs-specific documentation placement, provenance-routing, and checkpoint rules layered on Repository Standard v1.0.0.
+summary: MetalDocs-specific documentation placement and provenance-routing rules layered on Repository Standard v1.0.0.
 ---
 
 # Documentation governance
@@ -26,20 +26,16 @@ Do not add another documentation root, live archive/tombstone tree, or new categ
 
 Durable paths use lowercase kebab-case semantic names. Existing imported Product/R10 authorities may retain their historical internal title/provenance blocks until substantively rewritten; cosmetic normalization must not risk decision loss.
 
-## Local metadata deviation — checkpoint
+## Local metadata
 
-Repository Standard permits local semantic surfaces when a real consumer exists. MetalDocs uses minimal frontmatter:
+MetalDocs uses minimal frontmatter only where it improves routing:
 
 ```yaml
 id: unique-id
-kind: authority | checkpoint | work
+kind: authority | work
 owner: owner-name
 summary: one sentence
 ```
-
-`checkpoint` is a MetalDocs-specific durable, non-authoritative accepted-work snapshot. Current consumer: `docs/reference/t8e-checkpoint.md`, which preserves already-accepted T8-E design across repository-governance gates without promoting it to final authority.
-
-Removal trigger: when the owning stage is ratified and its durable authority fully absorbs the checkpoint.
 
 `work` remains temporary and branch-only under `docs/work/`; it never enters a merge candidate or `main`.
 

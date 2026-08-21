@@ -3,6 +3,7 @@
 > **Status:** ACTIVE / OPERATOR-RATIFIED TECHNICAL AUTHORITY  
 > **Ratified:** 2026-08-18  
 > **Post-T5 Fable bounded amendment:** 2026-08-18 — canonical Search baseline + conditional materialization + projection serialization + late-rendition no-op  
+> **T8-E bounded correction:** 2026-08-21 — OfficialRendition durable work only when source transformation is required
 > **Repository:** `developmentconexus-ops/MetalDocs`  
 > **Branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131  
 > **Decision baseline:** `wiki/architecture/rebaseline-decision-registry.md`  
@@ -36,6 +37,10 @@ PDF source
   → direct PDF viewer by default
   → no duplicate generated PDF without a named need
 
+PDF + RequireOfficialRendition(PDF)
+  → establish the OfficialRendition semantic fact over the same admitted PDF handle + descriptor
+  → no renderer, provider copy or durable rendition job
+
 DOCX + SourceOnly
   → direct read-only DOCX viewer
   → no persistent governed PDF merely for viewing
@@ -52,7 +57,7 @@ Binding distinctions:
 ```text
 preview/viewer mechanism != OfficialRendition
 SourceOnly viewing != durable rendering requirement
-official_rendition_render exists only when frozen representation policy requires it
+official_rendition_render exists only when frozen representation policy requires OfficialRendition **and transformation to the required format is necessary**
 ```
 
 A future rebuildable viewable-PDF cache is mechanism only and must not become Release authority.
@@ -89,7 +94,10 @@ Baseline:
 ```text
 conditional durable job:
   official_rendition_render(submission_id, required_format)
-  only when the frozen Submission representation policy requires OfficialRendition
+  only when the frozen Submission requires OfficialRendition **and its exact source must be transformed to the required format**
+
+already-PDF + required PDF:
+  establish OfficialRendition synchronously over the same admitted bytes; no durable job
 
 periodic reconciliation, not per-object durable enqueue:
   managed-content GC over durable GC_PENDING
@@ -132,8 +140,11 @@ required durable work exists
 Examples:
 
 ```text
-Submission requiring OfficialRendition(PDF)
+Submission requiring DOCX→OfficialRendition(PDF) transformation
   → official_rendition_render(submission_id, PDF)
+
+Submission already PDF + required OfficialRendition(PDF)
+  → no future external effect; no job
 
 IF materialized Search has been activated by T6:
   Release / obsolescence / relevant searchable-current change
@@ -148,7 +159,25 @@ A canonical query/view Search baseline creates no asynchronous work to enqueue.
 
 ## 6. Conditional OfficialRendition execution — T5-D / T5-E
 
-When a frozen Submission policy requires an OfficialRendition:
+When a frozen Submission policy requires an OfficialRendition, execution is conditional on whether transformation is actually needed.
+
+Already-PDF path:
+
+```text
+load exact eligible Submission whose source format is PDF
+→ open local transaction
+→ reload current eligibility
+→ prove required PDF rendition still absent/required
+→ revalidate the exact Submission handle + descriptor
+→ create OfficialRendition over that same handle + descriptor
+→ required T3 Audit
+→ if human gate also satisfied, execute T2 system Release
+→ COMMIT
+```
+
+No renderer, provider copy or durable job participates.
+
+Transformation path (current Launch: DOCX→PDF):
 
 ```text
 load Submission + requirement
@@ -466,6 +495,8 @@ Later implementation/tests must prove at least:
 
 ```text
 conditional rendition enqueue rolls back with Submission transaction rollback
+already-PDF + required PDF creates OfficialRendition over the same admitted handle/descriptor with zero renderer/copy/job
+DOCX→required PDF still commits the rendition intent atomically when renderer work is activated
 SourceOnly viewing creates no official-rendition requirement
 process crash after semantic commit cannot permanently lose required activated durable work
 duplicate rendition execution cannot create duplicate semantic OfficialRendition

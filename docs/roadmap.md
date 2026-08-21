@@ -12,10 +12,10 @@ summary: Sole mutable MetalDocs stage, gate, implementation-status, and next-act
 ```text
 REPOSITORY MODE                       CLEAN-SLATE / ARCHITECTURE-FIRST
 REPOSITORY RESET                      MERGED / OPERATOR-RATIFIED
-REPOSITORY STANDARD V1 ALIGNMENT      ACTIVE / DRAFT PR #135
+REPOSITORY STANDARD V1 ALIGNMENT      MERGED
 PRODUCT / OWNERSHIP                   OPERATOR-APPROVED
 T1 → T8-D                             CLOSED / OPERATOR-RATIFIED
-T8-E EXECUTABLE WIRE CONTRACT         PAUSED AT ACCEPTED CHECKPOINT
+T8-E EXECUTABLE WIRE CONTRACT         CLOSED / OPERATOR-RATIFIED
 T8-F → T12                            NOT OPEN
 IMPLEMENTATION                        BLOCKED
 LEGACY IMPLEMENTATION                 ABSENT FROM LIVE TREE
@@ -23,37 +23,84 @@ LEGACY IMPLEMENTATION                 ABSENT FROM LIVE TREE
 
 ## Current gate
 
-Align the clean-slate repository operating envelope with DevelopmentConexus Repository Standard v1.0.0 without reopening Product/R10 or restoring legacy implementation.
+T8-E — Executable Wire Contract is **CLOSED / OPERATOR-RATIFIED** as of 2026-08-21. PR #136 remains the unmerged integration carrier on `arch/t8e-wire-contract`; T8-F stays unopened until this ratified result is integrated into and revalidated on `main`.
 
-Exit requires:
+The reconciled T8-E contract is the ratified durable authority at `docs/architecture/wire-contract.md`. The application census remains 78 operations and is owned by `docs/product/journeys.md` plus `docs/decisions/api-operation-census.md`.
+
+The ratified authority contains the closed 78-operation request/success/header/problem/filter/action ledger. The two material upstream contradictions exposed by that ledger were operator-approved and reconciled on 2026-08-20:
 
 ```text
-Repository Standard routing/conformance controls complete
-+ Fable reset findings closed or deliberately dispositioned
-+ required unique unmerged provenance reachable
-+ docs/work/** absent from merge candidate
-+ required aggregate check green on exact candidate HEAD
-+ no unresolved review conversations
-+ explicit operator merge authorization
+T8-D  Governance Step label + immutable attempt label snapshot
+T3    unreachable ProviderSubjectBinding-disabled Audit census entry removed
 ```
+
+Document-admission measurement/probes and executable generator/provider feasibility evidence are complete enough for the Launch candidate:
+
+```text
+DOC_RAW_MAX_BYTES       100 MiB
+DOCX_EXPANDED_MAX_BYTES 256 MiB
+DOCX_MAX_ZIP_ENTRIES    4096
+Go boundary             oapi-codegen v2.8.0 probe PASS
+TypeScript boundary     openapi-typescript 7.13.0 probe PASS
+direct S3 PUT           signed exact Content-Length + If-None-Match:* probe PASS
+strict request split    kin-openapi + minimal envelope-guard probe PASS
+```
+
+The direct-PUT concern remains resolved subtractively without reopening T8-C: the existing `PresignCreate(handle,maxBytes,ttl)` seam is sufficient when T8-E supplies `maxBytes=expected_size_bytes`; the portable property is an at-most bound, while the reference S3 profile is stronger and signs exact `Content-Length`. Completion derives the actual descriptor independently, so no client-size truth is persisted.
+
+The final Lead coherence attack exposed one consolidated bounded upstream package and the operator approved it on **2026-08-21**. The implicated T4/T5/T8-C/T8-D lines are reconciled:
+
+```text
+T8-D               transaction/Audit + idempotency precision
+T4/T5/T8-C/T8-D    no renderer/job for already-PDF required PDF rendition
+T8-C/T8-D           reconstructible server-side CSRF synchronizer secret for GET /session
+```
+
+The correction remained subtractive/precision-only: no Product operation, owner, lifecycle state, permission, table family, generic worker, second cookie or new API was added.
+
+Independent Fable review PR #137 challenged candidate `ef329534fc9d5df3254d59c3787197fefa8435e6`. Lead adjudication accepted the material promotion/presence/bounds/profile findings, restored the current T6 Problem namespace rather than reopening it, and preserved T3 configuration Audit via closed typed facts rather than deleting auditability. No material contradiction survived to justify Round 2. PR #137 is closed and unmerged, and `review/t8e-fable` was deleted after preserving the review as Evidence history.
+
+The durable candidate absorbs the former T8-E checkpoint/work contract; `DOC-12` is consumed and the router/register point at the durable wire authority. Final promoted-tree verification passed:
+
+```text
+ledger rows                         78 / exact 1..78
+operationId                         78 unique
+method + path                       78 unique
+Idempotency-Key creations           exact 10
+ETag read / mutation domains        13 / 13
+exact-byte resources                exact 4
+Audit operation codes               37 unique
+Problem namespace                   https://errors.metaldocs.io/{code}
+ShortText / LongText                256 / 4096
+attention_required                  absent
+PROFILE_REPLACE If-Match+absent     412 precondition.resource_changed
+rows 3 / 45 validation.failed       absent
+row 42 validation.failed            present
+forward obligations                 21 / 3 / 27 = 51
+docs/work/**                         absent from candidate
+required CI                          #1013 SUCCESS
+```
+
+Operator ratification occurred explicitly on **2026-08-21**.
 
 ## Exact next action
 
 ```text
-finish Repository Standard v1 verification on PR #135
-→ operator reviews merge-ready evidence
-→ on authorized squash merge, reopen T8-E from docs/reference/t8e-checkpoint.md
-→ create a fresh T8-E Draft PR from updated main
+explicit operator merge authorization for PR #136
+→ squash merge PR #136 into main
+→ revalidate main + required CI + durable T8-E authority
+→ delete absorbed arch/t8e-wire-contract branch when safe
+→ only then open T8-F from updated main
 ```
 
-No T8-E design decision is made in the repository-governance alignment PR.
+Do not reopen completed T1→T8-D or the 78-operation Product/T6 census by preference. New material evidence reopens only the authority it actually implicates.
 
 ## Remaining architecture program
 
 | Stage | Owns | Opens / exits |
 |---|---|---|
-| T8-E — Executable Wire Contract | Exact OpenAPI application wire, schemas, headers, problems, ETags, idempotency, pagination, upload/exact-byte contract, generated Go/TypeScript boundaries | Resumes only after Repository Standard alignment merges; exits by operator ratification |
-| T8-F — Frontend Realization | Route tree, feature/package topology, generated transport consumption, query/state behavior, read-model consumption, editor/viewer boundaries | Opens after T8-E ratification |
+| T8-E — Executable Wire Contract | Exact OpenAPI application wire, schemas, headers, problems, ETags, idempotency, pagination, upload/exact-byte contract, generated Go/TypeScript boundaries | CLOSED / OPERATOR-RATIFIED; PR #136 integration pending |
+| T8-F — Frontend Realization | Route tree, feature/package topology, generated transport consumption, query/state behavior, read-model consumption, editor/viewer boundaries | READY but NOT OPEN; opens only after ratified T8-E is merged/revalidated on main |
 | T8-G — Runtime / Process / Deployment | Binaries/processes, River workers, renderer/provider boundary, startup/readiness/shutdown, configuration/secrets, trust/network boundaries, observability, recovery/runtime profiles | Opens after T8-F supplies its concrete runtime consumers; exits by ratification |
 | T8-H — Whole-T8 Global Coherence Review | Cross-check backend, persistence, wire, frontend, and runtime realization as one system | Opens after T8-A→T8-G close; exits with no unresolved material contradiction |
 | T9 — Golden Flows & Validation Baseline | Falsifiable composed-system flows and proof classes: contract, integration, concurrency, security, recovery, E2E, restore | Opens after Whole T8 coherence; exits by ratified validation baseline |
