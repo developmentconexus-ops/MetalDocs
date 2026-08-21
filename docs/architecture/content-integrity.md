@@ -3,6 +3,7 @@
 > **Status:** ACTIVE / OPERATOR-RATIFIED TECHNICAL AUTHORITY  
 > **Ratified:** 2026-08-18  
 > **Post-T5 Fable bounded amendment:** 2026-08-18 — restore security non-resurrection + admission-claim GC liveness  
+> **T8-E bounded correction:** 2026-08-21 — already-PDF required rendition reuses admitted bytes; rendering only when transformation is required
 > **Repository:** `developmentconexus-ops/MetalDocs`  
 > **Branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131  
 > **Decision baseline:** `wiki/architecture/rebaseline-decision-registry.md`  
@@ -349,7 +350,24 @@ No provider/scanner call occurs inside the semantic transaction.
 
 Rollback creates no Submission truth even when provider upload already succeeded. The READY handle remains retry/reclaim mechanism state once any live admission claim is released/expires.
 
-Required OfficialRendition uses the same pattern: rendering happens outside the semantic transaction; final admission revalidates exact READY content and creates the semantic Rendition fact only if the exact Submission remains eligible under T2/T5.
+Required OfficialRendition has exactly two Launch realization paths:
+
+```text
+submitted source already PDF + required format PDF
+  -> revalidate the exact already-admitted Submission handle + descriptor
+  -> create OfficialRendition semantic fact over that same handle + descriptor
+  -> no provider copy
+  -> no renderer execution
+  -> no durable rendition intent
+
+submitted source DOCX + required format PDF
+  -> render outside the semantic transaction
+  -> admit/verify the produced READY PDF through T4
+  -> final admission revalidates exact READY content and Submission eligibility
+  -> create OfficialRendition semantic fact
+```
+
+The first path is not a semantic downgrade: OfficialRendition still exists as the required immutable fact, but byte-for-byte PDF duplication/transformation is removed because it proves no additional property. Target proof must show same-PDF rendition preserves the exact Submission handle/descriptor and invokes neither `CopyToNewHandle` nor renderer/durable-intent machinery.
 
 T7 Historical Migration uses the same admission seam for untrusted imported exact content.
 

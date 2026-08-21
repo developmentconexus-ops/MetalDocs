@@ -756,7 +756,7 @@ Representation execution:
 SourceOnly + DOCX/PDF
   representation gate satisfied by absence
 
-RequireOfficialRendition(PDF) + submitted PDF  // candidate; promotion blocked by §8.5
+RequireOfficialRendition(PDF) + submitted PDF
   establish OfficialRendition semantic fact over the exact same already-admitted PDF handle/descriptor
   no physical duplicate, renderer job, or provider copy
   gate satisfied synchronously
@@ -1318,9 +1318,9 @@ S3 reference: stricter signed exact Content-Length = maxBytes
 
 No new parameter, AdmissionClaim field, or durable authority is needed. The client bound protects ingress resource use; completion still derives the real descriptor and does not compare against a persisted client expectation.
 
-## 8.4 T8-D — transaction-census + idempotency precision — OPEN
+## 8.4 T8-D — transaction-census + idempotency precision — RESOLVED
 
-The final T3↔T8-D parity attack found a bounded owner-local persistence/transaction correction. It adds no table, owner, state, API, permission, worker or capability.
+The final T3↔T8-D parity attack found a bounded owner-local persistence/transaction correction. **Operator-approved on 2026-08-21 and now reconciled in T8-D.** It adds no table, owner, state, API, permission, worker or capability.
 
 ```text
 1. Company replacement currently says -> Audit
@@ -1367,9 +1367,9 @@ The final T3↔T8-D parity attack found a bounded owner-local persistence/transa
 
 This package reduces accidental Audit/job-like behavior and makes already-ratified evidence/replay semantics executable.
 
-## 8.5 T4/T5/T8-C/T8-D — required PDF rendition when source is already PDF — OPEN
+## 8.5 T4/T5/T8-C/T8-D — required PDF rendition when source is already PDF — RESOLVED
 
-A material contradiction survived Structural Inversion:
+A material contradiction survived Structural Inversion and was **operator-approved for bounded reconciliation on 2026-08-21**:
 
 ```text
 T5 RV-1:
@@ -1403,11 +1403,11 @@ T8-C §17.2 enqueue intent iff renderer work is activated; preserve zero-or-one 
 T8-D SUBMIT realize same-PDF OfficialRendition synchronously; River intent only on transformation path
 ```
 
-This is a reduction, not a new rendition mode.
+This is a reduction, not a new rendition mode. The correction is now durable in T4/T5/T8-C/T8-D.
 
-## 8.6 T8-C/T8-D — session CSRF bootstrap reversibility — OPEN
+## 8.6 T8-C/T8-D — session CSRF bootstrap reversibility — RESOLVED
 
-T6 and the accepted T8-E checkpoint require:
+T6 and the accepted T8-E checkpoint require the following; the bounded correction was **operator-approved on 2026-08-21 and is now durable in T8-C/T8-D**:
 
 ```text
 GET /api/v1/session -> session-bound csrf_token
@@ -1657,34 +1657,32 @@ arbitrary Problem extension/default response
 generator-specific Product fields
 recursive archive framework
 compression-ratio knob redundant with raw/expanded/entry ceilings
-duplicate PDF rendition bytes/job for PDF source (candidate; §8.5 reconciliation pending)
+duplicate PDF rendition bytes/job for PDF source
 persisted/client-authored expected-size descriptor truth
 second request-schema/route-parameter validation authority
 dormant future capability
 ```
 
-The earlier Step-label and impossible-binding-Audit findings are resolved. The final evidence-triggered bounded coherence package is §§8.4–8.6; none changes Product scope, the 78-operation census, ownership topology or Launch lifecycle.
+The earlier Step-label/impossible-binding-Audit findings and the final evidence-triggered §§8.4–8.6 package are all resolved. None changes Product scope, the 78-operation census, ownership topology or Launch lifecycle.
 
 ---
 
 # 11. Remaining closure gate
 
-The measurement, generated-boundary feasibility, provider presign feasibility, strict-request validator split and 78-row ledger-census fixture obligations are closed at candidate level. The final Lead attack exposed the bounded cross-layer coherence package in §§8.4–8.6; because it touches already-ratified owners, it requires explicit operator adjudication before durable edits.
+The measurement, generated-boundary feasibility, provider presign feasibility, strict-request validator split, 78-row ledger-census fixture obligations and all evidence-triggered upstream reconciliations are closed at candidate level.
 
 Remaining Lead gate:
 
 ```text
-A. operator adjudication of §§8.4–8.6 bounded coherence package
-B. if approved, reconcile only the implicated T4/T5/T8-C/T8-D lines
-C. rerun whole-candidate Structural Inversion / YAGNI / overengineering / global-coherence exact-delta check
-D. revalidate main/base + exact candidate HEAD + intended authority/work diff + required CI
-E. only if A→D converge, create review/t8e-fable from that exact candidate HEAD
-F. independent Fable challenge
-G. Lead adjudication of Fable evidence
-H. explicit operator ratification
+A. rerun whole-candidate Structural Inversion / YAGNI / overengineering / global-coherence exact-delta check
+B. revalidate main/base + exact candidate HEAD + intended authority/work diff + required CI
+C. only if A→B converge, create review/t8e-fable from that exact candidate HEAD
+D. independent Fable challenge
+E. Lead adjudication of Fable evidence
+F. explicit operator ratification
 ```
 
-Until A→D converge:
+Until A→B converge:
 
 ```text
 T8-E ACTIVE

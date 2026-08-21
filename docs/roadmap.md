@@ -48,24 +48,22 @@ strict request split        kin-openapi + minimal envelope-guard probe PASS
 
 The direct-PUT concern remains resolved subtractively without reopening T8-C: the existing `PresignCreate(handle,maxBytes,ttl)` seam is sufficient when T8-E supplies `maxBytes=expected_size_bytes`; the portable property is an at-most bound, while the reference S3 profile is stronger and signs exact `Content-Length`. Completion derives the actual descriptor independently, so no client-size truth is persisted.
 
-The final Lead coherence attack exposed one consolidated **bounded upstream coherence package**, recorded in `docs/work/current/proposal.md` §§8.4–8.6:
+The final Lead coherence attack exposed one consolidated bounded upstream package and the operator approved it on **2026-08-21**. The implicated T4/T5/T8-C/T8-D lines are now reconciled:
 
 ```text
-T8-D               transaction/Audit + expired-idempotency precision
+T8-D               transaction/Audit + idempotency precision
 T4/T5/T8-C/T8-D    no renderer/job for already-PDF required PDF rendition
 T8-C/T8-D           reconstructible server-side CSRF synchronizer secret for GET /session
 ```
 
-The package is subtractive/precision-only: no Product operation, owner, lifecycle state, permission, table family, generic worker, second cookie or new API is added.
+The correction remained subtractive/precision-only: no Product operation, owner, lifecycle state, permission, table family, generic worker, second cookie or new API was added.
 
 ## Exact next action
 
 ```text
-operator adjudicates the bounded coherence package in proposal §§8.4–8.6
-→ if approved, reconcile only the implicated T4/T5/T8-C/T8-D lines
-→ rerun exact whole-candidate Structural Inversion / YAGNI / overengineering / global-coherence delta
+rerun exact whole-candidate Structural Inversion / YAGNI / overengineering / global-coherence delta
 → revalidate main/base + exact candidate HEAD + intended authority/work diff + required CI
-→ only then create isolated review/t8e-fable from exact candidate HEAD
+→ if and only if the Lead delta converges, create isolated review/t8e-fable from exact candidate HEAD
 → independent Fable challenge
 → Lead adjudication
 → explicit operator ratification
