@@ -34,8 +34,6 @@ observability                          OpenTelemetry metrics/traces + OTLP; slog
 recovery                               fail-closed exact-content + privacy/security non-resurrection
 reuse-first                            proven third-party mechanisms before local infrastructure
 operation 79                           absent
-T8-H                                   NOT OPEN
-Product implementation                 BLOCKED
 ```
 
 Independent review evidence:
@@ -48,4 +46,4 @@ Round 3          NOT JUSTIFIED
 
 Round-1 corrections were bounded to T8-G substrate/validation precision: writable ephemeral scratch capability, per-workload egress control, probe-scoped health exposure, and renderer/scanner content-envelope coherence. They reopened no T1→T8-F authority and changed no Global Maximum topology.
 
-This ratification does not itself integrate PR #144, open T8-H or authorize Product implementation. Integration remains a separate operator-authorized squash-merge gate followed by fresh `main` revalidation.
+This record is an immutable ratification snapshot. Current integration, stage progression, implementation permission and exact next action are owned exclusively by `../roadmap.md`.
