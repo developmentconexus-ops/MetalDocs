@@ -558,18 +558,14 @@ Preference, legacy familiarity, sunk cost, migration convenience and hypothetica
 
 ---
 
-## 13. T8-B closure and next stage
+## 13. T8-B ratification closure and handoff
 
 ```text
 T8-B Backend Module & Package Topology = CLOSED / OPERATOR-RATIFIED / PROMOTED
 ```
 
-The next open stage is:
-
-```text
-T8-C — Internal Communication Contracts
-```
+At T8-B ratification, the immediate downstream consumer was T8-C — Internal Communication Contracts. That is immutable handoff provenance, not current stage state.
 
 T8-C must freeze exact internal owner/application/mechanism contracts while preserving this topology. It must not reopen direct owner imports, mechanism-as-authority, foreign SQL or hidden shared write authority by convenience.
 
-Implementation remains **BLOCKED**.
+Current stage, integration status, implementation permission and exact next action are owned exclusively by `../roadmap.md`.
