@@ -128,6 +128,18 @@ RevisionOrdinal / ByteCount
 Sha256Hex
   ^[0-9a-f]{64}$
 
+ShortText
+  nonblank, maxLength=256
+
+LongText
+  nonblank, maxLength=4096
+
+Rfc6901Pointer
+  RFC6901 pointer rooted at /path, /query, /header, or /body
+
+URI
+  string, OpenAPI format=uri
+
 SearchQuery
   trim -> nonblank; normalized length <=256
 
@@ -155,13 +167,13 @@ ProviderSubjectRef
   byte equality is not binding identity; equality resolves to exact issuer+subject semantics
 
 EmailAddress
-  nonblank human text
+  nonblank human text, maxLength=256
   no trim/case-fold/canonicalization, deliverability, uniqueness or verification claim
   no OpenAPI `format: email` Launch gate because no current email-delivery/identity consumer exists
   profile/contact enrichment only; never authentication or Authorization identity
 ```
 
-Except for scalars that explicitly define normalization above (`CodeInput`, `SearchQuery`), accepted human text is **not** silently trimmed, case-folded or Unicode-normalized by convention. `nonblank` means the supplied value contains at least one non-whitespace code point. Human text is bounded by the aggregate JSON ceiling rather than unrelated guessed per-field maxima.
+Except for scalars that explicitly define normalization above (`CodeInput`, `SearchQuery`), accepted human text is **not** silently trimmed, case-folded or Unicode-normalized by convention. `nonblank` means the supplied value contains at least one non-whitespace code point. `ShortText` and `LongText` are the only ordinary human-text wire ceilings; the 65,536-byte JSON request ceiling remains an additional aggregate bound. The 256/4,096 split is a conservative controlled-document Launch bound, not a generic rich-text platform.
 
 Document `q` comparison:
 
@@ -216,6 +228,7 @@ existing profile           If-Match required
 absent profile recreation  If-None-Match:* required
 both / neither             400
 If-None-Match:* + existing profile -> 412
+If-Match + absent profile       -> 412 precondition.resource_changed
 ```
 
 ## 2.5 CSRF / durable idempotency
@@ -308,7 +321,7 @@ cursor + any repeated operation filter/query other than limit -> 400
 invalid/tampered cursor -> 400
 ```
 
-Cursor authenticates `operationId + normalized filters + ordering + seek position`; current AuthZ is rechecked every page. Limit may change on a subsequent page and is not cursor authority.
+Cursor authenticates `operationId + normalized filters + ordering + seek position`; current AuthZ is rechecked every page. Limit may change on a subsequent page and is not cursor authority. For an embedded first page whose continuation is a standalone list operation, the cursor authenticates the **standalone continuation operationId**; current Launch instance: `GovernanceCaseView.feedback` continues through `listGovernanceFeedback`.
 
 Response invariant:
 
@@ -399,9 +412,9 @@ SESSION_END
 
 No baseline `Location`, replay header, permission snapshot, provider header, or generic metadata header.
 
-Problem responses: `application/problem+json` + `Cache-Control:no-store`; 401 adds `WWW-Authenticate: MetalDocsSession`; 405 adds exact `Allow`; 429 may add truthful non-negative delta-seconds `Retry-After` but never fabricates one.
+Problem responses: `application/problem+json` + `Cache-Control:no-store`; 401 adds `WWW-Authenticate: MetalDocsSession`; 405 adds exact `Allow`. No `Retry-After` header is part of the Launch application contract; frontend branching remains on `Problem.code`.
 
-## 2.9 Exact-byte delivery — verify before commit
+## 2.9 Exact-byte delivery — complete-response integrity
 
 Semantic byte resources return authenticated application-origin `200` only.
 
@@ -425,11 +438,11 @@ Correctness law:
 ```text
 load semantic descriptor
 -> OpenExact
--> verify actual byte count + SHA-256 + format coherence
--> ONLY THEN commit HTTP 200 headers/body
+-> verify actual byte count + SHA-256 + format coherence while reading
+-> a 200 response may reach its declared Content-Length ONLY after the complete exact-byte proof succeeds
 ```
 
-The implementation may use a bounded temporary spool or provider-neutral equivalent proof, but it may not stream unverified provider bytes to the client and discover a hash mismatch after the 200 has begun. Existing visible semantic record with missing/corrupt bytes -> `500 internal.content_integrity` with zero success bytes; temporary content-store dependency failure ->503. Provider checksum/ETag may be optimization evidence but never replaces semantic SHA-256 authority.
+T8-E does not choose the buffering/read strategy. Pre-verification, double-read, bounded spool, or streaming that withholds a final bounded tail until full verification may satisfy the property. If a mismatch is detected after headers or partial bytes have begun, the server MUST terminate the response before the declared `Content-Length` is satisfied; it must never complete a successful 200 with bytes that disagree with the semantic descriptor. Existing visible semantic content whose corruption is known before response commitment -> `500 internal.content_integrity` with zero success bytes; temporary content-store dependency failure ->503. Provider checksum/ETag may be optimization evidence but never replaces semantic SHA-256 authority.
 
 ## 2.10 Direct DRAFT upload — exact-length create-only capability
 
@@ -509,15 +522,30 @@ This preserves direct PUT and closes max-size resource consumption without S3 PO
 
 All fixed objects are closed. Unless marked `?`, members are required.
 
+OAS encoding is itself closed; a Writer does not choose branch-vs-flat representation:
+
+```text
+OAS_BRANCH
+  true semantic variant with one required closed-enum member that is a TOTAL discriminator
+  -> oneOf + discriminator
+
+FIXTURE_PRESENCE
+  cross-field presence/value relation without one total discriminator
+  -> one closed flat object with schema-optional correlated members
+  -> one NAMED contract fixture enforces each required/forbidden relation
+```
+
+Current `OAS_BRANCH` families are the explicit semantic unions in §3.1, `SubmissionCreateResult`, `GovernanceDecisionRequest/View`, `GovernanceStepView`, `GovernanceCaseView.subject`, `DocumentHistoryItem`, `ReleaseView`, `ObsolescenceCreateResult`, and `AuditEventView` using the exact §4 mapping. Current `FIXTURE_PRESENCE` laws are `TemplateConfigurationItem.current_effective_title`, `DocumentSummary.official_revision`, `DocumentOfficialView.official`, `RevisionView.current_submission_id`, all `SubmissionView` correlated members, `DocumentHistoryItem.governance_decision.reason`, and `ObsolescenceRequestView` attempt/end-state correlations. No generator-specific union is introduced merely to encode a relational fixture.
+
 ## 3.1 References / enums / unions
 
 ```text
-UserReference { user_id:Uuid, display_name?:string }
-AreaReference { area_id:Uuid, code:CodeToken, name:nonblank string }
-DocumentTypeReference { document_type_id:Uuid, code:CodeToken, name:nonblank string }
+UserReference { user_id:Uuid, display_name?:ShortText }
+AreaReference { area_id:Uuid, code:CodeToken, name:ShortText }
+DocumentTypeReference { document_type_id:Uuid, code:CodeToken, name:ShortText }
 DocumentReference { document_id:Uuid, code:DocumentCode } // title belongs Revision
 RevisionIdentity { revision_id:Uuid, ordinal:RevisionOrdinal }
-RevisionReference { revision:RevisionIdentity, title:nonblank string }
+RevisionReference { revision:RevisionIdentity, title:LongText }
 ContentSummary { sha256:Sha256Hex, size_bytes:ByteCount, content_format:ContentFormat }
 ```
 
@@ -586,7 +614,7 @@ GovernancePolicy
   {mode:no_human_approval}
   {mode:use_governance_route,steps:[GovernanceRouteStep,...]} // minItems=1
 GovernanceRouteStep
-  label:nonblank string
+  label:ShortText
   selector:GovernanceSelector
   // array order is route order; ordinal is not wire data
 RepresentationPolicy
@@ -611,33 +639,33 @@ This is a bounded **selection preflight**, not a general directory listing: the 
 
 ```text
 
-CompanyView { company_id:Uuid, display_name:nonblank string }
-ReplaceCompanyRequest { display_name:nonblank string }
+CompanyView { company_id:Uuid, display_name:ShortText }
+ReplaceCompanyRequest { display_name:ShortText }
 
-UserProfileInput { display_name:nonblank string, email?:EmailAddress }
+UserProfileInput { display_name:ShortText, email?:EmailAddress }
 CreateUserRequest { provider_subject_ref:ProviderSubjectRef, profile:UserProfileInput }
 CreateUserResult { user_id:Uuid }
 UserView { user:UserReference, eligibility:UserEligibilityState }
 UserPage { items:UserView[], page:Page }
-UserProfileView { user_id:Uuid, display_name:nonblank string, email?:EmailAddress }
-ReplaceUserProfileRequest { display_name:nonblank string, email?:EmailAddress }
+UserProfileView { user_id:Uuid, display_name:ShortText, email?:EmailAddress }
+ReplaceUserProfileRequest { display_name:ShortText, email?:EmailAddress }
 UserProviderBindingView { user_id:Uuid, provider_subject_ref:ProviderSubjectRef }
 ReplaceUserProviderBindingRequest { provider_subject_ref:ProviderSubjectRef }
 UserEligibilityView { user_id:Uuid, state:UserEligibilityState }
 ReplaceUserEligibilityRequest { state:UserEligibilityState }
 
-AreaView { area_id:Uuid, code:CodeToken, name:nonblank string }
+AreaView { area_id:Uuid, code:CodeToken, name:ShortText }
 AreaSummary { area:AreaReference, state:AreaLifecycleState }
 AreaPage { items:AreaSummary[], page:Page }
-CreateAreaRequest { code:CodeInput, name:nonblank string }
+CreateAreaRequest { code:CodeInput, name:ShortText }
 CreateAreaResult { area_id:Uuid }
-ReplaceAreaRequest { name:nonblank string }
+ReplaceAreaRequest { name:ShortText }
 AreaLifecycleView { area_id:Uuid, state:AreaLifecycleState }
 ReplaceAreaLifecycleRequest { state:AreaLifecycleState }
 
-GroupView { group_id:Uuid, name:nonblank string }
+GroupView { group_id:Uuid, name:ShortText }
 GroupPage { items:GroupView[], page:Page }
-CreateGroupRequest / ReplaceGroupRequest { name:nonblank string }
+CreateGroupRequest / ReplaceGroupRequest { name:ShortText }
 CreateGroupResult { group_id:Uuid }
 GroupMemberPage { items:UserReference[], page:Page }
 ```
@@ -671,16 +699,16 @@ No editable Role/Permission policy API.
 ## 3.4 Document Governance
 
 ```text
-DocumentTypeView { document_type_id:Uuid, code:CodeToken, name:nonblank string, numbering_scope:NumberingScope, active:boolean }
+DocumentTypeView { document_type_id:Uuid, code:CodeToken, name:ShortText, numbering_scope:NumberingScope, active:boolean }
 DocumentTypePage { items:DocumentTypeView[], page:Page }
-CreateDocumentTypeRequest { code:CodeInput, name:nonblank string, numbering_scope:NumberingScope, active:boolean, governance:GovernancePolicy, representation:RepresentationPolicy }
+CreateDocumentTypeRequest { code:CodeInput, name:ShortText, numbering_scope:NumberingScope, active:boolean, governance:GovernancePolicy, representation:RepresentationPolicy }
 CreateDocumentTypeResult { document_type_id:Uuid }
-ReplaceDocumentTypeRequest { code:CodeInput, name:nonblank string, numbering_scope:NumberingScope, active:boolean }
+ReplaceDocumentTypeRequest { code:CodeInput, name:ShortText, numbering_scope:NumberingScope, active:boolean }
 DocumentTypeGovernanceView / ReplaceDocumentTypeGovernanceRequest { governance:GovernancePolicy, representation:RepresentationPolicy }
 EligibleTemplatesView { templates:DocumentReference[] } // code,id order; stable refs only
 ReplaceEligibleTemplatesRequest { template_document_ids:unique Uuid[] } // empty valid
 NumberingPreviewView { preview_code:DocumentCode, reservation:false }
-TemplateConfigurationItem { document:DocumentReference, template_role:boolean, has_effective_revision:boolean, current_effective_title?:nonblank string, eligible_document_type_ids:unique Uuid[] }
+TemplateConfigurationItem { document:DocumentReference, template_role:boolean, has_effective_revision:boolean, current_effective_title?:LongText, eligible_document_type_ids:unique Uuid[] }
 TemplateConfigurationPage { items:TemplateConfigurationItem[], page:Page }
 ```
 
@@ -693,11 +721,11 @@ Create explicitly supplies initial governance/representation because T8-D requir
 ```text
 TemplateCreationOption { document:DocumentReference, effective_revision:RevisionReference }
 DocumentCreationOptionsView { areas:AreaReference[], document_types:DocumentTypeReference[], templates:TemplateCreationOption[], default_responsible_owner:UserReference, responsible_owner_candidates?:UserReference[] }
-CreateDocumentRequest { document_type_id:Uuid, area_id:Uuid, title:nonblank string, template_document_id?:Uuid, responsible_owner_user_id?:Uuid }
+CreateDocumentRequest { document_type_id:Uuid, area_id:Uuid, title:LongText, template_document_id?:Uuid, responsible_owner_user_id?:Uuid }
 CreateDocumentResult { document_id:Uuid, revision_id:Uuid }
 DocumentSummary { document:DocumentReference, document_type:DocumentTypeReference, area:AreaReference, responsible_owner:UserReference, status:DocumentCatalogStatus, official_revision?:RevisionReference }
 DocumentPage { items:DocumentSummary[], page:Page }
-ReleasedRevisionView { revision:RevisionIdentity, title:nonblank string, release_id:Uuid, released_at:UtcInstant, source:ContentSummary, representation:{kind:source_only}|{kind:official_rendition,official_rendition_id:Uuid,content:ContentSummary} }
+ReleasedRevisionView { revision:RevisionIdentity, title:LongText, release_id:Uuid, released_at:UtcInstant, source:ContentSummary, representation:{kind:source_only}|{kind:official_rendition,official_rendition_id:Uuid,content:ContentSummary} }
 DocumentOfficialView { document:DocumentReference, document_type:DocumentTypeReference, area:AreaReference, responsible_owner:UserReference, status:DocumentOfficialStatus, official?:ReleasedRevisionView }
 ```
 
@@ -719,14 +747,14 @@ ReplaceResponsibleOwnerRequest { user_id:Uuid }
 TemplateRoleView { document_id:Uuid, is_template:boolean }
 ReplaceTemplateRoleRequest { is_template:boolean }
 CreateRevisionResult { revision_id:Uuid }
-RevisionView { revision:RevisionIdentity, document:DocumentReference, title:nonblank string, state:RevisionState, created_at:UtcInstant, current_submission_id?:Uuid }
-DocumentWorkView { document:DocumentReference, revision:RevisionIdentity, title:nonblank string, content:ContentSummary, updated_at:UtcInstant }
-UpdateDraftRequest { title?:nonblank string, source_upload_id?:Uuid } // minProperties1; null forbidden; omitted unchanged
+RevisionView { revision:RevisionIdentity, document:DocumentReference, title:LongText, state:RevisionState, created_at:UtcInstant, current_submission_id?:Uuid }
+DocumentWorkView { document:DocumentReference, revision:RevisionIdentity, title:LongText, content:ContentSummary, updated_at:UtcInstant }
+UpdateDraftRequest { title?:LongText, source_upload_id?:Uuid } // minProperties1; null forbidden; omitted unchanged
 StartDraftUploadRequest { expected_size_bytes:integer minimum1 maximum DOC_RAW_MAX_BYTES }
 DraftUploadAllocation { upload_id:Uuid, upload_url:URI, expires_at:UtcInstant, required_headers:map<string,string> }
 ```
 
-`RevisionView.current_submission_id` is present **iff** `state=submitted`; every other RevisionState forbids it. `DocumentCreationOptionsView.default_responsible_owner` is the current actor; candidate-list presence remains exactly the §2.7 owner-manage rule. Required/forbidden-member and discriminator laws in this registry are encoded as closed OAS branches where OAS 3.0.3 can represent them; value-relational laws that would require distortion remain explicit contract-fixture assertions. Raw WorkingContent generation is never public; ETag is wire OCC authority.
+`RevisionView.current_submission_id` is present **iff** `state=submitted`; every other RevisionState forbids it. `DocumentCreationOptionsView.default_responsible_owner` is the current actor; candidate-list presence remains exactly the §2.7 owner-manage rule. Required/forbidden-member laws use the closed `OAS_BRANCH` / `FIXTURE_PRESENCE` classification above; no per-Writer encoding choice remains. Raw WorkingContent generation is never public; ETag is wire OCC authority.
 
 ## 3.6 Submission / representation gate
 
@@ -736,8 +764,8 @@ SubmissionCreateResult
   {state:rendition_pending,submission_id:Uuid}
   {state:released,submission_id:Uuid,release_id:Uuid}
 SubmissionHumanGate { required:boolean, satisfied:boolean }
-SubmissionRepresentationGate { required:boolean, satisfied:boolean, attention_required:boolean }
-SubmissionView { submission_id:Uuid, revision:RevisionIdentity, title:nonblank string, submitter:UserReference, submitted_at:UtcInstant, content:ContentSummary, governance_mode:GovernanceMode, representation:RepresentationPolicy, human_gate:SubmissionHumanGate, representation_gate:SubmissionRepresentationGate, governance_attempt_id?:Uuid, release_id?:Uuid, termination?:SubmissionTerminationKind }
+SubmissionRepresentationGate { required:boolean, satisfied:boolean }
+SubmissionView { submission_id:Uuid, revision:RevisionIdentity, title:LongText, submitter:UserReference, submitted_at:UtcInstant, content:ContentSummary, governance_mode:GovernanceMode, representation:RepresentationPolicy, human_gate:SubmissionHumanGate, representation_gate:SubmissionRepresentationGate, governance_attempt_id?:Uuid, release_id?:Uuid, termination?:SubmissionTerminationKind }
 ```
 
 Cross-field law:
@@ -746,7 +774,6 @@ Cross-field law:
 governance_attempt_id iff governance route
 human_gate.required iff governance route; not-required => satisfied
 representation_gate.required iff require_official_rendition; not-required => satisfied
-attention_required only while rendition required + unsatisfied + terminal renderer attention exists
 release_id and termination mutually exclusive
 ```
 
@@ -778,8 +805,8 @@ Human-governed DOCX may render concurrently in mechanism space; initial result r
 
 ```text
 SubmissionWithdrawalView { submission_id:Uuid, actor:UserReference, withdrawn_at:UtcInstant }
-RevisionCancellationRequest { reason:nonblank string }
-RevisionCancellationView { revision_id:Uuid, actor:UserReference, reason:nonblank string, cancelled_at:UtcInstant }
+RevisionCancellationRequest { reason:LongText }
+RevisionCancellationView { revision_id:Uuid, actor:UserReference, reason:LongText, cancelled_at:UtcInstant }
 ```
 
 Cancellation singleton: first201; exact same reason repeat200; different later reason409.
@@ -787,24 +814,24 @@ Cancellation singleton: first201; exact same reason repeat200; different later r
 ## 3.7 Governance / history / work
 
 ```text
-GovernanceFeedbackView { feedback_id:Uuid, actor:UserReference, message:nonblank string, created_at:UtcInstant }
+GovernanceFeedbackView { feedback_id:Uuid, actor:UserReference, message:LongText, created_at:UtcInstant }
 GovernanceFeedbackPage { items:GovernanceFeedbackView[], page:Page }
-CreateGovernanceFeedbackRequest { message:nonblank string }
+CreateGovernanceFeedbackRequest { message:LongText }
 CreateGovernanceFeedbackResult { feedback_id:Uuid }
-GovernanceDecisionRequest {outcome:accept} | {outcome:return_for_changes,reason:nonblank string}
-GovernanceDecisionView {decision_id:Uuid,outcome:accept,actor:UserReference,decided_at:UtcInstant} | {decision_id:Uuid,outcome:return_for_changes,actor:UserReference,decided_at:UtcInstant,reason:nonblank string}
-GovernanceStepView {step_id:Uuid,label:nonblank string,state:pending} | {step_id:Uuid,label:nonblank string,state:active} | {step_id:Uuid,label:nonblank string,state:decided,decision:GovernanceDecisionView}
+GovernanceDecisionRequest {outcome:accept} | {outcome:return_for_changes,reason:LongText}
+GovernanceDecisionView {decision_id:Uuid,outcome:accept,actor:UserReference,decided_at:UtcInstant} | {decision_id:Uuid,outcome:return_for_changes,actor:UserReference,decided_at:UtcInstant,reason:LongText}
+GovernanceStepView {step_id:Uuid,label:ShortText,state:pending} | {step_id:Uuid,label:ShortText,state:active} | {step_id:Uuid,label:ShortText,state:decided,decision:GovernanceDecisionView}
 ```
 
 Step array order is frozen route order; persistence ordinal/candidate snapshots/Group membership/grants/provider claims are not exposed.
 
 ```text
-SubmissionGovernanceSubject { kind:submission, submission_id:Uuid, document:DocumentReference, revision:RevisionIdentity, title:nonblank string, submitter:UserReference, submitted_at:UtcInstant, content:ContentSummary }
-ObsolescenceGovernanceSubject { kind:obsolescence, request_id:Uuid, document:DocumentReference, target_revision:RevisionReference, initiator:UserReference, reason:nonblank string, requested_at:UtcInstant }
+SubmissionGovernanceSubject { kind:submission, submission_id:Uuid, document:DocumentReference, revision:RevisionIdentity, title:LongText, submitter:UserReference, submitted_at:UtcInstant, content:ContentSummary }
+ObsolescenceGovernanceSubject { kind:obsolescence, request_id:Uuid, document:DocumentReference, target_revision:RevisionReference, initiator:UserReference, reason:LongText, requested_at:UtcInstant }
 GovernanceCaseView { governance_attempt_id:Uuid, state:GovernanceAttemptState, subject:SubmissionGovernanceSubject|ObsolescenceGovernanceSubject, steps:GovernanceStepView[], feedback:GovernanceFeedbackPage, allowed_actions:unique GovernanceCaseAction[] }
 ```
 
-Embedded feedback is first20 and any cursor targets `listGovernanceFeedback`. `allowed_actions` canonical order is `accept, return_for_changes, add_feedback`, filtered from the same current T3 + Controlled Documents decisions used by commands; may be empty.
+Embedded feedback is first20 and its continuation cursor authenticates/targets `listGovernanceFeedback` per §2.7. `allowed_actions` canonical order is `accept, return_for_changes, add_feedback`, filtered from the same current T3 + Controlled Documents decisions used by commands; may be empty.
 
 Decision singleton: first201; exact same outcome+reason repeat200; any later different outcome/reason ->409 `state.governance_step_already_decided`.
 
@@ -814,22 +841,22 @@ Decision singleton: first201; exact same outcome+reason repeat200; any later dif
 revision_created
   {kind,revision:RevisionIdentity,occurred_at:UtcInstant}
 submission_created
-  {kind,submission_id:Uuid,revision:RevisionIdentity,title:nonblank string,submitter:UserReference,occurred_at:UtcInstant,governance_attempt_id?:Uuid}
+  {kind,submission_id:Uuid,revision:RevisionIdentity,title:LongText,submitter:UserReference,occurred_at:UtcInstant,governance_attempt_id?:Uuid}
 governance_decision
-  {kind,decision_id:Uuid,governance_attempt_id:Uuid,step_id:Uuid,actor:UserReference,outcome:GovernanceDecisionOutcome,occurred_at:UtcInstant,reason?:nonblank string}
+  {kind,decision_id:Uuid,governance_attempt_id:Uuid,step_id:Uuid,actor:UserReference,outcome:GovernanceDecisionOutcome,occurred_at:UtcInstant,reason?:LongText}
   reason present iff outcome=return_for_changes
 feedback_added
-  {kind,feedback_id:Uuid,governance_attempt_id:Uuid,actor:UserReference,message:nonblank string,occurred_at:UtcInstant}
+  {kind,feedback_id:Uuid,governance_attempt_id:Uuid,actor:UserReference,message:LongText,occurred_at:UtcInstant}
 submission_withdrawn
   {kind,submission_id:Uuid,actor:UserReference,occurred_at:UtcInstant}
 revision_cancelled
-  {kind,revision_id:Uuid,actor:UserReference,reason:nonblank string,occurred_at:UtcInstant}
+  {kind,revision_id:Uuid,actor:UserReference,reason:LongText,occurred_at:UtcInstant}
 release_completed
   {kind,release_id:Uuid,revision_id:Uuid,submission_id:Uuid,occurred_at:UtcInstant,predecessor_revision_id?:Uuid}
 official_rendition_completed
   {kind,official_rendition_id:Uuid,submission_id:Uuid,occurred_at:UtcInstant}
 obsolescence_requested
-  {kind,request_id:Uuid,target_revision_id:Uuid,initiator:UserReference,reason:nonblank string,occurred_at:UtcInstant,governance_attempt_id?:Uuid}
+  {kind,request_id:Uuid,target_revision_id:Uuid,initiator:UserReference,reason:LongText,occurred_at:UtcInstant,governance_attempt_id?:Uuid}
 obsolescence_withdrawn
   {kind,request_id:Uuid,actor:UserReference,occurred_at:UtcInstant}
 obsolescence_completed
@@ -840,7 +867,7 @@ Exact historical submitted titles come from immutable Submission snapshots; T8-E
 
 ```text
 DocumentHistoryPage {items:DocumentHistoryItem[],page:Page}
-WorkAuthoringItem {document:DocumentReference,revision:RevisionIdentity,title:nonblank string,state:OpenRevisionState,responsible_owner:UserReference,updated_at:UtcInstant}
+WorkAuthoringItem {document:DocumentReference,revision:RevisionIdentity,title:LongText,state:OpenRevisionState,responsible_owner:UserReference,updated_at:UtcInstant}
 WorkAuthoringPage {items:WorkAuthoringItem[],page:Page}
 WorkGovernanceItem {governance_attempt_id:Uuid,subject_kind:GovernanceSubjectKind,document:DocumentReference,created_at:UtcInstant}
 WorkGovernancePage {items:WorkGovernanceItem[],page:Page}
@@ -856,20 +883,28 @@ ReleaseView
   official-rendition:
     same core,
     representation:{kind:official_rendition,source:ContentSummary,official_rendition_id:Uuid,official_rendition:ContentSummary}
-ObsolescenceRequestCreateRequest { reason:nonblank string }
+ObsolescenceRequestCreateRequest { reason:LongText }
 ObsolescenceCreateResult {state:governance_pending,request_id:Uuid,governance_attempt_id:Uuid} | {state:obsolete,request_id:Uuid}
 ```
 
-`ObsolescenceRequestView` state union:
+`ObsolescenceRequestView` is a closed flat object under `FIXTURE_PRESENCE`:
 
 ```text
-active
-  request_id,document,target_revision,initiator,reason,state=active,requested_at,governance_attempt_id
-returned / withdrawn / completed-human
-  same core + matching state + governance_attempt_id + ended_at
-completed-no-human
-  same core + state=completed + ended_at; governance_attempt_id absent
+{ request_id, document, target_revision, initiator, reason:LongText,
+  state:ObsolescenceRequestState, requested_at,
+  governance_attempt_id?:Uuid, ended_at?:UtcInstant }
 ```
+
+Named fixture laws:
+
+```text
+state=active                 -> governance_attempt_id required; ended_at absent
+state=returned|withdrawn     -> governance_attempt_id + ended_at required
+state=completed              -> ended_at required;
+                      governance_attempt_id present iff human governance existed
+```
+
+`ObsolescenceCreateResult.state=obsolete` means the request completed synchronously and the target Revision became OBSOLETE; a subsequent `ObsolescenceRequestView` for that request uses `state=completed`.
 
 `ObsolescenceWithdrawalView { request_id:Uuid, actor:UserReference, withdrawn_at:UtcInstant }`.
 
@@ -949,9 +984,15 @@ GovernanceDecisionAuditFacts { governance_attempt_id:Uuid, step_id:Uuid, subject
 ReleaseAuditFacts { document_id:Uuid, revision_id:Uuid, submission_id:Uuid, predecessor_revision_id?:Uuid }
 RevisionCancellationAuditFacts { document_id:Uuid }
 ObsolescenceAuditFacts { document_id:Uuid, target_revision_id:Uuid }
+DocumentTypeCreatedAuditFacts { code:CodeToken, numbering_scope:NumberingScope, active:boolean, governance_mode:GovernanceMode, representation_kind:RepresentationKind }
+DocumentTypeBaseAspect code | name | numbering_scope | active
+DocumentTypeReconfigurationAuditFacts { changed:unique DocumentTypeBaseAspect[] } // non-empty, enum order
+DocumentGovernanceAspect governance_mode | governance_route | representation_policy
+DocumentGovernanceAuditFacts { changed:unique DocumentGovernanceAspect[] } // non-empty, enum order
+TemplateEligibilityAuditFacts { added_document_ids:unique Uuid[], removed_document_ids:unique Uuid[] } // each UUID ASC; at least one non-empty
 ```
 
-`resource_id` supplies the stable event/resource evidence identity; duplicate ids are not repeated inside facts. T3-required bounded DocumentType/configuration facts remain internal owner-authored Audit evidence at Launch: the wire exposes the closed operation code + resource identity rather than inventing a generic configuration-diff bag without a named UI consumer.
+`resource_id` supplies the stable event/resource evidence identity; duplicate ids are not repeated inside facts. T3-required DocumentType/configuration evidence is exposed through the closed fact shapes above. No generic before/after JSON, arbitrary configuration bag, labels, reasons, governed content, or provider data is projected.
 
 The closed wire projection constrains only `operation_code -> resource_kind -> exposed facts`:
 
@@ -964,7 +1005,11 @@ The closed wire projection constrains only `operation_code -> resource_kind -> e
 | `group.created`, `group.renamed`, `group.deleted` | `group` / group id | none |
 | `group_membership.added`, `group_membership.removed` | `group` / group id | `GroupMembershipAuditFacts` |
 | `role_assignment.granted`, `role_assignment.revoked` | `role_assignment` / assignment id | `RoleAssignmentAuditFacts` |
-| `document_type.created`, `document_type.reconfigured`, `document_type.activated`, `document_type.inactivated`, `document_governance.changed`, `template_eligibility.changed` | `document_type` / document_type id | none |
+| `document_type.created` | `document_type` / document_type id | `DocumentTypeCreatedAuditFacts` |
+| `document_type.reconfigured` | `document_type` / document_type id | `DocumentTypeReconfigurationAuditFacts` |
+| `document_type.activated`, `document_type.inactivated` | `document_type` / document_type id | none |
+| `document_governance.changed` | `document_type` / document_type id | `DocumentGovernanceAuditFacts` |
+| `template_eligibility.changed` | `document_type` / document_type id | `TemplateEligibilityAuditFacts` |
 | `document.responsible_owner_changed`, `document.template_role_changed`, `document.created` | `document` / document id | none |
 | `revision.created` | `revision` / revision id | none |
 | `submission.created`, `submission.withdrawn` | `submission` / submission id | none |
@@ -976,7 +1021,7 @@ The closed wire projection constrains only `operation_code -> resource_kind -> e
 
 `actor` and historical `visibility` are serialized **verbatim from the owner-authored evidence required by T8-C §4**. T8-E never derives USER/SYSTEM or COMPANY/AREA from an operation code, current RoleAssignment, current Area, queue identity, or transport context. The internal product-owned `system_actor_code` is likewise not exposed until a named client needs to distinguish multiple system principals.
 
-`AuditEventView` is a closed `operation_code`-discriminated union with common `{event_id:Uuid,occurred_at:UtcInstant,actor:AuditActor,operation_code:AuditOperationCode,resource_kind,resource_id:Uuid,visibility:AuditVisibility}`. Simple wire branches forbid `facts`; typed branches require exactly the matching exposed facts schema. No free-form feedback/reason/profile/provider/config-diff payload.
+`AuditEventView` is a closed `operation_code`-discriminated union with common `{event_id:Uuid,occurred_at:UtcInstant,actor:AuditActor,operation_code:AuditOperationCode,resource_kind,resource_id:Uuid,visibility:AuditVisibility}`. It uses exactly **20 oneOf branch schemas**, one per row of the matrix above after the DocumentType split, plus a full **37-entry discriminator mapping**. Multiple operation codes map to one branch only when `resource_kind` and exposed `facts` schema are identical. Simple branches forbid `facts`; typed branches require exactly the matching facts schema. No free-form feedback/reason/profile/provider/config-diff payload.
 
 `AuditEventPage={items:AuditEventView[],page:Page}` ordered `occurred_at DESC,event_id DESC`. `GET /audit/events` accepts only cursor/limit; `audit.read` historical visibility filtering occurs before pagination. No inferred Audit filter.
 
@@ -991,7 +1036,7 @@ Required: `type,title,status,detail,instance,code,trace_id`. `instance=urn:uuid:
 Optional non-empty `errors[]` is allowed only on `request.invalid` and validation-family variants. Its sole item shape is closed:
 
 ```text
-ProblemError { pointer:Rfc6901Pointer, detail:nonblank string }
+ProblemError { pointer:Rfc6901Pointer, detail:LongText }
 ```
 
 `pointer` is a valid RFC6901 pointer rooted at `/path`, `/query`, `/header`, or `/body`. `ProblemError` has no rejected-value/meta/code bag and never echoes sensitive rejected values; machine branching remains on the top-level `Problem.code`. Top-level `detail` is server-authored/sanitized human text and never carries raw provider/database/scanner errors, tokens, headers, SQL, stack traces or rejected secrets.
@@ -1021,7 +1066,7 @@ ProblemError { pointer:Rfc6901Pointer, detail:nonblank string }
 | `dependency.unavailable` | 503 | Service dependency unavailable |
 | `dependency.malware_inspector_unavailable` | 503 | Malware inspector unavailable |
 
-`type=https://errors.conexus.fun/metaldocs/{code}`.
+`type=https://errors.metaldocs.io/{code}`.
 
 Disclosure:
 
@@ -1061,7 +1106,7 @@ All path `*_id` parameters are required `Uuid`. `PAGED` means §2.7. JSON reques
 |---:|---|---|---|---|---|---|---|
 |1|`getSession`|`GET /api/v1/session`|`SAFE_READ`|`200 SessionView`|`JSON_NO_STORE`|none|`B`|
 |2|`endSession`|`DELETE /api/v1/session`|no body / `UNSAFE_CSRF`|`204`|`SESSION_END`|none|`C`|
-|3|`searchProviderSubjects`|`GET /api/v1/authentication/provider-subjects`|`SAFE_READ`|`200 ProviderSubjectSearchView`|`JSON_NO_STORE`|required `query:SearchQuery`; provider order|`A + validation.failed`|
+|3|`searchProviderSubjects`|`GET /api/v1/authentication/provider-subjects`|`SAFE_READ`|`200 ProviderSubjectSearchView`|`JSON_NO_STORE`|required `query:SearchQuery`; provider order|`A`|
 |4|`getCompany`|`GET /api/v1/company`|`SAFE_READ`|`200 CompanyView`|`JSON_ETAG`|none|`A`|
 |5|`replaceCompany`|`PUT /api/v1/company`|`ReplaceCompanyRequest` / `IF_MATCH_MUTATION`|`200 CompanyView`|`JSON_ETAG_MUTATION`|none|`U + J + P`|
 |6|`listUsers`|`GET /api/v1/users`|`SAFE_READ`|`200 UserPage`|`JSON_NO_STORE`|`PAGED`; user_id ASC|`A`|
@@ -1108,7 +1153,7 @@ All path `*_id` parameters are required `Uuid`. `PAGED` means §2.7. JSON reques
 |#|operationId|Method + path|Request/profile|Success|Headers|Query/order|Problems|
 |---:|---|---|---|---|---|---|---|
 |44|`getDocumentCreationOptions`|`GET /api/v1/document-creation/options`|`SAFE_READ`|`200 DocumentCreationOptionsView`|`JSON_NO_STORE`|optional area_id,document_type_id; §2.7|`A + N`|
-|45|`listDocuments`|`GET /api/v1/documents`|`SAFE_READ`|`200 DocumentPage`|`JSON_NO_STORE`|first page q,document_type_id,area_id,responsible_owner_user_id,status(default=`effective`),limit; §2.3/2.7|`A + validation.failed`|
+|45|`listDocuments`|`GET /api/v1/documents`|`SAFE_READ`|`200 DocumentPage`|`JSON_NO_STORE`|first page q,document_type_id,area_id,responsible_owner_user_id,status(default=`effective`),limit; §2.3/2.7|`A`|
 |46|`createDocument`|`POST /api/v1/documents`|`CreateDocumentRequest` / `IDEMPOTENT_CREATE`|`201 CreateDocumentResult`|`JSON_NO_STORE`|none|`U + J + I + S + X`|
 |47|`getDocument`|`GET /api/v1/documents/{document_id}`|`SAFE_READ`|`200 DocumentOfficialView`|`JSON_NO_STORE`|none|`B + N`|
 |48|`getDocumentResponsibleOwner`|`GET /api/v1/documents/{document_id}/responsible-owner`|`SAFE_READ`|`200 ResponsibleOwnerView`|`JSON_ETAG`|none|`A + N`|
@@ -1435,7 +1480,7 @@ unsafe request
   -> supplied X-CSRF-Token constant-time compares with the session CSRF secret/token
 ```
 
-The CSRF secret is **not** an authentication bearer token and grants nothing without the valid HttpOnly session cookie. No second cookie, localStorage credential, global CSRF-HMAC rotation subsystem or new endpoint is introduced. T8-C needs only a bounded session-resolve result precision; T8-D changes one session field from non-reconstructible digest to server-held synchronizer secret. This matches OWASP's stateful Synchronizer Token Pattern, where a per-session token is stored in the server-side session and returned in response content for the client to echo in a custom header.
+The CSRF secret is **not** an authentication bearer token and grants nothing without the valid HttpOnly session cookie. No second cookie, localStorage credential or new endpoint is introduced. A keyed derivation could also be designed, but Launch already has server-side ApplicationSession state and requires no second CSRF key/rotation dependency, so the per-session synchronizer secret remains the smaller selected realization. T8-C needs only a bounded session-resolve result precision; T8-D changes one session field from non-reconstructible digest to server-held synchronizer secret. This matches OWASP's stateful Synchronizer Token Pattern, where a per-session token is stored in the server-side session and returned in response content for the client to echo in a custom header.
 
 ---
 
@@ -1602,7 +1647,7 @@ wrong media/content coding and 65,536-byte JSON ceiling
 role bundles/scope matrix
 wrong-domain/tampered/stale ETags + exact-current PUT exception
 stale DRAFT always412
-PROFILE_REPLACE If-Match/If-None-Match matrix
+PROFILE_REPLACE full If-Match/If-None-Match matrix including If-Match+absent ->412
 Idempotency-Key replay/different fingerprint/24h expiry/current-AuthZ recheck
 cursor tamper/filter replay/ordering
 complete creation/options arrays
@@ -1669,24 +1714,24 @@ The earlier Step-label/impossible-binding-Audit findings and the final evidence-
 
 # 11. Remaining closure gate
 
-The measurement, generated-boundary feasibility, provider presign feasibility, strict-request validator split, 78-row ledger-census fixture obligations and all evidence-triggered upstream reconciliations are closed at candidate level.
+The measurement, generated-boundary feasibility, provider presign feasibility, strict-request validator split, 78-row ledger-census fixture obligations and evidence-triggered upstream reconciliations are closed at candidate level. Independent Fable review PR #137 found seven material issues; Lead adjudication accepted the durable-promotion finding, removed the unrealizable rendition-attention field, closed OAS presence encoding, restored the T6 Problem namespace, bounded human text, preserved T3 configuration Audit through closed typed facts, and closed the profile conditional matrix. No new Product operation, owner, lifecycle, permission or generic framework was introduced.
 
 Remaining Lead gate:
 
 ```text
-A. rerun whole-candidate Structural Inversion / YAGNI / overengineering / global-coherence exact-delta check
-B. revalidate main/base + exact candidate HEAD + intended authority/work diff + required CI
-C. only if A→B converge, create review/t8e-fable from that exact candidate HEAD
-D. independent Fable challenge
-E. Lead adjudication of Fable evidence
-F. explicit operator ratification
+A. execute durable promotion: proposal -> docs/architecture/wire-contract.md
+B. route the new authority from docs/index.md + docs/decisions/index.md
+C. consume/remove DOC-12 from forward-obligations and update its mechanical count proof
+D. delete docs/reference/t8e-checkpoint.md + docs/work/current/** before merge candidacy
+E. rerun whole-candidate Global Coherence + required CI on the promoted tree
+F. close/delete review PR #137 / review branch as Evidence-only history
+G. explicit operator ratification
 ```
 
-Until A→B converge:
+Until A→F converge:
 
 ```text
 T8-E ACTIVE
 T8-F NOT OPEN
 implementation BLOCKED
-Fable NOT STARTED
 ```

@@ -58,14 +58,17 @@ T8-C/T8-D           reconstructible server-side CSRF synchronizer secret for GET
 
 The correction remained subtractive/precision-only: no Product operation, owner, lifecycle state, permission, table family, generic worker, second cookie or new API was added.
 
+Independent Fable review PR #137 completed against candidate `ef329534fc9d5df3254d59c3787197fefa8435e6`. Lead adjudication accepted the material promotion/presence/bounds/profile findings, restored the current T6 Problem namespace rather than reopening it, and preserved T3 configuration Audit via closed typed facts rather than deleting auditability. The surviving corrections add no Product operation, owner, lifecycle, permission, table family or generic framework.
+
 ## Exact next action
 
 ```text
-rerun exact whole-candidate Structural Inversion / YAGNI / overengineering / global-coherence delta
-→ revalidate main/base + exact candidate HEAD + intended authority/work diff + required CI
-→ if and only if the Lead delta converges, create isolated review/t8e-fable from exact candidate HEAD
-→ independent Fable challenge
-→ Lead adjudication
+promote the reconciled T8-E wire contract to durable docs/architecture authority
+→ route it from docs/index.md and docs/decisions/index.md
+→ consume DOC-12 in docs/decisions/forward-obligations.md + update mechanical count proof
+→ delete docs/reference/t8e-checkpoint.md and docs/work/current/** before merge candidacy
+→ rerun exact whole-candidate Global Coherence + required CI
+→ close/delete PR #137 review branch as Evidence-only history
 → explicit operator ratification
 ```
 
