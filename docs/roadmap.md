@@ -15,7 +15,7 @@ REPOSITORY RESET                      MERGED / OPERATOR-RATIFIED
 REPOSITORY STANDARD V1 ALIGNMENT      MERGED
 PRODUCT / OWNERSHIP                   OPERATOR-APPROVED
 T1 → T8-G                             CLOSED / OPERATOR-RATIFIED / INTEGRATED
-T8-H WHOLE-T8 GLOBAL COHERENCE        NEXT / NOT STARTED
+T8-H WHOLE-T8 GLOBAL COHERENCE        OPEN / ACTIVE
 T9 → T12                              NOT OPEN
 IMPLEMENTATION                        BLOCKED
 LEGACY IMPLEMENTATION                 ABSENT FROM LIVE TREE
@@ -23,7 +23,31 @@ LEGACY IMPLEMENTATION                 ABSENT FROM LIVE TREE
 
 ## Current gate
 
-T8-G — Runtime / Process / Deployment is **CLOSED / OPERATOR-RATIFIED / INTEGRATED** as of 2026-08-21.
+T8-H — Whole-T8 Global Coherence Review is **OPEN / ACTIVE** as of 2026-08-21 after explicit operator authorization and fresh repository revalidation.
+
+Opening base:
+
+```text
+main                               0b4ef6ef891b01f907804cff4bd3c0022aebad80
+open PRs at opening                0
+active candidate branch            arch/t8h-global-coherence
+Product implementation             BLOCKED
+T9                                 NOT OPEN
+```
+
+The opening `main` commit is the T8-G closeout squash from PR #147. Its candidate HEAD `ed0ff1c2883d92b65f6502cfa90798abb1cf8ed3` passed required CI **#1079** and **#1080**; CI #1080 job `required` completed successfully. The squash merge therefore opened T8-H from the expected integrated T8-G state.
+
+Active branch-only review ledger:
+
+```text
+docs/work/current/t8h-global-coherence.md
+```
+
+The ledger is temporary work, not authority, and must not enter `main`. It currently records three material cross-stage coherence findings for operator adjudication before any accepted T8 authority is corrected.
+
+### Integrated T8-G baseline
+
+T8-G — Runtime / Process / Deployment remains **CLOSED / OPERATOR-RATIFIED / INTEGRATED** as of 2026-08-21.
 
 PR #144 was squash-merged into `main` as:
 
@@ -120,10 +144,11 @@ The bounded T8-E-FR read-symmetry precision ratified with T8-F remains in force 
 ## Exact next action
 
 ```text
-explicit operator authorization to open T8-H — Whole-T8 Global Coherence Review
-→ start fresh from current `main` and revalidate its exact SHA at execution time
-→ read AGENTS.md → docs/index.md → docs/roadmap.md → only the smallest T8-H authority pack required for a concrete cross-T8 check
-→ cross-check T8-A→T8-G as one coherent realization without reopening accepted authority by preference
+operator adjudication of the material H1–H3 findings in the active T8-H branch-only ledger
+→ apply only approved bounded coherence corrections to the owning T8 authorities
+→ prove the corrections preserve the 78-operation census and operation 79 absence
+→ run required CI on the candidate
+→ perform a fresh independent Fable challenge if material authority/topology corrections survive adjudication
 → do not begin T9 and do not implement Product code
 ```
 
@@ -138,7 +163,7 @@ Do not reopen completed T1→T8-G or the 78-operation Product/T6 census by prefe
 | T8-E — Executable Wire Contract | Exact OpenAPI application wire, schemas, headers, problems, ETags, idempotency, pagination, upload/exact-byte contract, generated Go/TypeScript boundaries | CLOSED / OPERATOR-RATIFIED / INTEGRATED; T8-E-FR precision ratified with T8-F |
 | T8-F — Frontend Realization | Route tree, feature/package topology, generated transport consumption, query/state behavior, read-model consumption, editor/viewer boundaries | CLOSED / OPERATOR-RATIFIED / INTEGRATED |
 | T8-G — Runtime / Process / Deployment | Binaries/processes, River workers, renderer/scanner/provider boundaries, startup/readiness/shutdown, configuration/secrets, trust/network boundaries, observability, recovery/runtime profiles | CLOSED / OPERATOR-RATIFIED / INTEGRATED |
-| T8-H — Whole-T8 Global Coherence Review | Cross-check backend, persistence, wire, frontend, runtime and their accepted upstream authorities as one system | NEXT / NOT STARTED; opens only on explicit operator authorization from current `main` |
+| T8-H — Whole-T8 Global Coherence Review | Cross-check backend, persistence, wire, frontend, runtime and their accepted upstream authorities as one system | OPEN / ACTIVE; material findings require operator adjudication before bounded authority corrections |
 | T9 — Golden Flows & Validation Baseline | Falsifiable composed-system flows and proof classes | NOT OPEN; opens only after Whole-T8 coherence closes |
 | T10 — Transition / Cutover | Real current→target transition and rollback barriers | NOT OPEN; opens after T9 baseline |
 | T11 — Implementation Program & Execution Graph | Bounded work graph and proof obligations | NOT OPEN; opens after T1→T10 accepted |
