@@ -77,7 +77,7 @@ Inherited unchanged from T2/T8-C:
 
 ```text
 PostgreSQL READ COMMITTED
-+ narrow explicit serialization where required
++ narrow explicit row serialization where required
 + explicit monotonic OCC/CAS
 + structural constraints where required
 ```
