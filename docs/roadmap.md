@@ -15,7 +15,7 @@ REPOSITORY RESET                      MERGED / OPERATOR-RATIFIED
 REPOSITORY STANDARD V1 ALIGNMENT      MERGED
 PRODUCT / OWNERSHIP                   OPERATOR-APPROVED
 T1 → T8-F                             CLOSED / OPERATOR-RATIFIED / INTEGRATED
-T8-G RUNTIME / PROCESS / DEPLOYMENT   OPEN / ACTIVE CANDIDATE / NOT RATIFIED
+T8-G RUNTIME / PROCESS / DEPLOYMENT   CLOSED / OPERATOR-RATIFIED / INTEGRATION PENDING
 T8-H → T12                            NOT OPEN
 IMPLEMENTATION                        BLOCKED
 LEGACY IMPLEMENTATION                 ABSENT FROM LIVE TREE
@@ -23,9 +23,9 @@ LEGACY IMPLEMENTATION                 ABSENT FROM LIVE TREE
 
 ## Current gate
 
-T8-G — Runtime / Process / Deployment is **OPEN / ACTIVE CANDIDATE / NOT RATIFIED** as of 2026-08-21.
+T8-G — Runtime / Process / Deployment is **CLOSED / OPERATOR-RATIFIED / INTEGRATION PENDING** as of 2026-08-21.
 
-The stage was opened by explicit operator authorization from freshly revalidated:
+The stage was opened from freshly revalidated:
 
 ```text
 main @ 8f39184a2b2e2d07a48ff6796dc9efa77c5c3aac
@@ -37,15 +37,16 @@ Candidate branch:
 arch/t8g-runtime-deployment
 ```
 
-Candidate durable authority:
+Ratified durable authority:
 
 ```text
 docs/architecture/runtime.md
++ docs/decisions/t8g-ratification.md
 ```
 
-The operator approved the complete design derivation before repository materialization, including the bounded correction that added the T4-required MalwareInspector and the final reuse-first third-party mechanism law. **Design approval is not T8-G ratification.** Ratification remains intentionally gated on repository verification, full independent Fable review, Lead adjudication and explicit operator ratification.
+The operator explicitly ratified the converged T8-G design after required CI #1066 passed on independently reviewed candidate `2f6c6f084fa368cceeef5e97b0c846cc381f4ab1` and Fable Round 2 returned **CONVERGED / MATERIAL findings = 0 / Round 3 NOT JUSTIFIED**. Integration remains a separate operator gate.
 
-Current candidate Global Maximum:
+Ratified Global Maximum:
 
 ```text
 one modular-monolith application runtime
@@ -62,7 +63,7 @@ one modular-monolith application runtime
 + proven third-party mechanisms before local infrastructure
 ```
 
-Current subtraction remains:
+Ratified subtraction remains:
 
 ```text
 Redis                             absent
@@ -79,26 +80,9 @@ operation 79                       absent
 Product implementation             BLOCKED
 ```
 
-### T8-G independent review gate
+### T8-G independent review closure
 
-A **full T8-G Fable review is mandatory before ratification**.
-
-Repository Standard isolation remains:
-
-```text
-exact candidate branch/HEAD
-→ review/t8g-fable[-rN]
-→ Evidence PR against the exact candidate
-→ only docs/work/current/ai-dialog.md differs from candidate
-→ Fable reviews whole T8-G authority and its cross-T8 coherence
-→ Evidence PR never merges
-```
-
-Lead adjudicates every finding against current repository authority. Corrections are applied only to the smallest implicated authority. If material corrections change the candidate, an additional independent Fable round reviews the exact corrected HEAD. T8-G ratification requires convergence with no surviving MATERIAL contradiction plus explicit operator ratification.
-
-### T8-G Fable Round 1
-
-Evidence PR #145 reviewed the exact CI-verified Round-1 candidate and returned:
+Fable Round 1 Evidence PR #145 returned:
 
 ```text
 F1  MATERIAL — deployment substrate omitted required writable ephemeral scratch capability
@@ -108,20 +92,21 @@ F4  MINOR    — renderer/scanner bounds lacked an explicit coherence law with t
 verdict      — NOT CONVERGED
 ```
 
-Lead adjudication accepted F1–F4 as bounded **T8-G-only self-coherence corrections**. They add no Product capability, semantic owner, application operation or upstream reopen and do not change the Global Maximum topology.
+Lead adjudication accepted F1–F4 as bounded T8-G-only self-coherence corrections. The corrected candidate added no Product capability, semantic owner, application operation or upstream reopen and changed no Global Maximum topology.
 
-The corrected candidate now explicitly requires:
+Fable Round 2 Evidence PR #146 reviewed exact corrected candidate `2f6c6f084fa368cceeef5e97b0c846cc381f4ab1` and returned:
 
 ```text
-bounded writable ephemeral scratch sized to accepted content profile × configured concurrency
-explicit accounting when scratch is memory-backed
-per-workload egress control sufficient for renderer denial and scanner-signature scoping
-health endpoints probe-scoped where substrate permits, with bounded fixed exposure otherwise
-renderer/scanner envelopes coherent with the accepted application content profile
-static envelope mismatches rejected as deployment/configuration faults
+F1 CLOSED
+F2 CLOSED
+F3 CLOSED
+F4 CLOSED
+CONVERGED
+MATERIAL findings = 0
+Round 3 = NOT JUSTIFIED
 ```
 
-Because Round 1 contained a MATERIAL finding and changed the candidate, **Round 2 independent confirmation is mandatory on the exact corrected CI-green HEAD**. PR #145 remains Evidence only and must close unmerged before the Round-2 Evidence branch becomes the active review channel.
+Both T8-G Evidence PRs are **CLOSED / UNMERGED**. Evidence never becomes authority.
 
 ## Integrated T8-F baseline
 
@@ -205,16 +190,14 @@ T8-G changes none of those counts.
 ## Exact next action
 
 ```text
-revalidate exact corrected T8-G candidate HEAD
-→ required Repository Standard CI must pass on that exact HEAD
-→ close Round-1 Evidence PR #145 unmerged
-→ open isolated review/t8g-fable-r2 Evidence PR from exact corrected candidate
-→ run bounded independent Fable confirmation of F1–F4 corrections plus regression attack on the full T8-G closure claims
-→ Lead adjudicates every Round-2 finding
-→ converge with no surviving MATERIAL contradiction
-→ explicit operator T8-G ratification
-→ integration authorization / squash merge
-→ do not open T8-H before T8-G is ratified and integrated
+revalidate exact T8-G ratification-carrier HEAD
+→ required Repository Standard CI must pass on that exact HEAD while Draft
+→ await explicit operator integration authorization
+→ only then mark PR #144 ready
+→ required post-ready CI must pass on the exact authorized HEAD
+→ squash-merge PR #144 only with explicit operator integration authorization
+→ revalidate resulting main tree/CI
+→ do not open T8-H automatically; T8-H requires its own explicit operator authorization after T8-G integration
 ```
 
 Candidate/review branch cleanup is non-authoritative housekeeping and does not change stage state.
@@ -227,8 +210,8 @@ Do not reopen completed T1→T8-F or the 78-operation Product/T6 census by prefe
 |---|---|---|
 | T8-E — Executable Wire Contract | Exact OpenAPI application wire, schemas, headers, problems, ETags, idempotency, pagination, upload/exact-byte contract, generated Go/TypeScript boundaries | CLOSED / OPERATOR-RATIFIED / INTEGRATED; T8-E-FR precision ratified with T8-F |
 | T8-F — Frontend Realization | Route tree, feature/package topology, generated transport consumption, query/state behavior, read-model consumption, editor/viewer boundaries | CLOSED / OPERATOR-RATIFIED / INTEGRATED |
-| T8-G — Runtime / Process / Deployment | Binaries/processes, River workers, renderer/scanner/provider boundaries, startup/readiness/shutdown, configuration/secrets, trust/network boundaries, observability, recovery/runtime profiles | OPEN / ACTIVE CANDIDATE / NOT RATIFIED; closes only after required CI + converged independent Fable review + explicit operator ratification + integration |
-| T8-H — Whole-T8 Global Coherence Review | Cross-check backend, persistence, wire, frontend, and runtime realization as one system | NOT OPEN; opens only after T8-G ratification/integration |
+| T8-G — Runtime / Process / Deployment | Binaries/processes, River workers, renderer/scanner/provider boundaries, startup/readiness/shutdown, configuration/secrets, trust/network boundaries, observability, recovery/runtime profiles | CLOSED / OPERATOR-RATIFIED / INTEGRATION PENDING; integration remains a separate operator gate |
+| T8-H — Whole-T8 Global Coherence Review | Cross-check backend, persistence, wire, frontend, and runtime realization as one system | NOT OPEN; may open only after T8-G integration and explicit operator authorization |
 | T9 — Golden Flows & Validation Baseline | Falsifiable composed-system flows and proof classes | NOT OPEN; opens after Whole T8 coherence |
 | T10 — Transition / Cutover | Real current→target transition and rollback barriers | NOT OPEN; opens after T9 baseline |
 | T11 — Implementation Program & Execution Graph | Bounded work graph and proof obligations | NOT OPEN; opens after T1→T10 accepted |
