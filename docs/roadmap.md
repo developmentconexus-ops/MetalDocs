@@ -30,6 +30,7 @@ Ratified authority:
 ```text
 docs/architecture/frontend.md
 + docs/decisions/frontend-read-symmetry.md   // bounded T8-E-FR precision discovered by T8-F
++ docs/decisions/t8f-ratification.md         // explicit ratification record
 ```
 
 The ratified frontend result remains:
@@ -84,7 +85,7 @@ Round 3 = NOT JUSTIFIED
 
 Lead independently revalidated the Round-2 result. Required CI #1047 was SUCCESS on the exact corrected HEAD and `main` remained `6443986672f4f183cff90b76e96e48ebe1c34594` during adjudication.
 
-The operator explicitly ratified T8-F on **2026-08-21**.
+The operator explicitly ratified T8-F on **2026-08-21**. Ratification/routing metadata through HEAD `4849c6e7bd15ba7f38f95e308c715446f41482cc` passed required CI #1054; this roadmap update only narrows the remaining gate to merge authorization and must itself pass required CI before integration.
 
 ## Ratified T8-E baseline
 
@@ -116,11 +117,9 @@ T8-E-FR changes none of those counts.
 ## Exact next action
 
 ```text
-revalidate final ratification-recording HEAD of PR #139
-→ required repository CI SUCCESS on that exact HEAD
-→ explicit operator merge authorization
-→ mark PR #139 ready only when merge is authorized
-→ squash merge PR #139 into main
+explicit operator merge authorization for PR #139
+→ mark PR #139 ready for review
+→ squash merge PR #139 into main using the exact authorized HEAD
 → revalidate main + merged tree + required CI + durable T8-F/T8-E-FR authorities
 → close/delete absorbed candidate/review branches where tooling permits
 → record T8-F integration closeout
