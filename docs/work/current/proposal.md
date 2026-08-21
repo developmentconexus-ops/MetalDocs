@@ -151,8 +151,8 @@ CsrfToken
 ProviderSubjectRef
   opaque/nonblank, maxLength=2048
   server-resolvable anti-corruption handle for exact issuer+subject
-  unchanged binding returns byte-stable ref
   client never parses it or treats it as Product identity
+  byte equality is not binding identity; equality resolves to exact issuer+subject semantics
 
 EmailAddress
   nonblank human text
@@ -756,7 +756,7 @@ Representation execution:
 SourceOnly + DOCX/PDF
   representation gate satisfied by absence
 
-RequireOfficialRendition(PDF) + submitted PDF
+RequireOfficialRendition(PDF) + submitted PDF  // candidate; promotion blocked by §8.5
   establish OfficialRendition semantic fact over the exact same already-admitted PDF handle/descriptor
   no physical duplicate, renderer job, or provider copy
   gate satisfied synchronously
@@ -1318,7 +1318,7 @@ S3 reference: stricter signed exact Content-Length = maxBytes
 
 No new parameter, AdmissionClaim field, or durable authority is needed. The client bound protects ingress resource use; completion still derives the real descriptor and does not compare against a persisted client expectation.
 
-## 8.4 T8-D — transaction-census + expired-idempotency precision — OPEN
+## 8.4 T8-D — transaction-census + idempotency precision — OPEN
 
 The final T3↔T8-D parity attack found a bounded owner-local persistence/transaction correction. It adds no table, owner, state, API, permission, worker or capability.
 
@@ -1350,10 +1350,19 @@ The final T3↔T8-D parity attack found a bounded owner-local persistence/transa
       (including User+Binding, teardown+offboarding, Submission+Release,
        Decision+Release, requested+completed obsolescence)
 
-8. T8-E semantic idempotency expires at completed_at+24h, while the unique key row may outlive cleanup
-   -> acquisition that finds now>=expires_at serializes on that key, removes the expired Replay then Key,
+8. T8-E defines Idempotency-Key as UUID identity, while T8-D currently persists `key TEXT`
+   -> persist the client key as `UUID NOT NULL` (separate from the internal row id), so textual UUID case/form
+      cannot create parallel uniqueness identities; parsing/canonicalization occurs before the scoped claim
+
+9. T8-E semantic replay authority is exactly `completed_at <= now < completed_at+24h`
+   -> the committed Key+Replay pair sets `key.expires_at = replay.completed_at + 24h`;
+      acquisition that finds `now >= expires_at` serializes on that scoped key, deletes expired Replay then Key,
       and may establish the new claim in the same transaction; the janitor is cleanup only and can never
-      extend replay authority. Concurrent post-expiry reuse still has one winner/loser path.
+      extend replay authority. Concurrent post-expiry reuse still has one winner/loser path
+
+10. T8-E freezes `ReplaySnapshot <= 2,048 bytes`
+    -> realize the bound structurally on `platform.idempotency_replays.payload`
+       (`CHECK(octet_length(payload) <= 2048)`), in addition to the operation-local snapshot encoders
 ```
 
 This package reduces accidental Audit/job-like behavior and makes already-ratified evidence/replay semantics executable.
