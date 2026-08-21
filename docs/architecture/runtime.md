@@ -2,17 +2,14 @@
 id: runtime-process-deployment
 kind: authority
 owner: architecture
-summary: T8-G candidate authority for runtime shells, process/deployment topology, trust boundaries, configuration/secrets, observability, content-processing mechanisms and recovery realization.
+summary: Operator-ratified T8-G authority for runtime shells, process/deployment topology, trust boundaries, configuration/secrets, observability, content-processing mechanisms and recovery realization.
 ---
 
 # R10 T8-G — Runtime / Process / Deployment
 
-> **Status:** OPEN / ACTIVE CANDIDATE / NOT RATIFIED
-> **Opened:** 2026-08-21
-> **Candidate base:** `main @ 8f39184a2b2e2d07a48ff6796dc9efa77c5c3aac`
-> **Implementation:** BLOCKED
+> **Ratification:** OPERATOR-RATIFIED on 2026-08-21 after required CI #1066 and independent Fable Round 2 CONVERGED. Integration through PR #144 remains pending; program stage/status and implementation permission remain exclusively in `../roadmap.md`.
 
-This document is the T8-G candidate authority for the smallest runtime, process and deployment realization capable of serving the operator-ratified T8-A→T8-F architecture.
+This document is the ratified T8-G authority for the smallest runtime, process and deployment realization capable of serving the operator-ratified T8-A→T8-F architecture.
 
 It owns runtime shells, long-lived process placement, deployment artifacts, startup/readiness/shutdown, configuration and secrets, trust/network boundaries, runtime observability, renderer/scanner placement, exact-byte buffering realization, operational controls and the runtime side of backup/restore readiness.
 
@@ -856,7 +853,7 @@ Every surviving runtime component has a named current consumer:
 
 ## 23. Falsification / reopen triggers
 
-T8-G candidate is materially falsified if evidence proves any of:
+T8-G is materially falsified if evidence proves any of:
 
 ```text
 F1  an accepted T8-F consumer cannot run through this topology
@@ -951,24 +948,32 @@ Exact executable proof shape belongs to T9.
 
 ---
 
-## 26. Candidate gate
+## 26. Ratified integration gate
 
-This candidate is design-approved by the operator but **not ratified**.
+This authority is **OPERATOR-RATIFIED / INTEGRATION PENDING**.
 
-Required closure sequence:
+Ratification evidence:
 
 ```text
-candidate authority complete
-→ Repository Standard required CI on exact candidate HEAD
-→ full independent Fable review on an isolated Evidence PR
-→ Lead adjudication of every finding
-→ bounded corrections only when evidence supports them
-→ additional independent round when material corrections change the candidate
-→ CONVERGED / no surviving MATERIAL contradiction
-→ explicit operator ratification
-→ integration authorization and squash merge
+required CI #1066 on exact independently reviewed candidate 2f6c6f084fa368cceeef5e97b0c846cc381f4ab1
+Fable Round 1 PR #145 CLOSED / UNMERGED / adjudicated
+Fable Round 2 PR #146 CLOSED / UNMERGED / CONVERGED / 0 MATERIAL
+Round 3 NOT JUSTIFIED
+explicit operator ratification on 2026-08-21
+```
+
+Remaining sequence:
+
+```text
+ratification record + status promotion
+→ Repository Standard required CI on exact ratification-carrier HEAD while Draft
+→ explicit operator integration authorization
+→ mark PR #144 ready
+→ required post-ready CI on the exact authorized HEAD
+→ squash-merge the exact authorized HEAD
+→ fresh main/tree/CI revalidation
 ```
 
 Evidence PRs are never authority and never merge.
 
-T8-H remains NOT OPEN until T8-G is operator-ratified and integrated. Product implementation remains BLOCKED.
+T8-H remains NOT OPEN until T8-G is integrated and receives its own explicit operator authorization. Product implementation remains BLOCKED.
