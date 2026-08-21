@@ -1323,7 +1323,7 @@ No new parameter, AdmissionClaim field, or durable authority is needed. The clie
 The final T3↔T8-D parity attack found a bounded owner-local persistence/transaction correction. **Operator-approved on 2026-08-21 and now reconciled in T8-D.** It adds no table, owner, state, API, permission, worker or capability.
 
 ```text
-1. Company replacement currently says -> Audit
+1. Company replacement originally said -> Audit
    T3 does not require semantic Company-display replacement Audit
    -> subtract that mandatory Audit
 
@@ -1350,7 +1350,7 @@ The final T3↔T8-D parity attack found a bounded owner-local persistence/transa
       (including User+Binding, teardown+offboarding, Submission+Release,
        Decision+Release, requested+completed obsolescence)
 
-8. T8-E defines Idempotency-Key as UUID identity, while T8-D currently persists `key TEXT`
+8. T8-E defines Idempotency-Key as UUID identity, while T8-D originally persisted `key TEXT`
    -> persist the client key as `UUID NOT NULL` (separate from the internal row id), so textual UUID case/form
       cannot create parallel uniqueness identities; parsing/canonicalization occurs before the scoped claim
 
@@ -1394,7 +1394,7 @@ submitted source = DOCX + required format = PDF
   -> existing durable renderer-intent / T4 admission / OfficialRendition path remains unchanged
 ```
 
-`controlled_docs.official_renditions` already permits the same managed-content handle/descriptor and no new persistence object is required. Bounded authority edits, if approved:
+`controlled_docs.official_renditions` already permits the same managed-content handle/descriptor and no new persistence object is required. Operator-approved bounded authority edits now durable:
 
 ```text
 T4-J       make rendering conditional on transformation being required
@@ -1414,7 +1414,7 @@ GET /api/v1/session -> session-bound csrf_token
 unsafe request      -> X-CSRF-Token validated against that session
 ```
 
-T8-D currently persists only `csrf_secret_digest`, and no other ratified state can reconstruct the token on a later `GET /session`. A one-way digest can validate a token that the caller already knows, but cannot bootstrap it after OIDC redirect/reload.
+T8-D originally persisted only `csrf_secret_digest`, and no other ratified state could reconstruct the token on a later `GET /session`. A one-way digest can validate a token that the caller already knows, but cannot bootstrap it after OIDC redirect/reload.
 
 The smallest stateful synchronizer-token correction follows the normal server-side session pattern:
 
