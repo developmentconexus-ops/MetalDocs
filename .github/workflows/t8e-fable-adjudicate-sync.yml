@@ -1,4 +1,4 @@
-name: T8-E Fable Adjudication Sync
+name: T8-E Promotion Executor
 
 on:
   pull_request:
@@ -8,7 +8,7 @@ permissions:
   contents: write
 
 jobs:
-  adjudicate:
+  promote:
     if: github.event.pull_request.number == 136 && github.actor != 'github-actions[bot]'
     runs-on: ubuntu-24.04
     steps:
@@ -16,25 +16,17 @@ jobs:
         with:
           ref: arch/t8e-wire-contract
           fetch-depth: 0
-      - name: Execute staged fail-closed adjudication
+      - name: Execute staged fail-closed durable promotion
         shell: bash
         run: |
           set -euo pipefail
           python3 - <<'PYEXTRACT'
           from pathlib import Path
-          t = Path('.github/workflows/t8e-fable-adjudicate.yml').read_text()
-          start_marker = "          python3 - <<'PY'\n"
-          end_marker = "\n          PY\n"
-          start = t.index(start_marker) + len(start_marker)
-          end = t.index(end_marker, start)
-          lines = t[start:end].splitlines()
+          t = Path('.github/workflows/t8e-promote-sync.yml').read_text()
+          marker = "        run: |\n"
+          start = t.index(marker) + len(marker)
+          lines = t[start:].splitlines()
           script = '\n'.join(line[10:] if line.startswith('          ') else line for line in lines) + '\n'
-          Path('/tmp/t8e-fable-adjudicate.py').write_text(script)
+          Path('/tmp/t8e-promote.sh').write_text(script)
           PYEXTRACT
-          python3 /tmp/t8e-fable-adjudicate.py
-          git diff --check
-          git config user.name github-actions[bot]
-          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add docs/work/current/proposal.md docs/roadmap.md
-          git commit -m 'docs(architecture): adjudicate T8-E Fable findings'
-          git push origin HEAD:arch/t8e-wire-contract
+          bash /tmp/t8e-promote.sh
