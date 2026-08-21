@@ -1,0 +1,216 @@
+name: T8-E Bounded Reconcile
+
+on:
+  pull_request:
+    types: [synchronize]
+
+permissions:
+  contents: write
+
+jobs:
+  reconcile:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+      - name: Apply approved bounded corrections
+        shell: bash
+        run: |
+          set -euxo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def patch(path, replacements):
+              p = Path(path)
+              s = p.read_text()
+              for old, new in replacements:
+                  n = s.count(old)
+                  if n != 1:
+                      raise SystemExit(f'{path}: anchor mismatch expected=1 got={n}: {old[:160]!r}')
+                  s = s.replace(old, new, 1)
+              p.write_text(s)
+
+          patch('docs/architecture/content-integrity.md', [
+          (
+          '> **Post-T5 Fable bounded amendment:** 2026-08-18 — restore security non-resurrection + admission-claim GC liveness  \n> **Repository:**',
+          '> **Post-T5 Fable bounded amendment:** 2026-08-18 — restore security non-resurrection + admission-claim GC liveness  \n> **T8-E bounded correction:** 2026-08-21 — already-PDF required rendition reuses admitted bytes; rendering only when transformation is required  \n> **Repository:**'
+          ),
+          (
+          'Required OfficialRendition uses the same pattern: rendering happens outside the semantic transaction; final admission revalidates exact READY content and creates the semantic Rendition fact only if the exact Submission remains eligible under T2/T5.',
+          '''Required OfficialRendition has exactly two Launch realization paths:\n\n```text\nsubmitted source already PDF + required format PDF\n  -> revalidate the exact already-admitted Submission handle + descriptor\n  -> create OfficialRendition semantic fact over that same handle + descriptor\n  -> no provider copy\n  -> no renderer execution\n  -> no durable rendition intent\n\nsubmitted source DOCX + required format PDF\n  -> render outside the semantic transaction\n  -> admit/verify the produced READY PDF through T4\n  -> final admission revalidates exact READY content and Submission eligibility\n  -> create OfficialRendition semantic fact\n```\n\nThe first path is not a semantic downgrade: OfficialRendition still exists as the required immutable fact, but byte-for-byte PDF duplication/transformation is removed because it proves no additional property. Target proof must show same-PDF rendition preserves the exact Submission handle/descriptor and invokes neither `CopyToNewHandle` nor renderer/durable-intent machinery.''' 
+          )
+          ])
+
+          patch('docs/architecture/async-and-search.md', [
+          (
+          '> **Post-T5 Fable bounded amendment:** 2026-08-18 — canonical Search baseline + conditional materialization + projection serialization + late-rendition no-op  \n> **Repository:**',
+          '> **Post-T5 Fable bounded amendment:** 2026-08-18 — canonical Search baseline + conditional materialization + projection serialization + late-rendition no-op  \n> **T8-E bounded correction:** 2026-08-21 — OfficialRendition durable work only when source transformation is required  \n> **Repository:**'
+          ),
+          (
+          '''PDF source\n  → direct PDF viewer by default\n  → no duplicate generated PDF without a named need\n\nDOCX + SourceOnly''',
+          '''PDF source\n  → direct PDF viewer by default\n  → no duplicate generated PDF without a named need\n\nPDF + RequireOfficialRendition(PDF)\n  → establish the OfficialRendition semantic fact over the same admitted PDF handle + descriptor\n  → no renderer, provider copy or durable rendition job\n\nDOCX + SourceOnly'''
+          ),
+          (
+          'official_rendition_render exists only when frozen representation policy requires it',
+          'official_rendition_render exists only when frozen representation policy requires OfficialRendition **and transformation to the required format is necessary**'
+          ),
+          (
+          '''conditional durable job:\n  official_rendition_render(submission_id, required_format)\n  only when the frozen Submission representation policy requires OfficialRendition''',
+          '''conditional durable job:\n  official_rendition_render(submission_id, required_format)\n  only when the frozen Submission requires OfficialRendition **and its exact source must be transformed to the required format**\n\nalready-PDF + required PDF:\n  establish OfficialRendition synchronously over the same admitted bytes; no durable job'''
+          ),
+          (
+          '''Submission requiring OfficialRendition(PDF)\n  → official_rendition_render(submission_id, PDF)''',
+          '''Submission requiring DOCX→OfficialRendition(PDF) transformation\n  → official_rendition_render(submission_id, PDF)\n\nSubmission already PDF + required OfficialRendition(PDF)\n  → no future external effect; no job'''
+          ),
+          (
+          '''When a frozen Submission policy requires an OfficialRendition:\n\n```text\nload Submission + requirement\n→ load exact T4 source bytes\n→ execute renderer outside semantic transaction\n→ admit/verify READY output through T4\n→ open local transaction\n→ reload current eligibility\n→ prove exact Submission remains the current eligible pre-Release candidate\n→ prove required rendition still absent/required\n→ revalidate exact READY descriptor + binding\n→ create OfficialRendition + required T3 Audit\n→ if human gate also satisfied, execute T2 system Release\n→ COMMIT\n```''',
+          '''When a frozen Submission policy requires an OfficialRendition, execution is conditional on whether transformation is actually needed.\n\nAlready-PDF path:\n\n```text\nload exact eligible Submission whose source format is PDF\n→ open local transaction\n→ reload current eligibility\n→ prove required PDF rendition still absent/required\n→ revalidate the exact Submission handle + descriptor\n→ create OfficialRendition over that same handle + descriptor\n→ required T3 Audit\n→ if human gate also satisfied, execute T2 system Release\n→ COMMIT\n```\n\nNo renderer, provider copy or durable job participates.\n\nTransformation path (current Launch: DOCX→PDF):\n\n```text\nload Submission + requirement\n→ load exact T4 source bytes\n→ execute renderer outside semantic transaction\n→ admit/verify READY output through T4\n→ open local transaction\n→ reload current eligibility\n→ prove exact Submission remains the current eligible pre-Release candidate\n→ prove required rendition still absent/required\n→ revalidate exact READY descriptor + binding\n→ create OfficialRendition + required T3 Audit\n→ if human gate also satisfied, execute T2 system Release\n→ COMMIT\n```'''
+          ),
+          (
+          'conditional rendition enqueue rolls back with Submission transaction rollback',
+          '''conditional rendition enqueue rolls back with Submission transaction rollback\nalready-PDF + required PDF creates OfficialRendition over the same admitted handle/descriptor with zero renderer/copy/job\nDOCX→required PDF still commits the rendition intent atomically when renderer work is activated'''
+          )
+          ])
+
+          patch('docs/architecture/interfaces.md', [
+          (
+          '> **Ratified:** 2026-08-19  \n> **Repository:**',
+          '> **Ratified:** 2026-08-19  \n> **T8-E bounded correction:** 2026-08-21 — same-PDF rendition emits no renderer intent + session resolve exposes per-session CSRF token material  \n> **Repository:**'
+          ),
+          (
+          '''Authentication public capabilities cover browser login/callback preflight, binding resolution/create/replace, session issue/resolve/revoke and current provider-subject search required by T6.\n\nProvider/network exchange occurs outside the local semantic transaction; binding/session state mutations occur in caller-provided Scope.\n\nSession issuance requires protected current enabled-User truth from Organization.''',
+          '''Authentication public capabilities cover browser login/callback preflight, binding resolution/create/replace, session issue/resolve/revoke and current provider-subject search required by T6.\n\nSession resolution returns the current authenticated User identity plus the opaque **per-session CSRF token material** required by T6 `GET /api/v1/session` and unsafe-request validation. The token is session-bound server state, not a second authentication credential: it grants nothing without the valid HttpOnly ApplicationSession cookie. Authentication owns generation/comparison semantics; exact persistence belongs T8-D.\n\nProvider/network exchange occurs outside the local semantic transaction; binding/session state mutations occur in caller-provided Scope.\n\nSession issuance requires protected current enabled-User truth from Organization and creates fresh per-session CSRF token material.'''
+          ),
+          (
+          '''When a frozen Submission requires OfficialRendition, Controlled Documents returns a named intent containing only the stable Submission identity and required format.''',
+          '''When a frozen Submission requires **renderer transformation** to establish OfficialRendition (current Launch: DOCX→PDF), Controlled Documents returns a named intent containing only the stable Submission identity and required format. If the exact submitted source is already PDF and the required format is PDF, Controlled Documents establishes the OfficialRendition semantic fact over the same admitted handle/descriptor and returns **no** rendition intent.'''
+          ),
+          (
+          '''required-rendition Submission semantic transition commits\n<=>\nrequired durable rendition intent commits in the same Scope''',
+          '''Submission transition that activates renderer work commits\n<=>\nrequired durable rendition intent commits in the same Scope\n\nalready-PDF + required PDF establishes the semantic OfficialRendition synchronously\n=> zero rendition intent'''
+          )
+          ])
+
+          patch('docs/architecture/persistence.md', [
+          (
+          '> **T8-E bounded correction:** 2026-08-20 — Governance Step label persistence + immutable attempt label snapshot\n> **Repository:**',
+          '> **T8-E bounded correction:** 2026-08-20 — Governance Step label persistence + immutable attempt label snapshot\n> **T8-E bounded correction:** 2026-08-21 — transaction/Audit/idempotency precision + same-PDF rendition + reconstructible CSRF session secret\n> **Repository:**'
+          ),
+          (
+          '''id                  UUID PRIMARY KEY\nuser_id             UUID NOT NULL REFERENCES org.users(id)\ntoken_digest        BYTEA NOT NULL UNIQUE\ncsrf_secret_digest  BYTEA NOT NULL\ncreated_at          TIMESTAMPTZ NOT NULL\nexpires_at          TIMESTAMPTZ NOT NULL''',
+          '''id                  UUID PRIMARY KEY\nuser_id             UUID NOT NULL REFERENCES org.users(id)\ntoken_digest        BYTEA NOT NULL UNIQUE\ncsrf_secret         BYTEA NOT NULL\ncreated_at          TIMESTAMPTZ NOT NULL\nexpires_at          TIMESTAMPTZ NOT NULL'''
+          ),
+          (
+          '''No raw token/IP/User-Agent/device/tenant selector/permission snapshot is persisted as target authority.''',
+          '''Session issuance generates a cryptographically random per-session `csrf_secret`. Session resolution may return that opaque secret/token material only after the ApplicationSession cookie has authenticated through `token_digest`. Unsafe-request CSRF validation compares the supplied token to this server-side session secret in constant time. The CSRF secret is not an authentication bearer credential and grants nothing without the valid HttpOnly session cookie.\n\nNo raw **authentication** token/IP/User-Agent/device/tenant selector/permission snapshot is persisted as target authority.'''
+          ),
+          (
+          '''Insert-only semantic exact-content fact. Renderer/provider identity is not semantic authority.\n\nRendition bytes are prepared outside the semantic transaction; final admission uses the universal ManagedContent `FOR SHARE` rule plus exact descriptor/malware evidence as applicable, then revalidates the governed state before insert/release consequence.''',
+          '''Insert-only semantic exact-content fact. Renderer/provider identity is not semantic authority.\n\nIf a Submission already contains admitted PDF and its frozen policy requires OfficialRendition(PDF), the OfficialRendition row may reference the **same** `managed_content_id` and copy the same exact descriptor as the Submission after canonical eligibility/descriptor revalidation. No provider copy, renderer output or River intent is created.\n\nWhen transformation is required (current Launch: DOCX→PDF), rendition bytes are prepared outside the semantic transaction; final admission uses the universal ManagedContent `FOR SHARE` rule plus exact descriptor/malware evidence as applicable, then revalidates the governed state before insert/release consequence.'''
+          ),
+          (
+          '''key TEXT NOT NULL''',
+          '''key UUID NOT NULL'''
+          ),
+          (
+          '''payload BYTEA NOT NULL\ncompleted_at TIMESTAMPTZ NOT NULL''',
+          '''payload BYTEA NOT NULL CHECK(octet_length(payload) <= 2048)\ncompleted_at TIMESTAMPTZ NOT NULL'''
+          ),
+          (
+          '''ReplaySnapshot remains versioned, self-contained and PII-free by construction. Exact maximum payload size belongs T8-E after exact success-representation census; T8-D requires only a bounded representation.''',
+          '''ReplaySnapshot remains versioned, self-contained and PII-free by construction. T8-E freezes the Launch maximum at 2,048 bytes and T8-D mirrors that bound structurally. The client `Idempotency-Key` is stored as UUID identity so textual UUID case/form cannot create parallel scoped uniqueness identities.'''
+          ),
+          (
+          '''Winner path uses the immediate scoped unique with `INSERT ... ON CONFLICT DO NOTHING`; under READ COMMITTED a loser waits without poisoning Scope, then sees the winner's committed ReplaySnapshot on the next command. If winner rolls back, contender may become owner. Same key + different fingerprint is conflict/zero business mutation.''',
+          '''Winner path uses the immediate scoped unique with `INSERT ... ON CONFLICT DO NOTHING`; under READ COMMITTED a loser waits without poisoning Scope, then sees the winner's committed ReplaySnapshot on the next command. If winner rolls back, contender may become owner. Same key + different fingerprint is conflict/zero business mutation.\n\nCompletion chooses one trusted `completed_at` and, before commit, sets the paired Key `expires_at = completed_at + 24 hours`. This is the semantic replay boundary; cleanup timing cannot extend it.\n\nA BeginIn conflict on an existing scoped key serializes on that row. If `now >= expires_at`, the transaction deletes the expired Replay then Key and retries claim establishment in the same Scope. If the row is still live, normal replay/fingerprint-conflict behavior applies. Concurrent post-expiry reuse still has one winner/loser path. The janitor remains cleanup only, never semantic expiry authority.'''
+          ),
+          (
+          '''Every authenticated semantic mutation inherits actor `FOR SHARE`. Natural idempotent DELETEs need no durable Idempotency-Key unless T6 explicitly says otherwise.\n\nMaterial mutation families include:''',
+          '''Every authenticated semantic mutation inherits actor `FOR SHARE`. Natural idempotent DELETEs need no durable Idempotency-Key unless T6 explicitly says otherwise.\n\nEach transaction appends **all and only** the T3-required semantic Audit evidence for the facts/effects it commits. One business transition may therefore append multiple Audit events; the singular `Audit` shorthand below never suppresses required companion evidence and never creates an event T3 does not require.\n\nMaterial mutation families include:'''
+          ),
+          (
+          '''UserProfile replacement/erasure\n  protected actor/target as applicable -> VersionToken/owner rule -> Audit when required\n\nOffboarding\n  ordered User locks -> target eligibility update root -> session purge + memberships/direct RoleAssignments removal + Audit\n\nCompany replacement\n  protected actor -> Company version CAS -> Audit''',
+          '''UserProfile replacement/erasure\n  protected actor/target as applicable -> VersionToken/owner rule -> ordinary replacement has no mandatory semantic Audit; lawful erasure appends user_profile.erased evidence when T3 requires it\n\nOffboarding\n  ordered User locks -> target eligibility update root -> session purge + memberships/direct RoleAssignments removal + all required teardown/offboarding Audit\n\nUser re-enable\n  protected actor/target -> eligibility VersionToken/CAS -> DISABLED->ENABLED only -> user.reenabled Audit; no prior session/membership/grant resurrection\n\nCompany replacement\n  protected actor -> Company version CAS; no mandatory semantic Audit'''
+          ),
+          (
+          '''DRAFT PATCH\n  protected actor -> Document FOR SHARE -> new handle FOR SHARE if replacing source -> generation CAS -> title/source update -> claim consume if applicable -> Audit when required''',
+          '''DRAFT PATCH\n  protected actor -> Document FOR SHARE -> new handle FOR SHARE if replacing source -> generation CAS -> title/source update -> claim consume if applicable; no mandatory Launch semantic Audit'''
+          ),
+          (
+          '''SUBMIT\n  Idempotency -> protected actor -> DocumentType config snapshot protection -> Document FOR UPDATE -> source handle FOR SHARE -> immutable Submission -> route/Step snapshot including label_snapshot -> activate first candidate set -> Audit -> required River intent -> Replay\n\nFeedback\n  Idempotency where required -> protected actor -> exact case validation -> append feedback + Audit/Replay as upstream requires''',
+          '''SUBMIT\n  Idempotency -> protected actor -> DocumentType config snapshot protection -> Document FOR UPDATE -> source handle FOR SHARE -> immutable Submission -> route/Step snapshot including label_snapshot -> activate first candidate set\n  -> SourceOnly: no rendition work\n  -> RequireOfficialRendition(PDF) + source PDF: insert OfficialRendition over same handle/descriptor; no provider copy/renderer/River intent\n  -> RequireOfficialRendition(PDF) + source DOCX: enqueue required River rendition intent\n  -> append all T3-required evidence for Submission + any same-tx OfficialRendition/Release -> Replay\n\nFeedback\n  Idempotency where required -> protected actor -> exact case validation -> append immutable feedback -> Replay; no duplicate semantic Audit'''
+          ),
+          (
+          '''OfficialRendition finalization\n  system/background path -> Document FOR UPDATE -> rendition handle FOR SHARE -> exact descriptor/proof -> insert OfficialRendition -> release consequence when gates satisfied''',
+          '''OfficialRendition finalization\n  renderer/background transformation path -> Document FOR UPDATE -> rendition handle FOR SHARE -> exact descriptor/proof -> insert OfficialRendition -> official_rendition.completed Audit -> release consequence when gates satisfied -> release.completed Audit when Release is established in the same commit'''
+          ),
+          (
+          '''Audit historical visibility filters before pagination''',
+          '''Audit historical visibility filters before pagination\nApplicationSession resolve can reproduce the per-session CSRF token from server-side session state; constant-time validation requires the authenticated session and token alone grants nothing\nIdempotency UUID textual variants map to one scoped key identity\nIdempotency ReplaySnapshot >2048 bytes is structurally rejected\nIdempotency post-expiry reuse succeeds correctly even when janitor cleanup lags\nalready-PDF required PDF rendition reuses the exact Submission handle/descriptor and creates zero provider copy/renderer/River intent; DOCX→PDF still enqueues the required intent'''
+          )
+          ])
+
+          patch('docs/work/current/proposal.md', [
+          (
+          'RequireOfficialRendition(PDF) + submitted PDF  // candidate; promotion blocked by §8.5',
+          'RequireOfficialRendition(PDF) + submitted PDF'
+          ),
+          (
+          '## 8.4 T8-D — transaction-census + idempotency precision — OPEN',
+          '## 8.4 T8-D — transaction-census + idempotency precision — RESOLVED'
+          ),
+          (
+          'The final T3↔T8-D parity attack found a bounded owner-local persistence/transaction correction. It adds no table, owner, state, API, permission, worker or capability.',
+          'The final T3↔T8-D parity attack found a bounded owner-local persistence/transaction correction. **Operator-approved on 2026-08-21 and now reconciled in T8-D.** It adds no table, owner, state, API, permission, worker or capability.'
+          ),
+          (
+          '## 8.5 T4/T5/T8-C/T8-D — required PDF rendition when source is already PDF — OPEN',
+          '## 8.5 T4/T5/T8-C/T8-D — required PDF rendition when source is already PDF — RESOLVED'
+          ),
+          (
+          'A material contradiction survived Structural Inversion:',
+          'A material contradiction survived Structural Inversion and was **operator-approved for bounded reconciliation on 2026-08-21**:'
+          ),
+          (
+          'This is a reduction, not a new rendition mode.',
+          'This is a reduction, not a new rendition mode. The correction is now durable in T4/T5/T8-C/T8-D.'
+          ),
+          (
+          '## 8.6 T8-C/T8-D — session CSRF bootstrap reversibility — OPEN',
+          '## 8.6 T8-C/T8-D — session CSRF bootstrap reversibility — RESOLVED'
+          ),
+          (
+          'T6 and the accepted T8-E checkpoint require:',
+          'T6 and the accepted T8-E checkpoint require the following; the bounded correction was **operator-approved on 2026-08-21 and is now durable in T8-C/T8-D**:'
+          ),
+          (
+          'duplicate PDF rendition bytes/job for PDF source (candidate; §8.5 reconciliation pending)',
+          'duplicate PDF rendition bytes/job for PDF source'
+          ),
+          (
+          '''The earlier Step-label and impossible-binding-Audit findings are resolved. The final evidence-triggered bounded coherence package is §§8.4–8.6; none changes Product scope, the 78-operation census, ownership topology or Launch lifecycle.''',
+          '''The earlier Step-label/impossible-binding-Audit findings and the final evidence-triggered §§8.4–8.6 package are all resolved. None changes Product scope, the 78-operation census, ownership topology or Launch lifecycle.'''
+          ),
+          (
+          '''The measurement, generated-boundary feasibility, provider presign feasibility, strict-request validator split and 78-row ledger-census fixture obligations are closed at candidate level. The final Lead attack exposed the bounded cross-layer coherence package in §§8.4–8.6; because it touches already-ratified owners, it requires explicit operator adjudication before durable edits.\n\nRemaining Lead gate:\n\n```text\nA. operator adjudication of §§8.4–8.6 bounded coherence package\nB. if approved, reconcile only the implicated T4/T5/T8-C/T8-D lines\nC. rerun whole-candidate Structural Inversion / YAGNI / overengineering / global-coherence exact-delta check\nD. revalidate main/base + exact candidate HEAD + intended authority/work diff + required CI\nE. only if A→D converge, create review/t8e-fable from that exact candidate HEAD\nF. independent Fable challenge\nG. Lead adjudication of Fable evidence\nH. explicit operator ratification\n```\n\nUntil A→D converge:''',
+          '''The measurement, generated-boundary feasibility, provider presign feasibility, strict-request validator split, 78-row ledger-census fixture obligations and all evidence-triggered upstream reconciliations are closed at candidate level.\n\nRemaining Lead gate:\n\n```text\nA. rerun whole-candidate Structural Inversion / YAGNI / overengineering / global-coherence exact-delta check\nB. revalidate main/base + exact candidate HEAD + intended authority/work diff + required CI\nC. only if A→B converge, create review/t8e-fable from that exact candidate HEAD\nD. independent Fable challenge\nE. Lead adjudication of Fable evidence\nF. explicit operator ratification\n```\n\nUntil A→B converge:'''
+          )
+          ])
+
+          patch('docs/roadmap.md', [
+          (
+          '''The final Lead coherence attack exposed one consolidated **bounded upstream coherence package**, recorded in `docs/work/current/proposal.md` §§8.4–8.6:\n\n```text\nT8-D               transaction/Audit + expired-idempotency precision\nT4/T5/T8-C/T8-D    no renderer/job for already-PDF required PDF rendition\nT8-C/T8-D           reconstructible server-side CSRF synchronizer secret for GET /session\n```\n\nThe package is subtractive/precision-only: no Product operation, owner, lifecycle state, permission, table family, generic worker, second cookie or new API is added.\n\n## Exact next action\n\n```text\noperator adjudicates the bounded coherence package in proposal §§8.4–8.6\n→ if approved, reconcile only the implicated T4/T5/T8-C/T8-D lines\n→ rerun exact whole-candidate Structural Inversion / YAGNI / overengineering / global-coherence delta\n→ revalidate main/base + exact candidate HEAD + intended authority/work diff + required CI\n→ only then create isolated review/t8e-fable from exact candidate HEAD\n→ independent Fable challenge\n→ Lead adjudication\n→ explicit operator ratification\n```''',
+          '''The final Lead coherence attack exposed one consolidated bounded upstream package and the operator approved it on **2026-08-21**. The implicated T4/T5/T8-C/T8-D lines are now reconciled:\n\n```text\nT8-D               transaction/Audit + idempotency precision\nT4/T5/T8-C/T8-D    no renderer/job for already-PDF required PDF rendition\nT8-C/T8-D           reconstructible server-side CSRF synchronizer secret for GET /session\n```\n\nThe correction remained subtractive/precision-only: no Product operation, owner, lifecycle state, permission, table family, generic worker, second cookie or new API was added.\n\n## Exact next action\n\n```text\nrerun exact whole-candidate Structural Inversion / YAGNI / overengineering / global-coherence delta\n→ revalidate main/base + exact candidate HEAD + intended authority/work diff + required CI\n→ if and only if the Lead delta converges, create isolated review/t8e-fable from exact candidate HEAD\n→ independent Fable challenge\n→ Lead adjudication\n→ explicit operator ratification\n```'''
+          )
+          ])
+          PY
+          git diff --check
+          git diff -- docs/architecture/content-integrity.md docs/architecture/async-and-search.md docs/architecture/interfaces.md docs/architecture/persistence.md docs/work/current/proposal.md docs/roadmap.md
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add docs/architecture/content-integrity.md docs/architecture/async-and-search.md docs/architecture/interfaces.md docs/architecture/persistence.md docs/work/current/proposal.md docs/roadmap.md
+          git commit -m 'docs(architecture): reconcile approved T8-E bounded package'
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
