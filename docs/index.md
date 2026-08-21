@@ -31,7 +31,7 @@ Start here after `AGENTS.md`, then read `roadmap.md`, then only the owning docum
 | Repository reset / provenance | [Repository reset](decisions/repository-reset.md) | Unmerged branches unless exact provenance is required |
 | Documentation governance | [Documentation rules](development/documentation.md) | Product architecture |
 | Repository-local engineering / CI / Git | [Engineering rules](development/engineering-rules.md) | Global Method text duplicated locally |
-| Executable application wire | [Wire contract](architecture/wire-contract.md); for Document Official routing-reference precision also [Frontend read symmetry](decisions/frontend-read-symmetry.md) | Temporary work/review history / old OpenAPI |
+| Executable application wire | [Wire contract](architecture/wire-contract.md) | Temporary work/review history, precision provenance, old OpenAPI |
 | Frontend realization | [Frontend](architecture/frontend.md) + [T8-F ratification](decisions/t8f-ratification.md) | Removed legacy frontend / speculative runtime or visual-framework choices |
 | Runtime / process / deployment | [Runtime](architecture/runtime.md) + [T8-G ratification](decisions/t8g-ratification.md) | Removed legacy runtime/deploy topology / speculative scale infrastructure |
 
