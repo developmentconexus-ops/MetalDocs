@@ -16,39 +16,27 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.ref }}
           fetch-depth: 0
-      - name: Execute staged fail-closed reconciliation
+      - name: Close resolved bookkeeping
         shell: bash
         run: |
           set -euxo pipefail
-          python3 - <<'PYEXTRACT'
+          python3 - <<'PY'
           from pathlib import Path
-          t = Path('.github/workflows/t8e-bounded-reconcile.yml').read_text()
-          start_marker = "          python3 - <<'PY'\n"
-          end_marker = "\n          PY\n"
-          start = t.index(start_marker) + len(start_marker)
-          end = t.index(end_marker, start)
-          lines = t[start:end].splitlines()
-          script = '\n'.join(line[10:] if line.startswith('          ') else line for line in lines) + '\n'
-          Path('/tmp/t8e-reconcile.py').write_text(script)
-          PYEXTRACT
-          python3 /tmp/t8e-reconcile.py
-          python3 - <<'PYFIX'
-          from pathlib import Path
-          for name in [
-              'docs/architecture/content-integrity.md',
-              'docs/architecture/async-and-search.md',
-              'docs/architecture/interfaces.md',
-              'docs/architecture/persistence.md',
-          ]:
-              p = Path(name)
-              lines = p.read_text().splitlines()
-              lines = [line.rstrip() if ('T8-E bounded correction:' in line and '2026-08-21' in line) else line for line in lines]
-              p.write_text('\n'.join(lines) + '\n')
-          PYFIX
+          p=Path('docs/work/current/proposal.md')
+          s=p.read_text()
+          reps=[
+          ('1. Company replacement currently says -> Audit','1. Company replacement originally said -> Audit'),
+          ('8. T8-E defines Idempotency-Key as UUID identity, while T8-D currently persists `key TEXT`','8. T8-E defines Idempotency-Key as UUID identity, while T8-D originally persisted `key TEXT`'),
+          ('Bounded authority edits, if approved:','Operator-approved bounded authority edits now durable:'),
+          ('T8-D currently persists only `csrf_secret_digest`, and no other ratified state can reconstruct the token on a later `GET /session`.','T8-D originally persisted only `csrf_secret_digest`, and no other ratified state could reconstruct the token on a later `GET /session`.')]
+          for old,new in reps:
+              if s.count(old)!=1: raise SystemExit(f'anchor mismatch {old!r} count={s.count(old)}')
+              s=s.replace(old,new,1)
+          p.write_text(s)
+          PY
           git diff --check
-          git diff -- docs/architecture/content-integrity.md docs/architecture/async-and-search.md docs/architecture/interfaces.md docs/architecture/persistence.md docs/work/current/proposal.md docs/roadmap.md
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add docs/architecture/content-integrity.md docs/architecture/async-and-search.md docs/architecture/interfaces.md docs/architecture/persistence.md docs/work/current/proposal.md docs/roadmap.md
-          git commit -m 'docs(architecture): reconcile approved T8-E bounded package'
+          git add docs/work/current/proposal.md
+          git commit -m 'docs(architecture): close reconciled T8-E bookkeeping'
           git push origin HEAD:${{ github.event.pull_request.head.ref }}
