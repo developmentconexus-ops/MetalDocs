@@ -15,7 +15,7 @@ REPOSITORY RESET                      MERGED / OPERATOR-RATIFIED
 REPOSITORY STANDARD V1 ALIGNMENT      MERGED
 PRODUCT / OWNERSHIP                   OPERATOR-APPROVED
 T1 → T8-D                             CLOSED / OPERATOR-RATIFIED
-T8-E EXECUTABLE WIRE CONTRACT         ACTIVE / DRAFT PR #136
+T8-E EXECUTABLE WIRE CONTRACT         ACTIVE / AWAITING OPERATOR RATIFICATION
 T8-F → T12                            NOT OPEN
 IMPLEMENTATION                        BLOCKED
 LEGACY IMPLEMENTATION                 ABSENT FROM LIVE TREE
@@ -23,18 +23,18 @@ LEGACY IMPLEMENTATION                 ABSENT FROM LIVE TREE
 
 ## Current gate
 
-T8-E — Executable Wire Contract, active in Draft PR #136 on branch `arch/t8e-wire-contract`.
+T8-E — Executable Wire Contract, durable candidate in PR #136 on branch `arch/t8e-wire-contract`.
 
 The reconciled T8-E contract is promoted to durable candidate authority at `docs/architecture/wire-contract.md`. The application census remains 78 operations and is owned by `docs/product/journeys.md` plus `docs/decisions/api-operation-census.md`.
 
-The active candidate contains the closed 78-operation request/success/header/problem/filter/action ledger. The two material upstream contradictions exposed by that ledger were operator-approved and reconciled on 2026-08-20:
+The durable candidate contains the closed 78-operation request/success/header/problem/filter/action ledger. The two material upstream contradictions exposed by that ledger were operator-approved and reconciled on 2026-08-20:
 
 ```text
 T8-D  Governance Step label + immutable attempt label snapshot
 T3    unreachable ProviderSubjectBinding-disabled Audit census entry removed
 ```
 
-Document-admission measurement/probes and executable generator/provider feasibility evidence are now complete enough for the Launch candidate:
+Document-admission measurement/probes and executable generator/provider feasibility evidence are complete enough for the Launch candidate:
 
 ```text
 DOC_RAW_MAX_BYTES       100 MiB
@@ -43,12 +43,12 @@ DOCX_MAX_ZIP_ENTRIES    4096
 Go boundary             oapi-codegen v2.8.0 probe PASS
 TypeScript boundary     openapi-typescript 7.13.0 probe PASS
 direct S3 PUT           signed exact Content-Length + If-None-Match:* probe PASS
-strict request split        kin-openapi + minimal envelope-guard probe PASS
+strict request split    kin-openapi + minimal envelope-guard probe PASS
 ```
 
 The direct-PUT concern remains resolved subtractively without reopening T8-C: the existing `PresignCreate(handle,maxBytes,ttl)` seam is sufficient when T8-E supplies `maxBytes=expected_size_bytes`; the portable property is an at-most bound, while the reference S3 profile is stronger and signs exact `Content-Length`. Completion derives the actual descriptor independently, so no client-size truth is persisted.
 
-The final Lead coherence attack exposed one consolidated bounded upstream package and the operator approved it on **2026-08-21**. The implicated T4/T5/T8-C/T8-D lines are now reconciled:
+The final Lead coherence attack exposed one consolidated bounded upstream package and the operator approved it on **2026-08-21**. The implicated T4/T5/T8-C/T8-D lines are reconciled:
 
 ```text
 T8-D               transaction/Audit + idempotency precision
@@ -58,19 +58,39 @@ T8-C/T8-D           reconstructible server-side CSRF synchronizer secret for GET
 
 The correction remained subtractive/precision-only: no Product operation, owner, lifecycle state, permission, table family, generic worker, second cookie or new API was added.
 
-Independent Fable review PR #137 completed against candidate `ef329534fc9d5df3254d59c3787197fefa8435e6`. Lead adjudication accepted the material promotion/presence/bounds/profile findings, restored the current T6 Problem namespace rather than reopening it, and preserved T3 configuration Audit via closed typed facts rather than deleting auditability. The surviving corrections add no Product operation, owner, lifecycle, permission, table family or generic framework.
+Independent Fable review PR #137 challenged candidate `ef329534fc9d5df3254d59c3787197fefa8435e6`. Lead adjudication accepted the material promotion/presence/bounds/profile findings, restored the current T6 Problem namespace rather than reopening it, and preserved T3 configuration Audit via closed typed facts rather than deleting auditability. No material contradiction survived to justify Round 2. PR #137 is closed and unmerged; its review branch remains Evidence-only pending branch cleanup.
 
-The durable candidate now absorbs the former T8-E checkpoint/work contract; `DOC-12` is consumed and the router/register point at the durable wire authority. Ratification has **not** occurred yet.
+The durable candidate absorbs the former T8-E checkpoint/work contract; `DOC-12` is consumed and the router/register point at the durable wire authority. Final promoted-tree verification passed:
+
+```text
+ledger rows                         78 / exact 1..78
+operationId                         78 unique
+method + path                       78 unique
+Idempotency-Key creations           exact 10
+ETag read / mutation domains        13 / 13
+exact-byte resources                exact 4
+Audit operation codes               37 unique
+Problem namespace                   https://errors.metaldocs.io/{code}
+ShortText / LongText                256 / 4096
+attention_required                  absent
+PROFILE_REPLACE If-Match+absent     412 precondition.resource_changed
+rows 3 / 45 validation.failed       absent
+row 42 validation.failed            present
+forward obligations                 21 / 3 / 27 = 51
+docs/work/**                         absent from candidate
+required CI                          #1013 SUCCESS
+```
+
+Ratification has **not** occurred yet.
 
 ## Exact next action
 
 ```text
-rerun exact whole-candidate Global Coherence + required CI on the promoted tree
-→ if and only if that converges, close/delete PR #137 review branch as Evidence-only history
-→ explicit operator ratification
+delete review/t8e-fable after closed Evidence PR #137
+→ explicit operator ratification of T8-E
 ```
 
-Do not reopen the accepted T8-E checkpoint or completed T1→T8-D decisions by preference. Product/T6 operation census remains closed at 78; new material evidence reopens only the authority it actually implicates.
+Do not reopen completed T1→T8-D or the 78-operation Product/T6 census by preference. New material evidence reopens only the authority it actually implicates.
 
 ## Remaining architecture program
 
