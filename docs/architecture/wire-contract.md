@@ -1,15 +1,15 @@
 ---
-id: t8e-executable-wire-contract-proposal
-kind: work
+id: executable-wire-contract
+kind: authority
 owner: architecture
-summary: Active T8-E proposal for the smallest exact 78-operation executable application wire.
+summary: Owns the exact 78-operation OpenAPI application wire, reusable schemas, headers, Problems, concurrency, pagination, upload, exact-byte and conformance laws.
 ---
 
-# T8-E executable wire contract — active proposal
+# T8-E executable wire contract
 
-> Temporary / non-authoritative. Implementation remains blocked.
+> **Ratification:** PENDING explicit operator ratification. Program stage/status and implementation permission remain exclusively in `../roadmap.md`.
 
-Accepted baseline remains in `../../reference/t8e-checkpoint.md`; Product/API meaning remains in `../../product/journeys.md` + `../../decisions/api-operation-census.md`. Current census: **78 application operations**. Operation 79 is a material Product/T6 reopen.
+Product/API meaning remains in `../product/journeys.md` + `../decisions/api-operation-census.md`. This authority owns only the executable application-wire realization of the accepted **78 application operations**. Operation 79 is a material Product/T6 reopen.
 
 The two bounded upstream contradictions exposed by this ledger were **operator-approved and durably reconciled on 2026-08-20**:
 
@@ -1319,7 +1319,7 @@ Multipart, recursive archive inspection, compression-ratio thresholds and DAM-sc
 
 ---
 
-# 8. Bounded upstream findings exposed by T8-E
+# 8. Bounded upstream reconciliations
 
 Both findings below were evidence-triggered bounded corrections, explicitly operator-approved on 2026-08-20 and reconciled in their owning durable authorities. Neither reopened Product, lifecycle, ownership, topology, or the 78-operation census.
 
@@ -1673,7 +1673,7 @@ External evidence checked during T8-E includes OpenAPI 3.0.3, RFC9110, RFC9457, 
 
 # 10. Structural Inversion / subtractive checkpoint
 
-Current candidate remains true if legacy API/schema shape were opposite:
+This authority remains true if legacy API/schema shape were opposite:
 
 ```text
 78 semantic operations derive from Product/T6
@@ -1709,29 +1709,3 @@ dormant future capability
 ```
 
 The earlier Step-label/impossible-binding-Audit findings and the final evidence-triggered §§8.4–8.6 package are all resolved. None changes Product scope, the 78-operation census, ownership topology or Launch lifecycle.
-
----
-
-# 11. Remaining closure gate
-
-The measurement, generated-boundary feasibility, provider presign feasibility, strict-request validator split, 78-row ledger-census fixture obligations and evidence-triggered upstream reconciliations are closed at candidate level. Independent Fable review PR #137 found seven material issues; Lead adjudication accepted the durable-promotion finding, removed the unrealizable rendition-attention field, closed OAS presence encoding, restored the T6 Problem namespace, bounded human text, preserved T3 configuration Audit through closed typed facts, and closed the profile conditional matrix. No new Product operation, owner, lifecycle, permission or generic framework was introduced.
-
-Remaining Lead gate:
-
-```text
-A. execute durable promotion: proposal -> docs/architecture/wire-contract.md
-B. route the new authority from docs/index.md + docs/decisions/index.md
-C. consume/remove DOC-12 from forward-obligations and update its mechanical count proof
-D. delete docs/reference/t8e-checkpoint.md + docs/work/current/** before merge candidacy
-E. rerun whole-candidate Global Coherence + required CI on the promoted tree
-F. close/delete review PR #137 / review branch as Evidence-only history
-G. explicit operator ratification
-```
-
-Until A→F converge:
-
-```text
-T8-E ACTIVE
-T8-F NOT OPEN
-implementation BLOCKED
-```

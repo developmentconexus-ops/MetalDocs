@@ -51,9 +51,8 @@ A later ratified authority wins over an older forward-obligation wording and mus
 - **DB-10 — PRESERVE** — One local transaction may compose multiple semantic owners when one invariant/business transition requires it.
 - **SEC-01 — PRESERVE** — Platform/operator/system principals receive no implicit company-content access; maintenance trust surfaces must be explicit and non-serving.
 
-## REOPEN — 4
+## REOPEN — 3
 
-- **DOC-12 — REOPEN** — Numbering capability/non-reuse is current; any still-open exact numbering grammar must be decided deliberately by the owning contract/admin design rather than inherited from legacy.
 - **CNT-03 — REOPEN** — EditorSession is not a correctness dependency; a bounded editor lease may be added only if concrete UX/integration evidence requires it.
 - **AUD-06 — REOPEN** — No claim of indefinite/statutory Audit retention exists; a future Records/compliance requirement must define retention, pruning, and checkpoint semantics.
 - **MIG-10 — REOPEN** — Detailed imported target families are not frozen; any future migration derives the smallest truthful shape from actual source evidence.
@@ -92,9 +91,9 @@ A later ratified authority wins over an older forward-obligation wording and mus
 
 ```text
 PRESERVE  21
-REOPEN     4
+REOPEN     3
 DEFERRED  27
-TOTAL     52
+TOTAL     51
 ```
 
 These are the only old registry rows preserved as a cross-stage forward-obligation set. Current semantic decisions remain in their owning authorities; superseded legacy decisions remain deleted.

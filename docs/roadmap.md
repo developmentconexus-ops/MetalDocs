@@ -25,7 +25,7 @@ LEGACY IMPLEMENTATION                 ABSENT FROM LIVE TREE
 
 T8-E — Executable Wire Contract, active in Draft PR #136 on branch `arch/t8e-wire-contract`.
 
-Accepted work through the previous four T8-E layers is preserved at `docs/reference/t8e-checkpoint.md`. The current application census is 78 operations and is owned by `docs/product/journeys.md` plus `docs/decisions/api-operation-census.md`.
+The reconciled T8-E contract is promoted to durable candidate authority at `docs/architecture/wire-contract.md`. The application census remains 78 operations and is owned by `docs/product/journeys.md` plus `docs/decisions/api-operation-census.md`.
 
 The active candidate contains the closed 78-operation request/success/header/problem/filter/action ledger. The two material upstream contradictions exposed by that ledger were operator-approved and reconciled on 2026-08-20:
 
@@ -60,15 +60,13 @@ The correction remained subtractive/precision-only: no Product operation, owner,
 
 Independent Fable review PR #137 completed against candidate `ef329534fc9d5df3254d59c3787197fefa8435e6`. Lead adjudication accepted the material promotion/presence/bounds/profile findings, restored the current T6 Problem namespace rather than reopening it, and preserved T3 configuration Audit via closed typed facts rather than deleting auditability. The surviving corrections add no Product operation, owner, lifecycle, permission, table family or generic framework.
 
+The durable candidate now absorbs the former T8-E checkpoint/work contract; `DOC-12` is consumed and the router/register point at the durable wire authority. Ratification has **not** occurred yet.
+
 ## Exact next action
 
 ```text
-promote the reconciled T8-E wire contract to durable docs/architecture authority
-→ route it from docs/index.md and docs/decisions/index.md
-→ consume DOC-12 in docs/decisions/forward-obligations.md + update mechanical count proof
-→ delete docs/reference/t8e-checkpoint.md and docs/work/current/** before merge candidacy
-→ rerun exact whole-candidate Global Coherence + required CI
-→ close/delete PR #137 review branch as Evidence-only history
+rerun exact whole-candidate Global Coherence + required CI on the promoted tree
+→ if and only if that converges, close/delete PR #137 review branch as Evidence-only history
 → explicit operator ratification
 ```
 

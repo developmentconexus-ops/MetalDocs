@@ -27,6 +27,7 @@ A fresh actor uses this register to discover current material decisions without 
 | T8-B | Backend topology | CURRENT / RATIFIED | Owner-first modular monolith realization baseline | `../architecture/backend.md` |
 | T8-C | Internal contracts | CURRENT / RATIFIED | Authority-aligned owner/resolver contract model | `../architecture/interfaces.md` |
 | T8-D | Persistence | CURRENT / RATIFIED | Owner-namespaced PostgreSQL relational core and concurrency realization | `../architecture/persistence.md` |
+| T8-E | Executable wire contract | CANDIDATE / AWAITING OPERATOR RATIFICATION | Exact 78-operation OAS 3.0.3 application wire is durably promoted; no operation 79 without material Product/T6 reopen | `../architecture/wire-contract.md` |
 | RESET | Repository clean-slate reset | CURRENT / OPERATOR-RATIFIED | Superseded implementation remains absent; required provenance stays reachable | `repository-reset.md` |
 | REPO-STD-V1 | Repository operating envelope | CURRENT ORGANIZATIONAL BASELINE / ALIGNMENT IN PROGRESS | Repository conforms to Repository Standard v1 through the active governance gate | `../roadmap.md` + `../development/documentation.md` + `../development/engineering-rules.md` |
 
@@ -36,9 +37,9 @@ The old decision corpus is intentionally not restored wholesale. Cross-stage obl
 
 ```text
 PRESERVE  21
-REOPEN     4
+REOPEN     3
 DEFERRED  27
-TOTAL     52
+TOTAL     51
 ```
 
 `CURRENT` semantics already live in the owning authorities above. `SUPERSEDED` mechanics remain deleted unless new material evidence explicitly reopens them.
