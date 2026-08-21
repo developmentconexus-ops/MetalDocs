@@ -7,9 +7,9 @@ summary: Owns T8-F frontend route/lens realization, interaction coverage, genera
 
 # T8-F — Frontend Realization
 
-> **Ratification:** OPERATOR-RATIFIED on 2026-08-21 after required CI #1047 and bounded Fable Round 2 CONVERGED. Integration through PR #139 remains pending; program stage/status and implementation permission remain exclusively in `../roadmap.md`.
+> **Ratification:** OPERATOR-RATIFIED on 2026-08-21 after required CI #1047 and bounded Fable Round 2 CONVERGED. Current program stage, integration status, implementation permission and exact next action remain exclusively in `../roadmap.md`.
 
-Product/API meaning remains in `../product/journeys.md`; the executable wire remains `wire-contract.md` plus the operator-approved bounded T8-E precision in `../decisions/frontend-read-symmetry.md`. This authority realizes those accepted semantics for the browser frontend. It creates no new Product owner, lifecycle, Permission, DTO authority, or API operation.
+Product/API meaning remains in `../product/journeys.md`; the executable wire is `wire-contract.md`. The bounded T8-E precision discovered during T8-F is recorded for provenance in `../decisions/frontend-read-symmetry.md` and is folded into the wire SSOT. This authority realizes those accepted semantics for the browser frontend. It creates no new Product owner, lifecycle, Permission, DTO authority, or API operation.
 
 ## 1. Lead outcome
 
@@ -180,7 +180,7 @@ WRITE         replaceDocumentResponsibleOwner
 SERVER STATE  purpose-built official/current representations
 ```
 
-The operator-approved T8-E precision adds disclosure-safe routing references to `DocumentOfficialView`:
+The operator-approved T8-E precision, now folded into `wire-contract.md`, adds disclosure-safe routing references to `DocumentOfficialView`:
 
 ```text
 open_revision?: { revision:RevisionIdentity, state:OpenRevisionState }
@@ -567,9 +567,9 @@ read-only PDF presentation
 
 T8-F does not choose binaries/processes, runtime host, deployment topology, CDN, container layout, provider CORS configuration, secrets, workers, readiness, observability, recovery profiles or buffering strategy. No SSR, service worker, BFF, websocket/realtime channel or editor-session service is a Launch runtime consumer.
 
-## 18. Ratified gate
+## 18. Ratification record
 
-T8-F is **CLOSED / OPERATOR-RATIFIED** on the candidate branch as of 2026-08-21 after repository verification, Fable Round-1 adjudication, bounded Fable Round 2 **CONVERGED**, and explicit operator ratification. Integration into `main` remains pending PR #139 and is a separate gate.
+T8-F was explicitly operator-ratified on 2026-08-21 after repository verification, Fable Round-1 adjudication and bounded Fable Round 2 **CONVERGED**. This is an immutable closure record, not current program-status authority.
 
 Minimum preserved properties:
 
@@ -589,8 +589,6 @@ logical idempotent retry          same key
 exact-content descriptor          server-owned
 DOCX interactive runtime          one adapter boundary
 Governance content                immutable/read-only
-T8-G                              NOT OPEN
-Product implementation            BLOCKED
 ```
 
-Ratification does not authorize T8-G or Product code. T8-G remains unopened until T8-F is integrated/revalidated from `main` and the operator explicitly authorizes the next stage.
+Current integration, stage progression, implementation permission and exact next action are owned exclusively by `../roadmap.md`.

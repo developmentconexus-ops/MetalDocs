@@ -20,6 +20,8 @@ T3    unreachable ProviderSubjectBinding-disabled Audit census entry removed
 
 They are no longer T8-E blockers.
 
+The bounded T8-E frontend read-symmetry precision discovered during T8-F was operator-approved on 2026-08-21 and is now consolidated directly in this wire SSOT. `../decisions/frontend-read-symmetry.md` preserves the decision provenance only; it does not supersede an executable schema.
+
 ## 1. Lead outcome
 
 The smallest closed executable contract is:
@@ -535,7 +537,7 @@ FIXTURE_PRESENCE
   -> one NAMED contract fixture enforces each required/forbidden relation
 ```
 
-Current `OAS_BRANCH` families are the explicit semantic unions in §3.1, `SubmissionCreateResult`, `GovernanceDecisionRequest/View`, `GovernanceStepView`, `GovernanceCaseView.subject`, `DocumentHistoryItem`, `ReleaseView`, `ObsolescenceCreateResult`, and `AuditEventView` using the exact §4 mapping. Current `FIXTURE_PRESENCE` laws are `TemplateConfigurationItem.current_effective_title`, `DocumentSummary.official_revision`, `DocumentOfficialView.official`, `RevisionView.current_submission_id`, all `SubmissionView` correlated members, `DocumentHistoryItem.governance_decision.reason`, and `ObsolescenceRequestView` attempt/end-state correlations. No generator-specific union is introduced merely to encode a relational fixture.
+Current `OAS_BRANCH` families are the explicit semantic unions in §3.1, `SubmissionCreateResult`, `GovernanceDecisionRequest/View`, `GovernanceStepView`, `GovernanceCaseView.subject`, `DocumentHistoryItem`, `ReleaseView`, `ObsolescenceCreateResult`, and `AuditEventView` using the exact §4 mapping. Current `FIXTURE_PRESENCE` laws are `TemplateConfigurationItem.current_effective_title`, `DocumentSummary.official_revision`, `DocumentOfficialView.official`, `RevisionView.current_submission_id`, all `SubmissionView` correlated members, `DocumentHistoryItem.governance_decision.reason`, and `ObsolescenceRequestView` attempt/end-state correlations. Disclosure-dependent optional routing references on `DocumentOfficialView` use the explicit presence/disclosure law in §3.5 and are not a second schema authority. No generator-specific union is introduced merely to encode a relational fixture.
 
 ## 3.1 References / enums / unions
 
@@ -546,6 +548,7 @@ DocumentTypeReference { document_type_id:Uuid, code:CodeToken, name:ShortText }
 DocumentReference { document_id:Uuid, code:DocumentCode } // title belongs Revision
 RevisionIdentity { revision_id:Uuid, ordinal:RevisionOrdinal }
 RevisionReference { revision:RevisionIdentity, title:LongText }
+OpenRevisionRoutingReference { revision:RevisionIdentity, state:OpenRevisionState }
 ContentSummary { sha256:Sha256Hex, size_bytes:ByteCount, content_format:ContentFormat }
 ```
 
@@ -726,10 +729,10 @@ CreateDocumentResult { document_id:Uuid, revision_id:Uuid }
 DocumentSummary { document:DocumentReference, document_type:DocumentTypeReference, area:AreaReference, responsible_owner:UserReference, status:DocumentCatalogStatus, official_revision?:RevisionReference }
 DocumentPage { items:DocumentSummary[], page:Page }
 ReleasedRevisionView { revision:RevisionIdentity, title:LongText, release_id:Uuid, released_at:UtcInstant, source:ContentSummary, representation:{kind:source_only}|{kind:official_rendition,official_rendition_id:Uuid,content:ContentSummary} }
-DocumentOfficialView { document:DocumentReference, document_type:DocumentTypeReference, area:AreaReference, responsible_owner:UserReference, status:DocumentOfficialStatus, official?:ReleasedRevisionView }
+DocumentOfficialView { document:DocumentReference, document_type:DocumentTypeReference, area:AreaReference, responsible_owner:UserReference, status:DocumentOfficialStatus, official?:ReleasedRevisionView, open_revision?:OpenRevisionRoutingReference, active_obsolescence_request_id?:Uuid }
 ```
 
-Closed presence laws prevent the official/catalog lenses from drifting into a second lifecycle authority:
+Closed presence and disclosure laws prevent the official/catalog lenses from drifting into a second lifecycle authority:
 
 ```text
 DocumentSummary.status=effective|obsolete  -> official_revision required
@@ -737,9 +740,21 @@ DocumentSummary.status=cancelled            -> official_revision absent
 
 DocumentOfficialView.status=effective|obsolete -> official required
 DocumentOfficialView.status=draft|submitted|cancelled -> official absent
+
+DocumentOfficialView.open_revision
+  source truth = unique current Revision with state DRAFT or SUBMITTED
+  present iff such Revision exists AND current disclosure/Authorization permits working-context existence
+  absent otherwise
+
+DocumentOfficialView.active_obsolescence_request_id
+  source truth = unique current ACTIVE ObsolescenceRequest
+  present iff such request exists AND current disclosure/Authorization permits that request context
+  absent otherwise
 ```
 
-`official` is therefore present iff at least one Release exists; obsolete retains the last released official. Newer cancelled/open work never replaces older EFFECTIVE official truth. Before first Release, status may be draft/submitted/cancelled and `official` is absent.
+Absence of either routing reference never proves semantic non-existence to a caller lacking disclosure authority. The routing references are derived read truth, never persisted pointers, and grant no access; every follow-up read or mutation performs current canonical Authorization and lifecycle checks.
+
+`official` is present iff at least one Release exists; obsolete retains the last released official. Newer cancelled/open work never replaces older EFFECTIVE official truth. Before first Release, status may be draft/submitted/cancelled and `official` is absent.
 
 ```text
 ResponsibleOwnerView { document_id:Uuid, responsible_owner_user_id:Uuid }
@@ -1651,6 +1666,7 @@ PROFILE_REPLACE full If-Match/If-None-Match matrix including If-Match+absent ->4
 Idempotency-Key replay/different fingerprint/24h expiry/current-AuthZ recheck
 cursor tamper/filter replay/ordering
 complete creation/options arrays
+DocumentOfficialView routing references obey current existence + disclosure; absence never leaks protected non-existence
 upload provider <= expected-size bound; S3 exact signed Content-Length; create-once/shared15min expiry; completion independently derives actual descriptor/global ceiling
 100 MiB raw / 256 MiB expanded / 4096-entry admission boundaries
 duplicate/traversal/encrypted/invalid package rejection
@@ -1708,4 +1724,4 @@ second request-schema/route-parameter validation authority
 dormant future capability
 ```
 
-The earlier Step-label/impossible-binding-Audit findings and the final evidence-triggered §§8.4–8.6 package are all resolved. None changes Product scope, the 78-operation census, ownership topology or Launch lifecycle.
+The earlier Step-label/impossible-binding-Audit findings, the final evidence-triggered §§8.4–8.6 package and the frontend read-symmetry precision consolidated in §3.5 are all resolved. None changes Product scope, the 78-operation census, ownership topology or Launch lifecycle.

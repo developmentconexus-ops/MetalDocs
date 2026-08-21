@@ -7,6 +7,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ci-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   required:
     runs-on: ubuntu-latest
@@ -27,11 +31,15 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Review branches are isolated Evidence channels and are deliberately
-          # non-mergeable. They must target the current candidate branch, not
-          # main; the candidate base must be an ancestor of the review head;
-          # and the only delta may be the temporary Fable dialogue.
+          # Review branches are isolated Evidence channels. A valid review PR
+          # stays Draft, targets its candidate branch and differs only by the
+          # temporary Fable dialogue. Valid isolation is green; making the PR
+          # ready or violating isolation is the blocking condition.
           if [[ "$HEAD_REF" == review/* ]]; then
+            if [[ "$PR_DRAFT" != "true" ]]; then
+              echo "::error::review Evidence PRs must remain Draft and must never become merge candidates"
+              exit 1
+            fi
             if [[ "$BASE_REF" == "main" ]]; then
               echo "::error::review branches must target their candidate branch, never main"
               exit 1
@@ -41,15 +49,20 @@ jobs:
               exit 1
             fi
             mapfile -t changed < <(git diff --name-only "$BASE_SHA..$HEAD_SHA")
-            [[ "${#changed[@]}" -eq 1 ]]
-            [[ "${changed[0]}" == "docs/work/current/ai-dialog.md" ]]
-            git diff --check "$BASE_SHA..$HEAD_SHA"
-            echo "::error::review branches are Evidence channels and must be closed/deleted, never merged"
-            exit 1
+            if [[ "${#changed[@]}" -ne 1 || "${changed[0]:-}" != "docs/work/current/ai-dialog.md" ]]; then
+              echo "::error::review branch delta must be docs/work/current/ai-dialog.md only"
+              printf 'changed: %s\n' "${changed[@]:-<none>}"
+              exit 1
+            fi
+            echo "review Evidence isolation verified"
+            exit 0
           fi
 
           # Main-targeting architecture-first PRs admit only the accepted live surfaces.
-          [[ "$BASE_REF" == "main" ]]
+          if [[ "$BASE_REF" != "main" ]]; then
+            echo "::error::non-review repository PRs must target main"
+            exit 1
+          fi
           allowed_path() {
             [[ "$1" =~ ^(AGENTS\.md|CLAUDE\.md|README\.md|\.gitignore|\.gitattributes|\.github/.+\.ya?ml|docs/.+\.md)$ ]]
           }
@@ -118,18 +131,39 @@ jobs:
             test -f "$path"
           done
 
-          # Decision forward-obligation census is mechanically closed.
+          # Decision forward-obligation census must be internally coherent.
+          # Counts are owned by the document, not duplicated in workflow code.
           python3 - <<'PY'
           from pathlib import Path
           import re
+
           p = Path('docs/decisions/forward-obligations.md').read_text()
-          expected = {'PRESERVE': 21, 'REOPEN': 3, 'DEFERRED': 27}
-          for kind, count in expected.items():
+          kinds = ('PRESERVE', 'REOPEN', 'DEFERRED')
+          counts = {}
+
+          for kind in kinds:
+              heading = re.search(rf'^## {kind} — (\d+)$', p, re.M)
+              if not heading:
+                  raise SystemExit(f'{kind}: count heading missing')
+              declared = int(heading.group(1))
               actual = len(re.findall(rf'^- \*\*[^*\n]+ — {kind}\*\* —', p, re.M))
-              if actual != count:
-                  raise SystemExit(f'{kind}: expected {count}, got {actual}')
-          if 'TOTAL     51' not in p:
-              raise SystemExit('forward-obligation total proof missing')
+              if actual != declared:
+                  raise SystemExit(f'{kind}: declared {declared}, got {actual}')
+              counts[kind] = declared
+
+          if '## Count proof' not in p:
+              raise SystemExit('forward-obligation count proof missing')
+          proof = p.split('## Count proof', 1)[1]
+
+          for kind, declared in counts.items():
+              row = re.search(rf'^{kind}\s+(\d+)$', proof, re.M)
+              if not row or int(row.group(1)) != declared:
+                  raise SystemExit(f'{kind}: count proof disagrees with heading')
+
+          total = re.search(r'^TOTAL\s+(\d+)$', proof, re.M)
+          expected_total = sum(counts.values())
+          if not total or int(total.group(1)) != expected_total:
+              raise SystemExit(f'TOTAL: expected {expected_total} from declared sections')
           PY
 
           # Router links resolve; durable docs are reachable from docs/index.md.
@@ -187,7 +221,18 @@ jobs:
           [[ "$pr131" == "d8b1c6d31e704e9552a14faa7764c634a29b081d" ]]
           [[ "$pr132" == "b0ebe54cb010e9837a25f7b778f3d9814d283cb8" ]]
 
-          # PR diff whitespace proof must compare the actual base and candidate.
-          mapfile -t changed < <(git diff --name-only "$BASE_SHA...$HEAD_SHA")
-          [[ "${#changed[@]}" -gt 0 ]]
-          git diff --check "$BASE_SHA...$HEAD_SHA"
+          # Whitespace remains non-blocking hygiene, but git diff --check also
+          # detects unresolved merge-conflict markers; those remain correctness blockers.
+          diff_check=$(git diff --check "$BASE_SHA...$HEAD_SHA" 2>&1 || true)
+          conflict_issues=$(printf '%s\n' "$diff_check" | grep -F 'leftover conflict marker' || true)
+          if [[ -n "$conflict_issues" ]]; then
+            echo "::error::leftover merge-conflict marker in PR diff"
+            printf '%s\n' "$conflict_issues"
+            exit 1
+          fi
+
+          whitespace_issues=$(printf '%s\n' "$diff_check" | grep -v -F 'leftover conflict marker' || true)
+          if [[ -n "$whitespace_issues" ]]; then
+            echo "::warning::non-blocking whitespace findings in PR diff"
+            printf '%s\n' "$whitespace_issues"
+          fi

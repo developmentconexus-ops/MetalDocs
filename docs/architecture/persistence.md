@@ -7,10 +7,10 @@
 > **Repository:** `developmentconexus-ops/MetalDocs`  
 > **Branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131  
 > **Method:** DevelopmentConexus Engineering Method v1.0.0  
-> **Upstream contract authority:** `wiki/architecture/r10-t8c-internal-communication-contracts.md`  
-> **Implementation:** BLOCKED
+> **Upstream contract authority:** `interfaces.md`  
+> **Current program stage / implementation permission / next action:** `../roadmap.md`
 
-This page is the durable target authority for R10 **T8-D — Persistence Realization**.
+This page is the durable target authority for R10 **T8-D — Persistence Realization**. Its closure/ratification facts are immutable; mutable program state is owned exclusively by `../roadmap.md`.
 
 It consolidates the operator-ratified effective result of:
 
@@ -1708,16 +1708,14 @@ Reviewer evidence remained non-authoritative until adjudicated and ratified.
 
 ---
 
-## 31. Stage boundary and next stage
+## 31. Ratification closure and handoff
 
 ```text
 T8-D Persistence Realization = CLOSED / OPERATOR-RATIFIED / PROMOTED
-T8-E Executable Wire Contract = ACTIVE
-T8-F→T8-H                   = NOT OPEN
-T9→T12                       = NOT OPEN
-implementation               = BLOCKED
 ```
+
+At T8-D ratification, the immediate downstream consumer was T8-E — Executable Wire Contract. That is immutable handoff provenance, not current stage state.
 
 T8-E consumes T6 semantic journeys plus this T8-D physical/concurrency authority and freezes exact executable `/api/v1` OpenAPI contracts. It may not silently change T8-D persistent meaning or upstream semantics to simplify wire encoding.
 
-No product implementation, target migration or T11 execution work is authorized by T8-D closure.
+T8-D closure by itself authorizes no Product implementation, target migration or T11 execution work. Current program stage, integration status, implementation permission and exact next action are owned exclusively by `../roadmap.md`.

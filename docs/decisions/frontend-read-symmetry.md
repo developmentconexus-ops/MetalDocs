@@ -2,14 +2,14 @@
 id: frontend-read-symmetry-precision
 kind: authority
 owner: architecture
-summary: Operator-approved bounded T8-E read-model precision discovered by T8-F; adds disclosure-safe current routing references to DocumentOfficialView without changing the 78-operation census.
+summary: Records the operator-approved bounded T8-E read-model precision discovered by T8-F; the effective executable schema is consolidated in wire-contract.md.
 ---
 
 # T8-E bounded precision — frontend read symmetry
 
 > **Operator approval:** 2026-08-21 during T8-F Fable Round-1 adjudication.
 
-This is a bounded precision to the ratified T8-E wire authority. It changes no Product capability, route family, lifecycle, semantic owner, Permission, persistence authority, or operation count.
+This records a bounded precision to the ratified T8-E wire authority. It changes no Product capability, route family, lifecycle, semantic owner, Permission, persistence authority, or operation count. The effective executable schema now lives entirely in `../architecture/wire-contract.md`; this document preserves the trigger, rationale and ratification provenance.
 
 ## Trigger
 
@@ -27,7 +27,7 @@ Using My Work or ascending Document History as a resolver would make projection/
 
 ## Precision
 
-The effective `DocumentOfficialView` is the ratified T8-E shape plus exactly two optional derived routing references:
+The precision folded into the T8-E wire SSOT adds exactly two optional derived routing references:
 
 ```text
 OpenRevisionRoutingReference {
@@ -105,4 +105,4 @@ new header/profile                        -> 0
 new Permission                            -> 0
 ```
 
-This document supersedes only the `DocumentOfficialView` member set in `../architecture/wire-contract.md`; every other T8-E law remains ratified and unchanged.
+`../architecture/wire-contract.md` contains the effective `DocumentOfficialView` member set and presence/disclosure laws. This record no longer supersedes any executable schema.

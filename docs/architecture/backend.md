@@ -86,7 +86,8 @@ MetalDocs/
 │   │   ├── governancecase/
 │   │   ├── history/
 │   │   ├── audit/
-│   │   └── admin/
+│   │   ├── admin/
+│   │   └── maintenance/                # T5-J managed-content GC choreography
 │   │
 │   ├── transport/
 │   │   ├── http/                       # inbound HTTP/browser adapters
@@ -114,6 +115,8 @@ MetalDocs/
 ```
 
 `cmd/*` means runtime entrypoints only. Code generators are tooling, not runtime shells.
+
+`application/maintenance` is a non-semantic application leaf whose current consumer is the ratified T5-J managed-content GC choreography. It remains inside the existing `application` class and adds no semantic owner, public owner surface, dependency class or Product operation.
 
 Exact private package/file decomposition inside a semantic owner is **not architecture authority** and is not owned by T8-D. T8-D owns persistence mapping and correctness realization, not owner-private folder structure.
 
@@ -175,7 +178,7 @@ prepare the seam, not dormant implementation
 
 `internal/application/*` is non-semantic choreography.
 
-The leaf set is derived from ratified T6 use-case/lens meaning and must provide a legal application route for every ratified inbound use-case family. An omitted leaf never creates a `transport → owner` exception.
+Human/API application leaves are derived from ratified T6 use-case/lens meaning and must provide a legal application route for every ratified inbound use-case family. Accepted non-semantic maintenance choreography may occupy the same `application` class when a named upstream consumer requires it; the current instance is T5-J managed-content GC. An omitted inbound leaf never creates a `transport → owner` exception.
 
 Application leaves are stateless and may:
 
@@ -555,18 +558,14 @@ Preference, legacy familiarity, sunk cost, migration convenience and hypothetica
 
 ---
 
-## 13. T8-B closure and next stage
+## 13. T8-B ratification closure and handoff
 
 ```text
 T8-B Backend Module & Package Topology = CLOSED / OPERATOR-RATIFIED / PROMOTED
 ```
 
-The next open stage is:
-
-```text
-T8-C — Internal Communication Contracts
-```
+At T8-B ratification, the immediate downstream consumer was T8-C — Internal Communication Contracts. That is immutable handoff provenance, not current stage state.
 
 T8-C must freeze exact internal owner/application/mechanism contracts while preserving this topology. It must not reopen direct owner imports, mechanism-as-authority, foreign SQL or hidden shared write authority by convenience.
 
-Implementation remains **BLOCKED**.
+Current stage, integration status, implementation permission and exact next action are owned exclusively by `../roadmap.md`.

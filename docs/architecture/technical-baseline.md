@@ -1,14 +1,14 @@
 # R10-T8A — Technical Authority & Legacy Disposition
 
-> **Status:** ACTIVE / OPERATOR-RATIFIED / PROMOTED  
+> **Status:** CLOSED / OPERATOR-RATIFIED / PROMOTED  
 > **Ratified:** 2026-08-19  
 > **Repository:** `developmentconexus-ops/MetalDocs`  
 > **Branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131  
-> **Implementation:** BLOCKED
+> **Current program stage / implementation permission / next action:** `../roadmap.md`
 
-This document is the durable T8-A authority for how R10 treats the existing MetalDocs technical realization while deriving the target physical architecture.
+This document is the durable T8-A authority for how R10 treats the existing MetalDocs technical realization while deriving the target physical architecture. Its closure/ratification facts are immutable; mutable program state is owned exclusively by `../roadmap.md`.
 
-It does **not** define the final backend package topology, internal owner contracts, relational schema, exact wire contract, frontend realization, process/deployment topology, or transition plan. Those remain T8-B→T8-G and T10 decisions.
+It does **not** define the final backend package topology, internal owner contracts, relational schema, exact wire contract, frontend realization, process/deployment topology, or transition plan. Those remain owned by T8-B→T8-G and T10 respectively.
 
 ## 1. Ratified Global Maximum
 
@@ -192,10 +192,11 @@ For target architecture the authority chain is:
 Product Contract REV001
 → Whole-Product GCR + 4+1 ownership topology
 → T1→T8-A durable authorities
-→ Decision Registry amendments
-→ active R10 router
+→ current routed T8 authorities
 → current evidence only for concrete implementation facts
 ```
+
+Current routing is resolved through `../index.md` and mutable stage/implementation/next-action state through `../roadmap.md`. Imported pre-reset `wiki/...` strings are provenance only under documentation governance.
 
 Historical ADR `Accepted` status does not imply R10 inheritance unless a current R10 authority explicitly preserves the property.
 
@@ -213,18 +214,14 @@ a supposedly deleted/deferred capability gains a concrete Launch consumer
 
 Preference, sunk cost, implementation convenience, or hypothetical future extensibility are not reopen triggers.
 
-## 12. Closure and next stage
+## 12. Ratification closure and handoff
 
 ```text
 T8-A Technical Authority & Legacy Census = CLOSED / OPERATOR-RATIFIED / PROMOTED
 ```
 
-The next allowed stage is:
-
-```text
-T8-B — Backend Module & Package Topology
-```
+At T8-A ratification, the immediate downstream consumer was T8-B — Backend Module & Package Topology. That handoff is immutable historical progression evidence, not current program status.
 
 T8-B must derive backend/package boundaries from ratified ownership and semantics without inheriting the legacy module map.
 
-T8-C→T12 and product implementation remain blocked behind their own gates.
+Current stage, integration status, implementation permission and exact next action are owned exclusively by `../roadmap.md`.
