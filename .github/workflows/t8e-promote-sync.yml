@@ -1,0 +1,225 @@
+name: T8-E Durable Promotion
+
+on:
+  pull_request:
+    types: [synchronize]
+
+permissions:
+  contents: write
+
+jobs:
+  promote:
+    if: github.event.pull_request.number == 136 && github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: arch/t8e-wire-contract
+          fetch-depth: 0
+      - name: Promote reconciled T8-E contract atomically
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path, old, new):
+              p = Path(path)
+              s = p.read_text()
+              n = s.count(old)
+              if n != 1:
+                  raise SystemExit(f'{path}: anchor mismatch expected=1 got={n}: {old[:160]!r}')
+              p.write_text(s.replace(old, new, 1))
+
+          # Promote branch-only candidate into durable architecture authority.
+          proposal_path = Path('docs/work/current/proposal.md')
+          proposal = proposal_path.read_text()
+          prefix = '''---
+id: t8e-executable-wire-contract-proposal
+kind: work
+owner: architecture
+summary: Active T8-E proposal for the smallest exact 78-operation executable application wire.
+---
+
+# T8-E executable wire contract — active proposal
+
+> Temporary / non-authoritative. Implementation remains blocked.
+
+Accepted baseline remains in `../../reference/t8e-checkpoint.md`; Product/API meaning remains in `../../product/journeys.md` + `../../decisions/api-operation-census.md`. Current census: **78 application operations**. Operation 79 is a material Product/T6 reopen.
+'''
+          if proposal.count(prefix) != 1:
+              raise SystemExit(f'proposal promotion prefix mismatch: {proposal.count(prefix)}')
+          durable_prefix = '''---
+id: executable-wire-contract
+kind: authority
+owner: architecture
+summary: Owns the exact 78-operation OpenAPI application wire, reusable schemas, headers, Problems, concurrency, pagination, upload, exact-byte and conformance laws.
+---
+
+# T8-E executable wire contract
+
+> **Ratification:** PENDING explicit operator ratification. Program stage/status and implementation permission remain exclusively in `../roadmap.md`.
+
+Product/API meaning remains in `../product/journeys.md` + `../decisions/api-operation-census.md`. This authority owns only the executable application-wire realization of the accepted **78 application operations**. Operation 79 is a material Product/T6 reopen.
+'''
+          durable = proposal.replace(prefix, durable_prefix, 1)
+          marker = '\n---\n\n# 11. Remaining closure gate'
+          if durable.count(marker) != 1:
+              raise SystemExit(f'proposal closure marker mismatch: {durable.count(marker)}')
+          durable = durable.split(marker, 1)[0].rstrip() + '\n'
+          durable = durable.replace('# 8. Bounded upstream findings exposed by T8-E', '# 8. Bounded upstream reconciliations', 1)
+          durable = durable.replace('Current candidate remains true if legacy API/schema shape were opposite:', 'This authority remains true if legacy API/schema shape were opposite:', 1)
+          if '../../' in durable:
+              raise SystemExit('promoted authority retains docs/work-relative ../../ path')
+          Path('docs/architecture/wire-contract.md').write_text(durable)
+
+          # Route the durable authority and retire the checkpoint route.
+          replace_once(
+              'docs/index.md',
+              '| Accepted T8-E design checkpoint | [T8-E checkpoint](reference/t8e-checkpoint.md) | Conversation history / old OpenAPI |',
+              '| Executable application wire | [Wire contract](architecture/wire-contract.md) | Temporary work/review history / old OpenAPI |'
+          )
+
+          # Register T8-E candidate authority and consume DOC-12 count delta.
+          replace_once(
+              'docs/decisions/index.md',
+              '| T8-D | Persistence | CURRENT / RATIFIED | Owner-namespaced PostgreSQL relational core and concurrency realization | `../architecture/persistence.md` |',
+              '| T8-D | Persistence | CURRENT / RATIFIED | Owner-namespaced PostgreSQL relational core and concurrency realization | `../architecture/persistence.md` |\n| T8-E | Executable wire contract | CANDIDATE / AWAITING OPERATOR RATIFICATION | Exact 78-operation OAS 3.0.3 application wire is durably promoted; no operation 79 without material Product/T6 reopen | `../architecture/wire-contract.md` |'
+          )
+          replace_once(
+              'docs/decisions/index.md',
+              'PRESERVE  21\nREOPEN     4\nDEFERRED  27\nTOTAL     52',
+              'PRESERVE  21\nREOPEN     3\nDEFERRED  27\nTOTAL     51'
+          )
+
+          # DOC-12 is now realized by the wire contract numbering/code grammar.
+          fwd = Path('docs/decisions/forward-obligations.md')
+          s = fwd.read_text()
+          doc12 = '- **DOC-12 — REOPEN** — Numbering capability/non-reuse is current; any still-open exact numbering grammar must be decided deliberately by the owning contract/admin design rather than inherited from legacy.\n'
+          if s.count(doc12) != 1:
+              raise SystemExit(f'DOC-12 anchor mismatch: {s.count(doc12)}')
+          s = s.replace(doc12, '', 1)
+          s = s.replace('## REOPEN — 4', '## REOPEN — 3', 1)
+          s = s.replace('PRESERVE  21\nREOPEN     4\nDEFERRED  27\nTOTAL     52', 'PRESERVE  21\nREOPEN     3\nDEFERRED  27\nTOTAL     51', 1)
+          fwd.write_text(s)
+
+          # Consume the local checkpoint deviation after its only consumer is retired.
+          replace_once(
+              'docs/development/documentation.md',
+              'summary: MetalDocs-specific documentation placement, provenance-routing, and checkpoint rules layered on Repository Standard v1.0.0.',
+              'summary: MetalDocs-specific documentation placement and provenance-routing rules layered on Repository Standard v1.0.0.'
+          )
+          replace_once(
+              'docs/development/documentation.md',
+              '''## Local metadata deviation — checkpoint
+
+Repository Standard permits local semantic surfaces when a real consumer exists. MetalDocs uses minimal frontmatter:
+
+```yaml
+id: unique-id
+kind: authority | checkpoint | work
+owner: owner-name
+summary: one sentence
+```
+
+`checkpoint` is a MetalDocs-specific durable, non-authoritative accepted-work snapshot. Current consumer: `docs/reference/t8e-checkpoint.md`, which preserves already-accepted T8-E design across repository-governance gates without promoting it to final authority.
+
+Removal trigger: when the owning stage is ratified and its durable authority fully absorbs the checkpoint.
+
+`work` remains temporary and branch-only under `docs/work/`; it never enters a merge candidate or `main`.
+''',
+              '''## Local metadata
+
+MetalDocs uses minimal frontmatter only where it improves routing:
+
+```yaml
+id: unique-id
+kind: authority | work
+owner: owner-name
+summary: one sentence
+```
+
+`work` remains temporary and branch-only under `docs/work/`; it never enters a merge candidate or `main`.
+'''
+          )
+
+          # CI now proves the promoted authority and the reduced obligation census.
+          replace_once(
+              '.github/workflows/ci.yml',
+              "expected = {'PRESERVE': 21, 'REOPEN': 4, 'DEFERRED': 27}",
+              "expected = {'PRESERVE': 21, 'REOPEN': 3, 'DEFERRED': 27}"
+          )
+          replace_once('.github/workflows/ci.yml', "if 'TOTAL     52' not in p:", "if 'TOTAL     51' not in p:")
+          replace_once(
+              '.github/workflows/ci.yml',
+              '            docs/architecture/persistence.md \\\n            docs/decisions/api-operation-census.md \\\n            docs/decisions/forward-obligations.md \\\n            docs/reference/t8e-checkpoint.md; do',
+              '            docs/architecture/persistence.md \\\n            docs/architecture/wire-contract.md \\\n            docs/decisions/api-operation-census.md \\\n            docs/decisions/forward-obligations.md; do'
+          )
+
+          # Roadmap remains the sole mutable progression authority.
+          replace_once(
+              'docs/roadmap.md',
+              '''## Exact next action
+
+```text
+promote the reconciled T8-E wire contract to durable docs/architecture authority
+→ route it from docs/index.md and docs/decisions/index.md
+→ consume DOC-12 in docs/decisions/forward-obligations.md + update mechanical count proof
+→ delete docs/reference/t8e-checkpoint.md and docs/work/current/** before merge candidacy
+→ rerun exact whole-candidate Global Coherence + required CI
+→ close/delete PR #137 review branch as Evidence-only history
+→ explicit operator ratification
+```''',
+              '''The reconciled T8-E contract is now promoted to durable candidate authority at `docs/architecture/wire-contract.md`. `DOC-12` is consumed, the temporary checkpoint/work surfaces are removed, and the decision/router/CI surfaces point at the promoted authority. Ratification has **not** occurred yet.
+
+## Exact next action
+
+```text
+rerun exact whole-candidate Global Coherence + required CI on the promoted tree
+→ if and only if that converges, close/delete PR #137 review branch as Evidence-only history
+→ explicit operator ratification
+```'''
+          )
+          PY
+
+          # Delete temporary/consumed surfaces in the same promotion commit.
+          git rm \
+            docs/reference/t8e-checkpoint.md \
+            docs/work/current/index.md \
+            docs/work/current/proposal.md \
+            docs/work/current/t8e-fable-adjudication-trigger.md \
+            .github/workflows/t8e-fable-adjudicate.yml \
+            .github/workflows/t8e-adjudicate-via-review.yml \
+            .github/workflows/t8e-fable-adjudicate-sync.yml \
+            .github/workflows/t8e-promote-sync.yml
+
+          git add \
+            .github/workflows/ci.yml \
+            docs/architecture/wire-contract.md \
+            docs/index.md \
+            docs/decisions/index.md \
+            docs/decisions/forward-obligations.md \
+            docs/development/documentation.md \
+            docs/roadmap.md
+
+          # Promotion-specific fail-closed checks before commit.
+          test ! -e docs/reference/t8e-checkpoint.md
+          test ! -e docs/work/current
+          test -f docs/architecture/wire-contract.md
+          grep -q '^kind: authority$' docs/architecture/wire-contract.md
+          grep -q 'Ratification:.*PENDING' docs/architecture/wire-contract.md
+          ! grep -R -n 't8e-checkpoint.md' AGENTS.md README.md docs .github/workflows/ci.yml
+          ! grep -R -n 'attention_required' docs/architecture/wire-contract.md
+          grep -q 'https://errors.metaldocs.io/{code}' docs/architecture/wire-contract.md
+          ! grep -q 'errors.conexus.fun/metaldocs' docs/architecture/wire-contract.md
+          grep -q 'ShortText' docs/architecture/wire-contract.md
+          grep -q 'LongText' docs/architecture/wire-contract.md
+          grep -q 'T8-E | Executable wire contract | CANDIDATE / AWAITING OPERATOR RATIFICATION' docs/decisions/index.md
+          grep -q 'REOPEN     3' docs/decisions/forward-obligations.md
+          grep -q 'TOTAL     51' docs/decisions/forward-obligations.md
+          git diff --check
+
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git commit -m 'docs(architecture): promote T8-E durable wire authority'
+          git push origin HEAD:arch/t8e-wire-contract
