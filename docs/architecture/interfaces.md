@@ -6,10 +6,10 @@
 > **Repository:** `developmentconexus-ops/MetalDocs`  
 > **Branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131  
 > **Method:** DevelopmentConexus Engineering Method v1.0.0  
-> **Upstream topology authority:** `wiki/architecture/r10-t8b-backend-module-package-topology.md`  
-> **Implementation:** BLOCKED
+> **Upstream topology authority:** `backend.md`  
+> **Current program stage / implementation permission / next action:** `../roadmap.md`
 
-This page is the durable target authority for R10 **T8-C — Internal Communication Contracts**.
+This page is the durable target authority for R10 **T8-C — Internal Communication Contracts**. Its closure/ratification facts are immutable; mutable program state is owned exclusively by `../roadmap.md`.
 
 It freezes how the five ratified semantic owners, stateless application choreography and non-semantic platform mechanisms communicate inside the T8-B modular-monolith topology. It does not freeze persistence schema/SQL/lock realization owned by T8-D, exact HTTP/OpenAPI wire encoding owned by T8-E, frontend realization owned by T8-F, runtime/process/deployment owned by T8-G, transition owned by T10 or implementation decomposition owned by T11.
 
@@ -1529,7 +1529,7 @@ D42  exact owner no-op replacement returns current VersionToken with no version/
 
 ---
 
-## 27. Stage boundaries
+## 27. Stage responsibility partition
 
 ### T8-C closed authority
 
@@ -1550,7 +1550,7 @@ inside/outside transaction classification
 fail-closed contract semantics
 ```
 
-### T8-D owns next
+### T8-D owns persistence realization
 
 ```text
 target schemas/tables
@@ -1569,7 +1569,7 @@ exact database/sql Runner realization
 exact transaction/serialization/lock mapping under T2/T8-C laws
 ```
 
-### T8-E owns later
+### T8-E owns executable wire realization
 
 ```text
 exact HTTP paths/operationIds/schemas
@@ -1582,7 +1582,7 @@ exact ReplaySnapshot -> status/body encoder
 OpenAPI generated Go/TS boundary
 ```
 
-T8-F/T8-G/T10/T11 remain later stages.
+T8-F/T8-G/T10/T11 own their named downstream technical dimensions. This section partitions authority; it does not state which program stage is currently active.
 
 ---
 
@@ -1607,7 +1607,7 @@ Preference, mock convenience, legacy API shape and hypothetical future integrati
 
 ---
 
-## 29. Closure
+## 29. Ratification closure and handoff
 
 ```text
 T8-C Internal Communication Contracts = CLOSED / OPERATOR-RATIFIED / PROMOTED
@@ -1625,10 +1625,6 @@ third Fable round not required
 
 No upstream reopen occurred.
 
-The next active stage is:
+At T8-C ratification, the immediate downstream consumer was T8-D — Persistence Realization. That is immutable handoff provenance, not current stage state.
 
-```text
-T8-D — Persistence Realization
-```
-
-Implementation remains **BLOCKED**.
+Current stage, integration status, implementation permission and exact next action are owned exclusively by `../roadmap.md`.
