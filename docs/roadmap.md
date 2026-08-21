@@ -87,7 +87,7 @@ Repository Standard isolation remains:
 
 ```text
 exact candidate branch/HEAD
-→ review/t8g-fable
+→ review/t8g-fable[-rN]
 → Evidence PR against the exact candidate
 → only docs/work/current/ai-dialog.md differs from candidate
 → Fable reviews whole T8-G authority and its cross-T8 coherence
@@ -95,6 +95,33 @@ exact candidate branch/HEAD
 ```
 
 Lead adjudicates every finding against current repository authority. Corrections are applied only to the smallest implicated authority. If material corrections change the candidate, an additional independent Fable round reviews the exact corrected HEAD. T8-G ratification requires convergence with no surviving MATERIAL contradiction plus explicit operator ratification.
+
+### T8-G Fable Round 1
+
+Evidence PR #145 reviewed the exact CI-verified Round-1 candidate and returned:
+
+```text
+F1  MATERIAL — deployment substrate omitted required writable ephemeral scratch capability
+F2  MINOR    — substrate contract omitted per-workload egress-control capability
+F3  MINOR    — health probes were described too broadly as public-origin surfaces
+F4  MINOR    — renderer/scanner bounds lacked an explicit coherence law with the accepted content profile
+verdict      — NOT CONVERGED
+```
+
+Lead adjudication accepted F1–F4 as bounded **T8-G-only self-coherence corrections**. They add no Product capability, semantic owner, application operation or upstream reopen and do not change the Global Maximum topology.
+
+The corrected candidate now explicitly requires:
+
+```text
+bounded writable ephemeral scratch sized to accepted content profile × configured concurrency
+explicit accounting when scratch is memory-backed
+per-workload egress control sufficient for renderer denial and scanner-signature scoping
+health endpoints probe-scoped where substrate permits, with bounded fixed exposure otherwise
+renderer/scanner envelopes coherent with the accepted application content profile
+static envelope mismatches rejected as deployment/configuration faults
+```
+
+Because Round 1 contained a MATERIAL finding and changed the candidate, **Round 2 independent confirmation is mandatory on the exact corrected CI-green HEAD**. PR #145 remains Evidence only and must close unmerged before the Round-2 Evidence branch becomes the active review channel.
 
 ## Integrated T8-F baseline
 
@@ -178,13 +205,12 @@ T8-G changes none of those counts.
 ## Exact next action
 
 ```text
-complete/revalidate exact T8-G candidate HEAD
-→ required Repository Standard CI must pass
-→ open isolated review/t8g-fable Evidence PR from exact candidate
-→ run full independent Fable review of T8-G and cross-T8 coherence
-→ Lead adjudicates every finding
-→ apply only evidence-backed bounded corrections
-→ if candidate changes materially, run another independent Fable round on exact corrected HEAD
+revalidate exact corrected T8-G candidate HEAD
+→ required Repository Standard CI must pass on that exact HEAD
+→ close Round-1 Evidence PR #145 unmerged
+→ open isolated review/t8g-fable-r2 Evidence PR from exact corrected candidate
+→ run bounded independent Fable confirmation of F1–F4 corrections plus regression attack on the full T8-G closure claims
+→ Lead adjudicates every Round-2 finding
 → converge with no surviving MATERIAL contradiction
 → explicit operator T8-G ratification
 → integration authorization / squash merge
