@@ -1,0 +1,32 @@
+name: T8-E Candidate Consolidation v2
+
+on:
+  pull_request:
+    types: [synchronize]
+
+permissions:
+  contents: write
+
+jobs:
+  consolidate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+      - name: Apply bounded evidence consolidation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 .github/t8e-candidate-patch.py
+          git diff --check
+          changed="$(git diff --name-only)"
+          test "$changed" = "docs/work/current/proposal.md"
+          git diff -- docs/work/current/proposal.md
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add docs/work/current/proposal.md
+          git commit -m 'docs(architecture): consolidate T8-E executable evidence'
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
