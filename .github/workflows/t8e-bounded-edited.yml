@@ -32,6 +32,19 @@ jobs:
           Path('/tmp/t8e-reconcile.py').write_text(script)
           PYEXTRACT
           python3 /tmp/t8e-reconcile.py
+          python3 - <<'PYFIX'
+          from pathlib import Path
+          for name in [
+              'docs/architecture/content-integrity.md',
+              'docs/architecture/async-and-search.md',
+              'docs/architecture/interfaces.md',
+              'docs/architecture/persistence.md',
+          ]:
+              p = Path(name)
+              lines = p.read_text().splitlines()
+              lines = [line.rstrip() if ('T8-E bounded correction:' in line and '2026-08-21' in line) else line for line in lines]
+              p.write_text('\n'.join(lines) + '\n')
+          PYFIX
           git diff --check
           git diff -- docs/architecture/content-integrity.md docs/architecture/async-and-search.md docs/architecture/interfaces.md docs/architecture/persistence.md docs/work/current/proposal.md docs/roadmap.md
           git config user.name github-actions[bot]
