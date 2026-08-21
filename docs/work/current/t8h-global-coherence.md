@@ -12,17 +12,24 @@ summary: Branch-only T8-H adversarial review ledger for cross-stage realization 
 > **Implementation:** BLOCKED
 > **Scope:** T8-A→T8-G coherence only; T9 is not open.
 
-This is temporary branch-only work under the repository documentation law. It records the active T8-H review and must not enter `main`. Durable corrections, if operator-approved, belong in the owning authorities; final stage/status remains exclusively in `docs/roadmap.md`.
+This is temporary branch-only work. It must not enter `main`. Durable meaning lives in the owning authorities; mutable program status lives only in `docs/roadmap.md`.
 
-## 1. Review objective and law
+## 1. Review objective
 
-T8-H asks one question:
+T8-H asks whether T8-A→T8-G form one executable technical realization without:
 
-> Do the operator-ratified T8-A→T8-G decisions form one executable technical realization without duplicate or missing authority, incompatible assumptions, removed required seams, or accidental complexity created by the architecture itself?
+```text
+duplicate or missing authority
+incompatible assumptions
+removed required seams
+repeated correctness machinery
+speculative capability
+accidental complexity created by the architecture itself
+```
 
-The review follows DevelopmentConexus Engineering Method v1.0.0. It does not reopen an accepted decision because another shape is preferable. A finding is material only when current evidence touches an invariant, authority/boundary, public contract, persistence meaning, security/trust property, concurrency/recovery property, or user-observable behavior.
+The review follows DevelopmentConexus Engineering Method v1.0.0. Accepted stages reopen only on material evidence, never preference.
 
-The bounded review pack is:
+Bounded primary pack:
 
 ```text
 T8-A  docs/architecture/technical-baseline.md
@@ -34,210 +41,234 @@ T8-F  docs/architecture/frontend.md
 T8-G  docs/architecture/runtime.md
 ```
 
-Additional authority was opened only for concrete seams:
-
-```text
-docs/decisions/frontend-read-symmetry.md
-  reason: effective DocumentOfficialView differs from the T8-E body
-
-docs/decisions/t8f-ratification.md
-+ docs/decisions/t8g-ratification.md
-+ docs/decisions/index.md
-+ docs/development/documentation.md
-  reason: test whether stage/integration state is duplicated outside roadmap
-```
-
-Historical implementation, closed review PRs and old `wiki/...` authority paths were not used as target authority.
+Additional files were opened only for concrete authority/routing seams.
 
 ## 2. Opening revalidation
 
-Observed at T8-H opening:
-
 ```text
 main                              0b4ef6ef891b01f907804cff4bd3c0022aebad80
-main expected SHA                  MATCH
+expected SHA                       MATCH
 open PRs                           0
-T8-H pre-existing branch           none
 T8-H branch                        arch/t8h-global-coherence
+Draft PR                           #148
 closeout PR #147                   MERGED
 PR #147 head                       ed0ff1c2883d92b65f6502cfa90798abb1cf8ed3
 CI #1079                           SUCCESS
 CI #1080                           SUCCESS
-CI #1080 aggregate job `required`  SUCCESS
+CI #1080 job required              SUCCESS
 ```
 
-Remote historical/candidate/review branches remain housekeeping only. Their existence does not open, close or block T8-H.
+Remote historical/review branches are housekeeping/provenance only.
 
-## 3. Cross-stage attack matrix
+## 3. Whole-T8 attack result
 
-| Seam | Attack | Current result |
-|---|---|---|
-| T8-A → T8-B | Did legacy shape regain authority through package topology? | PASS — owner-first modular monolith was independently rederived. |
-| T8-B → T8-C | Can every accepted internal consumer fit the closed dependency classes without a hidden owner/edge? | MATERIAL PRECISION — `application/maintenance` is accepted by T8-C but absent from T8-B's frozen package projection. |
-| T8-C → T8-D | Can transaction, Audit, AuthZ, idempotency, GC and durable intent contracts be persisted without foreign SQL or duplicate truth? | PASS. |
-| T8-D → T8-E | Can persisted/concurrency truth realize ETags, CSRF, replay and exact-byte wire laws? | PASS. |
-| T8-E → T8-F | Can a fresh browser navigation resolve every accepted stable lens from the exact wire? | MATERIAL AUTHORITY SPLIT — effective operation-47 schema is defined by T8-E plus a separate superseding precision. |
-| T8-F → T8-G | Does runtime serve exactly the admitted frontend consumers without speculative infrastructure? | PASS. |
-| Whole T8 status authority | Is mutable stage/integration state owned only by roadmap? | MATERIAL DUPLICATION — stale mutable status remains in durable T8-F/T8-G and decision records. |
-| AuthN / CSRF | Is session bootstrap reconstructible and same-origin runtime-compatible? | PASS. |
-| AuthZ | Is there exactly one final ALLOW/default-DENY authority? | PASS. |
-| Audit / transaction | Can required evidence append before one local commit? | PASS. |
-| Durable jobs | Can River intent participate atomically without a second business-state authority? | PASS; external mechanism fit checked. |
-| Idempotency | Are key scope, fingerprint, replay snapshot, 24h expiry and frontend retry semantics compatible? | PASS. |
-| Exact content | Do semantic descriptor, storage mechanism, wire proof, frontend consumption and runtime spool agree? | PASS. |
-| Official rendition | Do same-PDF reuse and conditional DOCX→PDF behavior agree? | PASS. |
-| Search | Is Launch Search still canonical PostgreSQL read behavior with no dormant external engine? | PASS. |
-| Operation census | Did any seam require a new application operation? | PASS — 78 remains closed; operation 79 remains absent. |
+| Seam | Result |
+|---|---|
+| T8-A → T8-B clean-slate derivation | PASS |
+| T8-B → T8-C package/consumer fit | H3 found; operator-approved bounded precision assembled |
+| T8-C → T8-D transaction/Audit/AuthZ/idempotency/GC/jobs | PASS |
+| T8-D → T8-E persistence/concurrency → wire | PASS |
+| T8-E → T8-F fresh-navigation/read symmetry | H2 found; operator-approved authority consolidation assembled |
+| T8-F → T8-G concrete runtime consumers | PASS |
+| Whole-T8 mutable status authority | H1 found; operator-approved authority cleanup assembled |
+| Authentication / CSRF | PASS |
+| Authorization single ALLOW/default-DENY authority | PASS |
+| same-commit Audit / transaction | PASS |
+| River durable intent | PASS |
+| idempotency / replay | PASS |
+| exact content / exact-byte delivery | PASS |
+| OfficialRendition | PASS |
+| PostgreSQL Search baseline | PASS |
+| application operation census | PASS — 78; operation 79 absent |
 
-## 4. Material finding H1 — duplicated mutable program status
+## 4. H1 — mutable status authority duplication
 
-### Evidence
+### Finding
 
-Repository documentation governance states that only `docs/roadmap.md` owns mutable stage/gate/implementation status and exact next action.
+Durable T8-F/T8-G authority and ratification records retained progression snapshots such as `INTEGRATION PENDING`, `T8-G NOT OPEN` and `T8-H NOT OPEN`, while repository law makes `docs/roadmap.md` the sole mutable stage/status authority.
 
-Current durable documents nevertheless retain mutable progression snapshots that are now false, including:
+### Operator adjudication
 
 ```text
-docs/architecture/frontend.md
-  integration through PR #139 remains pending
-  T8-G NOT OPEN / remains unopened
-
-docs/architecture/runtime.md
-  integration through PR #144 remains pending
-  T8-H NOT OPEN
-
-docs/decisions/t8f-ratification.md
-  T8-G NOT OPEN / integration remains separate
-
-docs/decisions/t8g-ratification.md
-  T8-H NOT OPEN / integration remains separate
-
-docs/decisions/index.md
-  T8-F ... INTEGRATION PENDING
-  T8-G ... INTEGRATION PENDING
+APPROVED
 ```
 
-These statements do not override roadmap, but their survival creates the exact parallel mutable-status authority that repository governance forbids and gives fresh actors contradictory current-state evidence.
-
-### Root cause
-
-Durable architecture/ratification artifacts captured future program-state snapshots instead of preserving only immutable ratification facts and delegating all mutable stage state to roadmap.
-
-### Smallest correction candidate
+### Assembled correction
 
 ```text
 preserve immutable ratification/review facts
-remove stale mutable downstream-stage/integration snapshots from affected T8-F/T8-G authority and ratification records
-remove `INTEGRATION PENDING` from current decision dispositions
-replace mutable progression prose with one stable pointer to docs/roadmap.md where needed
+remove mutable downstream-stage/integration snapshots
+remove INTEGRATION PENDING from current decision dispositions
+point current integration/stage/implementation/next-action state to docs/roadmap.md
 ```
 
-No Product/T1→T8-G semantic reopen is required.
-
-## 5. Material finding H2 — executable wire authority is split
-
-### Evidence
-
-`docs/architecture/wire-contract.md` declares itself the exact 78-operation application-wire authority. However the effective `DocumentOfficialView` member set is not present there. `docs/decisions/frontend-read-symmetry.md` explicitly supersedes that member set by adding:
+Affected durable surfaces:
 
 ```text
-open_revision?: OpenRevisionRoutingReference
-active_obsolescence_request_id?: Uuid
+docs/architecture/frontend.md
+docs/architecture/runtime.md
+docs/decisions/t8f-ratification.md
+docs/decisions/t8g-ratification.md
+docs/decisions/index.md
 ```
 
-The index compensates by routing fresh actors to both files, and T8-F correctly consumes the precision. Therefore the runtime semantics are not missing, but the exact executable contract has two simultaneous sources.
+No Product or T8 semantic meaning changed.
 
-### Root cause
+## 5. H2 — executable wire authority split
 
-A valid bounded T8-E precision discovered during T8-F was recorded as a durable superseding patch instead of being folded back into the exact wire SSOT after approval.
+### Finding
 
-### Smallest correction candidate
+The effective operation-47 `DocumentOfficialView` required `frontend-read-symmetry.md` to supersede the schema declared by `wire-contract.md`, leaving two live executable wire sources.
+
+### Operator adjudication
 
 ```text
-fold the already-ratified DocumentOfficialView precision and presence/disclosure laws into docs/architecture/wire-contract.md
-retain docs/decisions/frontend-read-symmetry.md as immutable ratification/provenance of the bounded correction, not a live schema override
-route executable-wire consumers to one exact wire authority
-preserve 78 operations, all operationIds, Problems, headers and operation 79 absence
+APPROVED
 ```
 
-This consolidates already-approved meaning; it does not create a new operation, Permission, owner or persistence pointer.
+### Assembled correction
 
-## 6. Material finding H3 — T8-B package projection omits accepted maintenance leaf
+`docs/architecture/wire-contract.md` now contains:
 
-### Evidence
+```text
+OpenRevisionRoutingReference
+DocumentOfficialView.open_revision?
+DocumentOfficialView.active_obsolescence_request_id?
+exact existence + disclosure presence laws
+absence-is-not-nonexistence law
+follow-up Authorization/lifecycle recheck law
+```
 
-T8-B says it freezes backend repository/package topology and projects the accepted `internal/application/*` leaves. T8-C later ratified T5-J GC choreography at:
+`docs/decisions/frontend-read-symmetry.md` now preserves decision rationale/provenance only and explicitly does not supersede executable schema. `docs/index.md` routes executable-wire work to `wire-contract.md` alone.
+
+Wire effect remains:
+
+```text
+operations added       0
+operations removed     0
+application census     78
+operation 79           absent
+Permissions added      0
+Problems added         0
+persistence pointers   0
+```
+
+## 6. H3 — missing accepted maintenance leaf
+
+### Finding
+
+T8-C ratified T5-J managed-content GC choreography at `internal/application/maintenance`, but T8-B's frozen package projection omitted that already-accepted leaf.
+
+### Operator adjudication
+
+```text
+APPROVED
+```
+
+### Assembled correction
+
+T8-B now projects:
 
 ```text
 internal/application/maintenance
+  current consumer = T5-J managed-content GC choreography
+  class = existing non-semantic application class
 ```
 
-T8-C explicitly keeps this inside the existing non-semantic `application` class and states that no T8-B reopen is required. The leaf adds no semantic owner, public surface or dependency direction, but the T8-B frozen projection does not show it.
-
-### Root cause
-
-A later accepted concrete consumer refined the contents of an already-admitted application class without reflecting that precision back into the topology projection.
-
-### Smallest correction candidate
-
-```text
-add application/maintenance to the T8-B target projection
-state its current consumer = T5-J managed-content GC choreography
-change no dependency-class law, semantic owner, runtime shell or Product operation
-```
-
-This is a bounded coherence precision, not a topology redesign.
+It adds no semantic owner, public owner surface, dependency class, runtime shell or Product operation.
 
 ## 7. Challenged seams with no material finding
 
-### Historical `wiki/...` header strings
+### Imported `wiki/...` strings
 
-T8-C/T8-D still carry imported `wiki/...` upstream-authority strings. `docs/development/documentation.md` explicitly classifies these as non-navigational provenance. They are therefore not a current authority conflict and are not a T8-H cleanup target.
+Documentation governance classifies the remaining imported `wiki/...` authority strings as non-navigational provenance. No cleanup is justified.
 
 ### River / `database/sql`
 
-T8-C selects the `database/sql` transaction family and exposes the concrete transaction only to catalogued platform mechanisms. T8-D requires durable River intent to share the semantic transaction. T8-G runs River workers in-process.
-
-Current upstream River documentation confirms a maintained `riverdatabasesql` driver for Go `database/sql`; River's client transaction type is `*sql.Tx` for that driver, and transactional insert APIs keep job insertion atomic with the caller transaction. No hidden substrate contradiction was found.
-
-Reference evidence:
-
-```text
-https://pkg.go.dev/github.com/riverqueue/river/riverdriver/riverdatabasesql
-https://pkg.go.dev/github.com/riverqueue/river
-```
+Current River upstream support includes `riverdatabasesql`; its transaction form uses `*sql.Tx` and transactional insertion can share the caller transaction. This fits the accepted T8-C/D transaction seam and T8-G in-process worker topology.
 
 ### Security / content / state
 
-No second Authorization evaluator, Product lifecycle truth, exact-content authority, durable frontend entity store, Redis dependency, external Search authority, generic outbox/event bus or provider-key Product identity was found across T8-A→T8-G.
+No second Authorization evaluator, Product lifecycle truth, exact-content authority, durable frontend entity store, Redis dependency, external Search authority, generic outbox/event bus or provider-key Product identity survived the attack.
 
-## 8. Proposed proof after operator adjudication
+## 8. Correction proof contract
 
-If H1–H3 are approved, the bounded correction must prove:
-
-```text
-P1  roadmap remains the only mutable stage/status/next-action authority
-P2  no affected durable T8-F/T8-G document asserts stale integration/downstream-stage state
-P3  exact DocumentOfficialView effective schema exists in wire-contract.md
-P4  frontend-read-symmetry.md no longer acts as a second executable schema SSOT
-P5  application/maintenance appears in the T8-B target topology with no new class edge
-P6  accepted application census remains exactly 78 and operation 79 absent
-P7  required CI passes
-```
-
-An independent Fable challenge is justified after the material coherence corrections are assembled, because H1/H2 touch authority placement and H3 touches a frozen topology seam. Reviewer findings remain Evidence, not authority.
-
-## 9. Current T8-H decision
+The corrected candidate must prove:
 
 ```text
-T8-H outcome        NOT YET RATIFIED
-material findings  H1, H2, H3
-Product reopen      NO
-T1→T7 reopen        NO
-T8-A reopen         NO
-operation 79        ABSENT
-T9                   NOT OPEN
-implementation      BLOCKED
+P1  roadmap is the sole mutable stage/status/next-action authority
+P2  affected T8-F/T8-G durable records contain no stale integration/downstream-stage state
+P3  effective DocumentOfficialView schema + disclosure laws live in wire-contract.md
+P4  frontend-read-symmetry.md is provenance, not second executable schema authority
+P5  application/maintenance is present in T8-B with no new dependency class edge
+P6  application census remains exactly 78 and operation 79 absent
+P7  required candidate CI passes
 ```
 
-T8-H remains active. The next action is operator adjudication of H1–H3 before changing the already-ratified owning authorities.
+Independent Fable challenge follows only after the exact corrected candidate satisfies this proof contract.
+
+## 9. CI quality audit — separate from T8 architecture findings
+
+The operator requested a proportionality review because required CI has produced repeated red runs.
+
+Current evidence:
+
+```text
+CI #1081
+  failed only because git diff --check rejected three Markdown trailing-space hard breaks
+  corrected mechanically
+  same gate CI #1082 then passed
+
+review PR #145
+  structurally valid Fable Evidence PR
+  CI #1064 failure by workflow design
+
+review PR #146
+  structurally valid converged Fable Evidence PR
+  CI #1068 failure by workflow design
+```
+
+The current review-branch path validates isolation and then deliberately executes `exit 1`. Repository Standard v1 requires review isolation to be proven; it does not require a correct Evidence PR to be red.
+
+Provisional classification:
+
+```text
+KEEP / BLOCK
+  architecture-only tracked-path envelope while implementation is blocked
+  required bootstrap surfaces + bootstrap budget
+  docs/work absence from merge candidate/main
+  router/reachability proof
+  required provenance/archive refs
+
+REDESIGN
+  valid review branch should PASS isolation check, not fail by design
+  forward-obligation proof should compare document rows to its own summary,
+    not duplicate 21/3/27/51 as workflow authority
+
+DOWNGRADE FROM REQUIRED BLOCKER
+  generic Markdown trailing-whitespace failure; it is formatting hygiene,
+  and in Markdown two trailing spaces can be intentional syntax
+
+ADD SMALL OPERATIONAL IMPROVEMENT
+  cancel superseded CI runs for the same PR
+```
+
+No CI workflow correction has been applied yet. It is a separate operator decision and must not be smuggled into H1–H3.
+
+## 10. Current T8-H decision
+
+```text
+T8-H outcome            NOT YET RATIFIED
+H1                       APPROVED / CORRECTION ASSEMBLED
+H2                       APPROVED / CORRECTION ASSEMBLED
+H3                       APPROVED / CORRECTION ASSEMBLED
+Product reopen           NO
+T1→T7 reopen             NO
+T8-A reopen              NO
+application operations   78
+operation 79             ABSENT
+T9                       NOT OPEN
+implementation           BLOCKED
+```
+
+Next: prove P1–P7 on the exact candidate, resolve the bounded CI-quality decision, then perform fresh independent challenge.
