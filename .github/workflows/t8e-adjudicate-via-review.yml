@@ -2,7 +2,7 @@ name: T8-E Adjudicate Via Review
 
 on:
   pull_request:
-    types: [edited]
+    types: [edited, synchronize]
 
 permissions:
   contents: write
