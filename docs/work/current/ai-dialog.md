@@ -267,3 +267,91 @@ If no MATERIAL finding survives, say so explicitly and list the strongest attack
 Do not edit the candidate branch or any other file. Reviewer output is Evidence; the Lead adjudicates every finding. Do not ratify T8-G, do not merge this Evidence PR and do not open T8-H.
 
 ## Fable response
+
+Reviewed candidate HEAD `4d93066070a08fa49271dbd58cd43a830d921509` on `review/t8g-fable`. Route followed: `AGENTS.md` → `docs/index.md` → `docs/roadmap.md` → `docs/architecture/runtime.md`; upstream authority consulted only where a concrete challenge required it (`content-integrity.md` §9/§21, `wire-contract.md` §2.9/upload profile, `backend.md` shell seam, `async-and-search.md` River/GC laws).
+
+### Mechanical closure re-execution
+
+All re-executed claims held:
+
+```text
+candidate delta vs main@8f39184a          = docs/architecture/runtime.md + docs/index.md + docs/roadmap.md only
+review branch delta vs candidate HEAD     = docs/work/current/ai-dialog.md only
+application operation census              = 78 unchanged; runtime.md adds no /api/v1 operation
+operation 79                              = absent; /auth/*, /livez, /readyz explicitly excluded from census,
+                                            consistent with the T8-E precedent that OIDC redirect/callback
+                                            sits outside the application OpenAPI
+T8-H                                      = not opened; implementation remains BLOCKED
+component census (§22)                    = every KEEP row has a named current consumer; no orphan component found
+Product semantic owner added              = none found; runtime/provider identity nowhere becomes Product identity
+```
+
+### Findings
+
+---
+
+**F1**
+- **severity:** MATERIAL
+- **claim:** §16 claims to freeze "required deployment properties, not a cloud vendor", but the frozen substrate property list omits **bounded writable ephemeral scratch/disk capacity**, which §11 makes mandatory (`spool disk usage O(content size)`, `whole governed file in Go heap forbidden baseline`) and §9 also requires for the renderer (`bounded … ephemeral disk`). The candidate's own deployment contract admits substrates that cannot run the candidate's own mandatory exact-byte mechanism.
+- **owning authority implicated:** `docs/architecture/runtime.md` only (self-contradiction between §11/§9 and §16).
+- **candidate section(s):** §16; secondarily §11.
+- **concrete counterexample / failure mode:** A substrate with an in-memory-backed filesystem (Cloud Run–class platforms, where writable paths count against container memory — Cloud Run is explicitly named in §16 as a viable non-required substrate) satisfies every listed §16 property: HTTPS ingress, private reachability, immutable artifact, one-shot execution, health probes, resource limits, graceful termination, log capture, secrets, PostgreSQL, managed content, backup/restore. An operator selecting by the §16 checklist deploys there; the verified spool then places O(content size) bytes in memory for every concurrent exact-byte read of accepted content (T8-E-scale DOCX/PDF, up to the accepted `maxBytes` profile), directly violating the §11 bounded-memory law — discovered only at implementation/T9, not at substrate selection, which is exactly the decision §16 exists to gate.
+- **smallest correction:** Add one property to the §16 required list, e.g. `bounded writable ephemeral scratch capacity sized to the accepted content profile × concurrency (verified spool + renderer/scanner spool I/O)`. No other section changes.
+- **reopen required:** no — bounded T8-G text correction; no upstream authority implicated.
+
+---
+
+**F2**
+- **severity:** MINOR
+- **claim:** §16 also omits a **network egress-control capability** from the frozen substrate list, although §9 mandates `outbound network denied by baseline` for the renderer and §10 mandates scanner signature-update egress bounded separately from scanned-content processing. `private network reachability for required backing mechanisms` gives reachability, not denial.
+- **owning authority implicated:** `docs/architecture/runtime.md` only.
+- **candidate section(s):** §16; §9; §10.
+- **concrete counterexample / failure mode:** A substrate offering private networking but no per-workload egress policy (plain Docker host networking, several PaaS profiles) passes the §16 checklist yet cannot enforce renderer outbound denial; a malicious DOCX exercising LibreOffice remote-content fetch then has open egress. F9 catches this as a falsifier after the fact, but the selection contract itself should carry the property.
+- **smallest correction:** Add `per-workload outbound network egress control (renderer denial / scanner signature-source scoping)` to the §16 required list.
+- **reopen required:** no.
+
+---
+
+**F3**
+- **severity:** MINOR
+- **claim:** §5 places `/livez` and `/readyz` in the "Public/runtime surfaces" block of the only public MetalDocs HTTP surface, making unauthenticated internet observation of readiness state (including PostgreSQL-outage flapping per §14) part of the frozen public contract, when the actual consumers of these endpoints are substrate probes and ingress — §16 already requires `health probes` from the substrate.
+- **owning authority implicated:** `docs/architecture/runtime.md` only.
+- **candidate section(s):** §5; §13.
+- **concrete counterexample / failure mode:** An external party polls `/readyz` and learns exactly when the product's database is down (outage disclosure aiding attack timing) at zero cost; the endpoints also become an unauthenticated request-floor surface. §13's "tiny fixed mechanism responses" limits the leak but does not remove the dependency-state oracle.
+- **smallest correction:** State that health endpoints are substrate/ingress-scoped and need not be exposed on the public origin; where the substrate cannot scope them, their public exposure is an accepted bounded disclosure. One sentence in §5 or §13.
+- **reopen required:** no.
+
+---
+
+**F4**
+- **severity:** MINOR
+- **claim:** §10 and §9 impose bounded request-length/duration envelopes on the scanner and renderer but state no coherence law tying those bounds to the **accepted application content maximum**. A mechanically conforming deployment (e.g. ClamAV `clamd` with default `StreamMaxLength` far below the accepted T8-E `maxBytes`) fail-closes every accepted large upload deterministically — accepted consumers cannot run, yet no law names this as a configuration fault detectable before per-admission failure.
+- **owning authority implicated:** `docs/architecture/runtime.md` only (F7 already covers the falsification; the selection/config coherence law is missing).
+- **candidate section(s):** §10; §9; §12.
+- **mechanism/library:** ClamAV `clamd` (reference); applies to any scanner/renderer mechanism.
+- **concrete counterexample / failure mode:** Operator deploys reference `clamd` with defaults; every accepted maxBytes-class DOCX admission returns FAILURE/UNAVAILABLE forever. Fail-closed behavior is correct per T4, but the architecture treats a statically knowable envelope mismatch as a runtime mystery instead of a startup/ops-policy fault.
+- **smallest correction:** One law line: scanner/renderer bounded envelopes must admit the accepted application content maximum; an envelope below the accepted profile is a deployment configuration fault surfaced by ops policy/startup validation, not silent per-admission failure.
+- **reopen required:** no.
+
+---
+
+### Non-material observations (not findings)
+
+- §20 permits a private third-party River UI conditionally; if ever activated it becomes a deployed component with no §22 census row or §24 activation entry. Suggest the activation law cover it when (if) adopted.
+- §13/§18: the recovery/restore serving barrier's persistence locus is unspecified. The startup step "prove recovery/restore serving barrier clear" only fails closed if the barrier travels inside the restored recovery point (DB) rather than ambient deployment state. Implementation detail, but worth one clarifying clause at correction time.
+- ApplicationSession/CSRF server-side state placement (PostgreSQL) is implied by §14 (sessions survive IdP outage) and §18 (restored sessions invalidated) but never stated; consistent with the no-Redis subtraction; no contradiction found.
+
+### Strongest attacks executed (no surviving finding)
+
+1. **T4 malware timing/trust-class re-derivation** — candidate §10 matches `content-integrity.md` §9 exactly, including the DRAFT-debounce/READY law and fail-closed scanner outage; "trusted derived output must also be malware scanned" is a T4 §21 *reopen trigger*, not current law, so no-rescan for TRUSTED_INTERNAL_DERIVATION is coherent.
+2. **T8-E exact-byte law vs verified spool** — `wire-contract.md` §2.9 explicitly authorizes bounded-spool as a satisfying strategy and forbids completing 200/Content-Length on mismatch; the spool's prove-before-commit is a strict subset. No path found that emits a complete successful response with unverified bytes.
+3. **T8-B shell seam** — `backend.md` (`cmd/<runtime-shells>` "names/count/process topology = T8-G"; "Runtime process count remains T8-G") delegates exactly what §4 decides; one executable with mode-scoped DB identities merges no privilege context, since DDL authority follows credentials, not binary bytes.
+4. **T5 River/GC in-process coherence** — `async-and-search.md` names the same runtime for renderer execution and periodic GC reconciliation, forbids a parallel custom scheduler, and the candidate preserves job-row ≠ business-state, revalidating workers, and GC recheck laws; shutdown flow (§15) relies on ratified at-least-once/idempotency semantics rather than inventing states.
+5. **Backup/restore re-execution** — recovery set (DB + required bytes + descriptor manifest + post-snapshot privacy/security reconciliation + backup pin/GC exclusion) matches T4; River intents sharing the DB snapshot restore transaction-coupled intents coherently; no `force_ready`-class bypass exists; RECOVERY→NORMAL requires established proof; session invalidation is mandatory.
+6. **Third-party semantic-authority sweep, both directions** — no selected mechanism holds Product authority (River backlog ≠ business state, Gotenberg fidelity-gated reference without semantic finalization, clamd verdict is admission *input* under the T4 seam, OIDC roles/groups blocked from Authorization, S3 identity never Product identity). Inverse: no unjustified from-scratch generic infrastructure found — spool/CSRF/health/transport-enforcement are small bounded local mechanisms with stdlib crypto, exactly where §21 places them; all reference families (pgx/v5, otelpgx, go-oidc/v3 + x/oauth2, AWS SDK Go v2, envconfig, River, ClamAV, Gotenberg+LibreOffice, tern/v2) are maintained, license-acceptable (GPL/MPL components isolated as separate processes or file-scoped), with clear replacement boundaries.
+7. **Census/subtraction attack** — every §22 KEEP has a real current consumer; every REMOVE was checked for a hidden current requirement (Redis for sessions/CSRF — not needed, DB-backed; separate worker — no measured isolation need; Collector — no current pipeline need; CDN/mesh/failover — no consumer). §24 preserves activation seams without dormant implementation.
+8. **Operation-79 / wire-preservation attack** — no runtime path adds, proxies, or reshapes an application operation; same-origin SPA + exact T8-E headers/problems/bytes remain realizable through §5/§6; no BFF resurrection.
+
+### Verdict
+
+**NOT CONVERGED — one MATERIAL finding (F1).** F1 is a bounded self-coherence defect in the §16 substrate contract with a two-line correction and no upstream reopen. F2–F4 are MINOR hardening corrections at the same locus class. Everything else attacked held. After Lead adjudication and the bounded correction, a short confirmation round on the corrected HEAD should suffice; nothing found challenges the Global Maximum topology, the reuse-first selections, or any T1→T8-F ratified authority.
