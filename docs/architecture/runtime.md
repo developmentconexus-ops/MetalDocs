@@ -204,18 +204,25 @@ An OCI image is the reference deployment artifact. Container vendor/orchestrator
 
 ## 5. Public and private trust boundaries
 
-The MetalDocs application is the only public HTTP surface owned by MetalDocs.
+The MetalDocs application is the only HTTP service owned by MetalDocs that may receive internet-origin traffic.
 
-Public/runtime surfaces:
+Public application-origin surfaces:
 
 ```text
 /                     SPA/static/history fallback
 /api/v1/*             exact T8-E application wire
 /auth/login            OIDC browser integration
 /auth/callback         OIDC browser integration
+```
+
+Operational probe surfaces:
+
+```text
 /livez                 runtime liveness
 /readyz                runtime readiness
 ```
+
+Health endpoints are substrate/ingress probe surfaces and need not be exposed on the internet-public origin. Prefer private or probe-scoped reachability where the deployment substrate supports it. If a substrate cannot isolate probe reachability, public exposure is an accepted bounded disclosure only with the tiny fixed responses defined by §13; health responses never become diagnostic APIs.
 
 Not public:
 
@@ -339,6 +346,8 @@ outbound network denied by baseline
 bounded CPU / memory / PIDs / ephemeral disk / execution time
 ```
 
+Renderer request/input/output envelopes must be coherent with the accepted application content profile. A statically configured renderer limit below the relevant accepted source/output profile is a deployment configuration fault, not ordinary per-job degradation; it must be detected before production readiness by startup validation when locally knowable or by deployment/conformance verification otherwise.
+
 Remote/linked-content retrieval during conversion is not baseline. A document that cannot render acceptably without untrusted outbound dependency fails visibly; MetalDocs does not silently grant renderer egress.
 
 ### Backpressure
@@ -387,6 +396,8 @@ bounded CPU / memory / request length / duration / queue/in-flight work
 no production bypass flag such as FORCE_CLEAN or scan-disabled governed admission
 ```
 
+The scanner request/stream envelope must admit the accepted application content maximum for every format that can require the governed-boundary malware gate, plus bounded protocol overhead where applicable. A lower static limit is invalid deployment configuration and must be detected before production readiness rather than surfacing indefinitely as per-admission failure.
+
 ClamAV `clamd` is the reference production mechanism. Prefer same deployment locality / Unix-socket or otherwise protected transport because native clamd TCP is not an authenticated/encrypted public protocol.
 
 The content-scanning engine receives no arbitrary document-processing egress entitlement. Signature update is a separate bounded operational concern: the selected updater may have narrowly scoped egress to approved signature sources, or signatures may be delivered by the deployment platform. Signature-update network access never grants scanned document content general outbound access.
@@ -413,7 +424,7 @@ Properties:
 ```text
 whole governed file in Go heap     forbidden baseline
 memory usage                        bounded transfer/hash buffers
-spool disk usage                    O(content size)
+spool scratch usage                 O(content size)
 spool durability                    none
 spool Product authority             none
 ```
@@ -446,6 +457,8 @@ deployment/build metadata
 ```
 
 Runtime configuration does not define Product Permissions, lifecycle, governance or accepted operations.
+
+Cross-field validation includes coherence between the accepted application content profile and locally configured renderer/scanner/body/workspace limits. A statically known envelope mismatch that makes accepted content impossible is a configuration error, not a runtime warning.
 
 Secret laws:
 
@@ -572,10 +585,13 @@ A valid deployment substrate must provide:
 ```text
 public HTTPS/TLS ingress for the MetalDocs app
 private network reachability for required backing mechanisms
+per-workload outbound egress control sufficient to deny renderer egress and scope scanner-signature update access
 immutable application artifact execution
 one-shot process execution
 health probes
 resource limits
+bounded writable ephemeral scratch capacity sized to the accepted content profile and configured concurrency
+explicit scratch resource accounting; memory-backed scratch is admissible only when its worst-case use is included in and satisfies the runtime memory envelope
 bounded graceful termination
 stdout/stderr log capture
 managed secret/workload identity capability
@@ -583,6 +599,8 @@ PostgreSQL backing service
 managed-content backing service
 backup/restore capability
 ```
+
+The scratch capability must support the verified spool plus renderer/scanner temporary I/O required by the selected profile. Substrate selection must prove accepted content size × configured concurrent scratch users fits the declared capacity; a platform whose writable filesystem consumes process/container memory is not rejected categorically, but that memory cost must be included explicitly rather than bypassing the §11 bounded-memory intent.
 
 Not durable requirements:
 
@@ -908,6 +926,7 @@ T8-G hands T9 falsifiable properties, not Product implementation permission. T9 
 
 ```text
 bad config / missing required secret → serve fails closed
+content-envelope mismatch below accepted profile → deployment/startup validation fails
 incompatible schema → serve fails
 PostgreSQL down → unready while process remains live
 renderer down → ordinary Product serving survives; rendition work fails/retries truthfully
@@ -915,9 +934,10 @@ scanner down → required governed admission blocked while unrelated serving sur
 malicious sample → cannot become immutable governed content
 clean sample → scan evidence binds the exact admitted bytes
 renderer outbound network → denied
+scanner signature updater → only approved signature-source egress
 representative DOCX corpus → fidelity gate passes for selected profile
 provider byte corruption → complete successful exact-byte response cannot be emitted
-accepted content profile → bounded heap/spool/resource behavior
+accepted content profile × configured concurrency → bounded heap/scratch/resource behavior
 SIGTERM → unready first + bounded drain + retry-safe interruption
 River terminal required work → visible, inspectable and redrivable
 backup recovery point → DB + required exact-content manifest complete
