@@ -7,9 +7,9 @@ summary: T8-G candidate authority for runtime shells, process/deployment topolog
 
 # R10 T8-G — Runtime / Process / Deployment
 
-> **Status:** OPEN / ACTIVE CANDIDATE / NOT RATIFIED  
-> **Opened:** 2026-08-21  
-> **Candidate base:** `main @ 8f39184a2b2e2d07a48ff6796dc9efa77c5c3aac`  
+> **Status:** OPEN / ACTIVE CANDIDATE / NOT RATIFIED
+> **Opened:** 2026-08-21
+> **Candidate base:** `main @ 8f39184a2b2e2d07a48ff6796dc9efa77c5c3aac`
 > **Implementation:** BLOCKED
 
 This document is the T8-G candidate authority for the smallest runtime, process and deployment realization capable of serving the operator-ratified T8-A→T8-F architecture.
