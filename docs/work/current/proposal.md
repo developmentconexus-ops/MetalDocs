@@ -11,6 +11,15 @@ summary: Active T8-E proposal for the smallest exact 78-operation executable app
 
 Accepted baseline remains in `../../reference/t8e-checkpoint.md`; Product/API meaning remains in `../../product/journeys.md` + `../../decisions/api-operation-census.md`. Current census: **78 application operations**. Operation 79 is a material Product/T6 reopen.
 
+The two bounded upstream contradictions exposed by this ledger were **operator-approved and durably reconciled on 2026-08-20**:
+
+```text
+T8-D  Governance Step label persisted + immutable label_snapshot per GovernanceAttempt Step
+T3    unreachable ProviderSubjectBinding-disabled Audit census entry removed
+```
+
+They are no longer T8-E blockers.
+
 ## 1. Lead outcome
 
 The smallest closed executable contract is:
@@ -818,7 +827,7 @@ obsolescence.withdrawn
 obsolescence.completed
 ```
 
-`provider_binding.disabled` is excluded pending §8.2. `document.created` is atomic Document+REV000; `revision.created` means later Revision only.
+T3 bounded precision is reconciled: there is no `provider_binding.disabled` Launch transition or Audit operation. `document.created` is atomic Document+REV000; `revision.created` means later Revision only.
 
 Resource kinds:
 
@@ -962,8 +971,6 @@ All path `*_id` parameters are required `Uuid`. `PAGED` means §2.7. JSON reques
 |42|`getDocumentTypeNumberingPreview`|`GET /api/v1/document-types/{document_type_id}/numbering-preview`|`SAFE_READ`|`200 NumberingPreviewView`|`JSON_NO_STORE`|optional area_id|`A + N + validation.failed`|
 |43|`listTemplateConfigurations`|`GET /api/v1/document-governance/templates`|`SAFE_READ`|`200 TemplateConfigurationPage`|`JSON_NO_STORE`|`PAGED`; document.code,document_id|`A`|
 
-Rows35/38/39 are promotion-blocked by §8.1.
-
 ## 6.2 Operations 44→77
 
 |#|operationId|Method + path|Request/profile|Success|Headers|Query/order|Problems|
@@ -1003,7 +1010,7 @@ Rows35/38/39 are promotion-blocked by §8.1.
 |76|`getObsolescenceRequest`|`GET /api/v1/obsolescence-requests/{request_id}`|`SAFE_READ`|`200 ObsolescenceRequestView`|`JSON_NO_STORE`|none|`A + N`|
 |77|`withdrawObsolescenceRequest`|`PUT /api/v1/obsolescence-requests/{request_id}/withdrawal`|no body / `UNSAFE_CSRF`|`201 ObsolescenceWithdrawalView` first; `200` exact repeat|`JSON_NO_STORE`|none|`U + N + S`|
 
-Row67 is promotion-blocked by §8.1. Row59 is fully expressible through existing T8-C after §2.10 consumer precision.
+Row59 is fully expressible through existing T8-C after §2.10 consumer precision.
 
 ## 6.3 Audit — 78
 
@@ -1070,23 +1077,15 @@ representative accepted DOCX/PDF set
 
 ---
 
-# 8. Bounded upstream contradictions exposed by T8-E
+# 8. Bounded upstream findings exposed by T8-E — RESOLVED
 
-Evidence-triggered bounded reopens only; no whole-architecture reopening.
+Both findings below were evidence-triggered bounded corrections, explicitly operator-approved on 2026-08-20 and reconciled in their owning durable authorities. Neither reopened Product, lifecycle, ownership, topology, or the 78-operation census.
 
-## 8.1 T8-D — Governance Step label preservation
+## 8.1 T8-D — Governance Step label preservation — RESOLVED
 
-Product/T6 requires human-facing configured Step labels and GovernanceAttempt freezes exact route snapshot. T8-D persists current/frozen steps without any label field. Resolving a historical label from current config would let later config rename rewrite old governed context.
+Product/T6 requires human-facing configured Step labels and GovernanceAttempt freezes exact route snapshot. T8-D originally persisted current/frozen steps without any label field, allowing a later relabel to rewrite historical governed context.
 
-```text
-KNOWN     Product Step label exists
-KNOWN     attempt freezes route snapshot
-KNOWN     T8-D current/frozen step shape omits label
-MATERIAL  historical governed context / persistent meaning
-OUTCOME   bounded T8-D completeness correction
-```
-
-Smallest correction if operator ratifies:
+Operator-approved correction now durable in T8-D:
 
 ```text
 controlled_docs.document_type_governance_steps
@@ -1097,19 +1096,17 @@ controlled_docs.governance_attempt_steps
 
 Attempt creation copies immutable `label_snapshot`. Zero new tables/owners/lifecycles/selectors/candidate APIs/workflow platform/operations.
 
-## 8.2 T3 — unreachable ProviderSubjectBinding disabled Audit event
+## 8.2 T3 — unreachable ProviderSubjectBinding disabled Audit event — RESOLVED
 
-T3 required census names `ProviderSubjectBinding accepted / disabled / replaced`, but Product/T6 has only creation + replacement and T8-D explicitly preserves current binding on User offboarding. No Launch binding-disable command/state exists.
+T3 originally named `ProviderSubjectBinding accepted / disabled / replaced`, while Product/T6 has only creation + replacement and T8-D explicitly preserves the current binding on User offboarding.
+
+Operator-approved bounded precision now durable in T3:
 
 ```text
-KNOWN     T3 text names disabled event
-KNOWN     no operation disables binding
-KNOWN     T8-D offboarding preserves binding
-MATERIAL  public Audit enum must contain reachable semantic events only
-OUTCOME   bounded T3 precision: remove disabled from required binding Audit census
+ProviderSubjectBinding accepted / replaced
 ```
 
-No Product operation/persistence field/replacement behavior changes. Wire exposes only `provider_binding.accepted|replaced` pending operator adjudication.
+No Product operation, persistence field, replacement behavior, or offboarding behavior changed. The impossible Audit event was removed rather than manufacturing a binding-disable transition.
 
 ## 8.3 Subtractive result — no T8-C reopen for direct PUT
 
@@ -1121,9 +1118,7 @@ consumer call: maxBytes = expected_size_bytes
 provider PUT profile: exact Content-Length = maxBytes
 ```
 
-A capability that allows exactly `maxBytes` bytes is a valid, stricter realization of an at-most-`maxBytes` contract. Therefore the current seam is sufficient; no new parameter or durable authority is needed. This is retained as an explicit subtractive finding so a later Writer does not reintroduce a pointless T8-C change.
-
-T8-E cannot promote until §8.1/§8.2 are explicitly reconciled with their owning durable authorities.
+A capability that allows exactly `maxBytes` bytes is a valid stricter realization of an at-most-`maxBytes` contract. No new parameter or durable authority is needed.
 
 ---
 
@@ -1180,7 +1175,8 @@ Idempotency-Key replay/different fingerprint/24h expiry
 cursor tamper/filter replay
 complete creation/options arrays
 upload exact Content-Length/create-once/shared15min expiry + completion size re-proof
-Audit operation/resource/facts combinations
+Governance Step historical label snapshot survives current-route relabel
+Audit operation/resource/facts combinations exclude provider_binding.disabled
 router404/405 without implicit HEAD/OPTIONS
 exact bytes verified before response commit
 Range/redirect/206/304/compression absent
@@ -1234,25 +1230,23 @@ duplicate PDF rendition bytes for PDF source
 dormant future capability
 ```
 
-The two material upstream findings in §8.1/§8.2 are bounded completeness contradictions. Neither justifies reopening Product, lifecycle, ownership, topology, or the 78-operation census.
+The two upstream material findings were resolved by the smallest owner-local corrections: two persistence fields for truthful Step-label history and one impossible Audit event removed.
 
 ---
 
 # 11. Remaining closure gate
 
 ```text
-A. operator adjudication + durable reconciliation of §8.1 T8-D Step label
-B. operator adjudication + durable reconciliation of §8.2 T3 binding-disabled Audit census
-C. representative DOCX/PDF measurement -> freeze §7 numeric ceilings
-D. disposable pinned Go+TS generation/compile/type probe
-E. exact contract fixtures over all 78 rows
-F. final whole-candidate Structural Inversion / YAGNI / overengineering / global-coherence pass
-G. only then create review/t8e-fable from exact candidate HEAD
-H. Lead adjudication
-I. explicit operator ratification
+A. representative DOCX/PDF measurement -> freeze §7 numeric ceilings
+B. disposable pinned Go+TS generation/compile/type probe
+C. exact contract fixtures over all 78 rows
+D. final whole-candidate Structural Inversion / YAGNI / overengineering / global-coherence pass
+E. only then create review/t8e-fable from exact candidate HEAD
+F. Lead adjudication
+G. explicit operator ratification
 ```
 
-Until A→F converge:
+Until A→D converge:
 
 ```text
 T8-E ACTIVE
