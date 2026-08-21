@@ -1,1 +1,1 @@
-purpose: rerun promoted T8-E coherence proof after harness-only fix; delete after run
+purpose: run minimal promoted T8-E tail proof after wire proof; delete after run
