@@ -112,9 +112,9 @@ jobs:
             docs/architecture/backend.md \
             docs/architecture/interfaces.md \
             docs/architecture/persistence.md \
+            docs/architecture/wire-contract.md \
             docs/decisions/api-operation-census.md \
-            docs/decisions/forward-obligations.md \
-            docs/reference/t8e-checkpoint.md; do
+            docs/decisions/forward-obligations.md; do
             test -f "$path"
           done
 
@@ -123,12 +123,12 @@ jobs:
           from pathlib import Path
           import re
           p = Path('docs/decisions/forward-obligations.md').read_text()
-          expected = {'PRESERVE': 21, 'REOPEN': 4, 'DEFERRED': 27}
+          expected = {'PRESERVE': 21, 'REOPEN': 3, 'DEFERRED': 27}
           for kind, count in expected.items():
               actual = len(re.findall(rf'^- \*\*[^*\n]+ — {kind}\*\* —', p, re.M))
               if actual != count:
                   raise SystemExit(f'{kind}: expected {count}, got {actual}')
-          if 'TOTAL     52' not in p:
+          if 'TOTAL     51' not in p:
               raise SystemExit('forward-obligation total proof missing')
           PY
 
@@ -159,11 +159,11 @@ jobs:
           start = (root / 'docs/index.md').resolve()
           seen, stack = set(), [start]
           while stack:
-              p = stack.pop()
-              if p in seen:
-                  continue
-              seen.add(p)
-              stack.extend(t for t in targets(p) if t not in seen)
+            p = stack.pop()
+            if p in seen:
+              continue
+            seen.add(p)
+            stack.extend(t for t in targets(p) if t not in seen)
 
           durable = {
               p.resolve() for p in (root / 'docs').rglob('*.md')
