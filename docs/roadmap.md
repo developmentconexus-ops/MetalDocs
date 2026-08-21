@@ -44,7 +44,7 @@ docs/architecture/runtime.md
 + docs/decisions/t8g-ratification.md
 ```
 
-The operator explicitly ratified the converged T8-G design after required CI #1066 passed on independently reviewed candidate `2f6c6f084fa368cceeef5e97b0c846cc381f4ab1` and Fable Round 2 returned **CONVERGED / MATERIAL findings = 0 / Round 3 NOT JUSTIFIED**. Integration remains a separate operator gate.
+The operator explicitly ratified the converged T8-G design after required CI #1066 passed on independently reviewed candidate `2f6c6f084fa368cceeef5e97b0c846cc381f4ab1` and Fable Round 2 returned **CONVERGED / MATERIAL findings = 0 / Round 3 NOT JUSTIFIED**. The ratification carrier is `1742b5628427151dd9c24761e68b1ac10937d736`; required CI #1074 passed on that exact Draft HEAD. Integration remains a separate operator gate.
 
 Ratified Global Maximum:
 
@@ -190,8 +190,7 @@ T8-G changes none of those counts.
 ## Exact next action
 
 ```text
-revalidate exact T8-G ratification-carrier HEAD
-→ required Repository Standard CI must pass on that exact HEAD while Draft
+revalidate exact ratified T8-G carrier HEAD
 → await explicit operator integration authorization
 → only then mark PR #144 ready
 → required post-ready CI must pass on the exact authorized HEAD
