@@ -65,9 +65,11 @@ Round 3                             NOT JUSTIFIED
 post-review status carrier          da0ffffc386a1335a866a9416cdcf7625de2ac02
 status-carrier required CI          #1112 SUCCESS
 operator ratification               EXPLICIT / 2026-08-21
+closure candidate                  8c2ae8515fecf513cfd699e9d0e53eb2551fd835
+closure required CI                #1117 SUCCESS
 ```
 
-The post-review status carrier changed only roadmap plus the temporary T8-H ledger; it changed no independently reviewed technical authority. The temporary ledger has now been removed from the closure candidate.
+The post-review status carrier changed only roadmap plus the temporary T8-H ledger; it changed no independently reviewed technical authority. The temporary ledger has now been removed from the closure candidate. CI #1116 correctly rejected the first closure attempt because the new durable T8-H ratification record was not yet reachable; the decision register now routes it explicitly and #1117 passed.
 
 ## Integrated T8 baseline preserved by T8-H
 
@@ -98,9 +100,9 @@ The bounded T8-E-FR read-symmetry meaning remains unchanged and is executable on
 ## Exact next action
 
 ```text
-run required CI on the exact T8-H closure candidate
-→ if green, mark PR #148 ready for review
-→ obtain explicit operator merge authorization
+mark PR #148 ready for review
+→ run required CI on the exact same closure candidate as a merge candidate
+→ if green, obtain explicit operator merge authorization
 → squash-merge PR #148 only after that authorization
 → revalidate integrated main and final T8-H tree
 → only then may T9 be opened
