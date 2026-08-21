@@ -2,7 +2,7 @@
 
 > **Status:** CLOSED / OPERATOR-RATIFIED / PROMOTED  
 > **Ratified:** 2026-08-20  
-> **T8-E bounded correction:** 2026-08-20 — Governance Step label persistence + immutable attempt label snapshot  
+> **T8-E bounded correction:** 2026-08-20 — Governance Step label persistence + immutable attempt label snapshot
 > **Repository:** `developmentconexus-ops/MetalDocs`  
 > **Branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131  
 > **Method:** DevelopmentConexus Engineering Method v1.0.0  
@@ -77,7 +77,7 @@ Inherited unchanged from T2/T8-C:
 
 ```text
 PostgreSQL READ COMMITTED
-+ narrow explicit row serialization where required
++ narrow explicit serialization where required
 + explicit monotonic OCC/CAS
 + structural constraints where required
 ```
