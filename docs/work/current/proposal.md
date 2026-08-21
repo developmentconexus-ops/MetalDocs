@@ -153,6 +153,12 @@ ProviderSubjectRef
   server-resolvable anti-corruption handle for exact issuer+subject
   unchanged binding returns byte-stable ref
   client never parses it or treats it as Product identity
+
+EmailAddress
+  trim surrounding whitespace
+  minLength=3; maxLength=254; OpenAPI format=email
+  no case-folding/canonicalization, uniqueness or verification claim
+  profile/contact metadata only; never authentication or Authorization identity
 ```
 
 Other human text is nonblank where stated and is bounded by the aggregate JSON ceiling rather than unrelated guessed per-field maxima.
@@ -977,13 +983,13 @@ All path `*_id` parameters are required `Uuid`. `PAGED` means §2.7. JSON reques
 |---:|---|---|---|---|---|---|---|
 |44|`getDocumentCreationOptions`|`GET /api/v1/document-creation/options`|`SAFE_READ`|`200 DocumentCreationOptionsView`|`JSON_NO_STORE`|optional area_id,document_type_id; §2.7|`A + N + validation.failed`|
 |45|`listDocuments`|`GET /api/v1/documents`|`SAFE_READ`|`200 DocumentPage`|`JSON_NO_STORE`|first page q,document_type_id,area_id,responsible_owner_user_id,status,limit; §2.3/2.7|`A + validation.failed`|
-|46|`createDocument`|`POST /api/v1/documents`|`CreateDocumentRequest` / `IDEMPOTENT_CREATE`|`201 CreateDocumentResult`|`JSON_NO_STORE`|none|`U + J + I + S`|
+|46|`createDocument`|`POST /api/v1/documents`|`CreateDocumentRequest` / `IDEMPOTENT_CREATE`|`201 CreateDocumentResult`|`JSON_NO_STORE`|none|`U + J + I + S + X`|
 |47|`getDocument`|`GET /api/v1/documents/{document_id}`|`SAFE_READ`|`200 DocumentOfficialView`|`JSON_NO_STORE`|none|`B + N`|
 |48|`getDocumentResponsibleOwner`|`GET /api/v1/documents/{document_id}/responsible-owner`|`SAFE_READ`|`200 ResponsibleOwnerView`|`JSON_ETAG`|none|`A + N`|
 |49|`replaceDocumentResponsibleOwner`|`PUT /api/v1/documents/{document_id}/responsible-owner`|`ReplaceResponsibleOwnerRequest` / `IF_MATCH_MUTATION`|`200 ResponsibleOwnerView`|`JSON_ETAG_MUTATION`|none|`U + J + N + P + S`|
 |50|`getDocumentTemplateRole`|`GET /api/v1/documents/{document_id}/template-role`|`SAFE_READ`|`200 TemplateRoleView`|`JSON_ETAG`|none|`A + N`|
 |51|`replaceDocumentTemplateRole`|`PUT /api/v1/documents/{document_id}/template-role`|`ReplaceTemplateRoleRequest` / `IF_MATCH_MUTATION`|`200 TemplateRoleView`|`JSON_ETAG_MUTATION`|none|`U + J + N + P + S`|
-|52|`createDocumentRevision`|`POST /api/v1/documents/{document_id}/revisions`|no body / `IDEMPOTENT_CREATE`|`201 CreateRevisionResult`|`JSON_NO_STORE`|none|`U + N + I + S`|
+|52|`createDocumentRevision`|`POST /api/v1/documents/{document_id}/revisions`|no body / `IDEMPOTENT_CREATE`|`201 CreateRevisionResult`|`JSON_NO_STORE`|none|`U + N + I + S + X`|
 |53|`getDocumentHistory`|`GET /api/v1/documents/{document_id}/history`|`SAFE_READ`|`200 DocumentHistoryPage`|`JSON_NO_STORE`|`PAGED`; occurred_at ASC,kind,semantic id|`A + N`|
 |54|`listAuthoringWork`|`GET /api/v1/work/authoring`|`SAFE_READ`|`200 WorkAuthoringPage`|`JSON_NO_STORE`|`PAGED`; document.code,document_id|`B`|
 |55|`listGovernanceWork`|`GET /api/v1/work/governance`|`SAFE_READ`|`200 WorkGovernancePage`|`JSON_NO_STORE`|`PAGED`; governance_attempt_id|`B`|
@@ -993,7 +999,7 @@ All path `*_id` parameters are required `Uuid`. `PAGED` means §2.7. JSON reques
 |59|`startRevisionDraftUpload`|`POST /api/v1/revisions/{revision_id}/draft/uploads`|`StartDraftUploadRequest` / `UNSAFE_CSRF`|`201 DraftUploadAllocation`|`JSON_NO_STORE`|none|`U + J + N + S`|
 |60|`completeRevisionDraftUpload`|`POST /api/v1/revisions/{revision_id}/draft/uploads/{upload_id}/complete`|no body / `UNSAFE_CSRF`|`204` live READY repeat|`NO_STORE`|none|`U + N + S + state.upload_expired + validation.content_invalid`|
 |61|`getRevisionDraftSource`|`GET /api/v1/revisions/{revision_id}/draft/source`|`SAFE_READ`|`200 exact bytes`|`EXACT_BYTES`|none|`A + N + X`|
-|62|`createSubmission`|`POST /api/v1/revisions/{revision_id}/submissions`|no body / `SUBMISSION_CREATE`|`201 SubmissionCreateResult`|`JSON_NO_STORE`|none|`U + N + I + D + S + validation.failed + validation.content_malicious + dependency.malware_inspector_unavailable`|
+|62|`createSubmission`|`POST /api/v1/revisions/{revision_id}/submissions`|no body / `SUBMISSION_CREATE`|`201 SubmissionCreateResult`|`JSON_NO_STORE`|none|`U + N + I + D + S + X + validation.failed + validation.content_malicious + dependency.malware_inspector_unavailable`|
 |63|`getSubmission`|`GET /api/v1/submissions/{submission_id}`|`SAFE_READ`|`200 SubmissionView`|`JSON_NO_STORE`|none|`A + N`|
 |64|`getSubmissionSource`|`GET /api/v1/submissions/{submission_id}/source`|`SAFE_READ`|`200 exact bytes`|`EXACT_BYTES`|none|`A + N + X`|
 |65|`withdrawSubmission`|`PUT /api/v1/submissions/{submission_id}/withdrawal`|no body / `UNSAFE_CSRF`|`201 SubmissionWithdrawalView` first; `200` exact repeat|`JSON_NO_STORE`|none|`U + N + S`|
@@ -1032,19 +1038,76 @@ TOTAL                                78
 
 ---
 
-# 7. Document admission limits — measured prerequisite
+# 7. Document admission limits — measured Launch candidate
 
-Do not substitute internet defaults for Product corpus evidence.
-
-Current repository search contains no named representative `.docx`/`.pdf` binary corpus. Before T8-E promotion, measure representative controlled-document files and freeze:
+The Launch candidate freezes exactly three resource ceilings:
 
 ```text
-DOC_RAW_MAX_BYTES
-DOCX_EXPANDED_MAX_BYTES
-DOCX_MAX_ZIP_ENTRIES
+DOC_RAW_MAX_BYTES        = 104857600  // 100 MiB; DOCX and PDF
+DOCX_EXPANDED_MAX_BYTES  = 268435456  // 256 MiB; streamed top-level OPC expansion
+DOCX_MAX_ZIP_ENTRIES     = 4096       // top-level ZIP entries
 ```
 
-Closed structural laws independent of final numbers:
+These are application admission limits, not claims about the theoretical maximum accepted by Microsoft Word, S3, a DAM, or another provider.
+
+Measured real corpus supplied during T8-E:
+
+```text
+ForgeFlow_Arquitetura_Base_v01.docx
+  raw bytes              22,863
+  ZIP entries            24
+  file entries           20
+  expanded bytes         284,172
+  embedded media entries 0
+  expanded/raw           12.43x
+
+PO-05-04 Projeto e Desenvolvimento.pdf
+  raw bytes              445,131
+  pages                  11
+  encrypted              no
+```
+
+The largest measured real sample therefore sits below the candidate ceilings by approximately:
+
+```text
+raw bytes       235x
+DOCX expansion  944x
+ZIP entries     170x
+```
+
+The deliberately large headroom is necessary because the supplied DOCX contains tables/formatting but no embedded media, while ordinary future controlled documents may contain images, headers/footers, page/section breaks and richer OOXML parts. The limits are still materially below generic DAM/large-media scales.
+
+Adversarial disposable probes demonstrate that each control protects a different resource:
+
+```text
+expanded_above_256m.docx
+  raw       306,139 bytes
+  expanded  314,572,846 bytes
+  -> reject by DOCX_EXPANDED_MAX_BYTES
+
+many_entries.docx
+  raw       628,056 bytes
+  entries   5,002
+  expanded  320,040 bytes
+  -> reject by DOCX_MAX_ZIP_ENTRIES
+
+duplicate_parts.docx
+  duplicate canonical ZIP part name
+  -> reject structurally
+
+traversal.docx
+  parent-traversal ZIP path
+  -> reject structurally
+
+expanded_bomb.docx
+  raw       130,838 bytes
+  expanded  134,217,774 bytes
+  -> high compression ratio alone is NOT invalid because actual resource use remains inside the explicit expanded-byte budget
+```
+
+Industry comparables are sanity bounds only, never Product authority: controlled-document products commonly admit individual files around the 100 MB class, while DAM/large-media products allow materially larger files. MetalDocs therefore keeps a conservative controlled-document Launch ceiling rather than importing DAM-scale behavior.
+
+Closed structural laws:
 
 ```text
 DOCX = valid top-level OOXML/OPC ZIP with WordprocessingML main document
@@ -1058,22 +1121,30 @@ PDF = structurally parseable PDF; encrypted/password-protected PDF rejected at L
 client filename/Content-Type never decides actual ContentFormat
 ```
 
-Validation does not recursively unpack arbitrary embedded archives, so application archive depth is exactly one and no generic nested-archive framework/ratio limit is added. Malware inspection remains a separate exact-byte governed-boundary control.
+Validation does not recursively unpack arbitrary embedded archives, so application archive depth is exactly one. No generic nested-archive framework or compression-ratio threshold is added. Malware inspection remains a separate exact-byte governed-boundary control.
 
-Measurement protocol:
+Boundary behavior is exact:
 
 ```text
-representative accepted DOCX/PDF set
--> raw byte count by format
--> DOCX top-level entry count
--> DOCX total streamed expanded bytes
--> interactive-editor save/reopen corpus constraints
--> server-side rendition/converter constraints
--> smallest ceiling admitting required corpus + explicit operating headroom
--> fixture immediately below/above every ceiling
+expected_size_bytes > DOC_RAW_MAX_BYTES
+  -> allocation rejected before provider capability exists
+
+actual provider bytes != expected_size_bytes
+  -> completion rejected; READY not established
+
+actual DOCX expanded bytes > DOCX_EXPANDED_MAX_BYTES
+  -> 422 validation.content_invalid
+
+actual DOCX ZIP entries > DOCX_MAX_ZIP_ENTRIES
+  -> 422 validation.content_invalid
+
+structural path/duplicate/encryption/package violation
+  -> 422 validation.content_invalid
 ```
 
-`DraftUploadAllocation.max_bytes = DOC_RAW_MAX_BYTES`; `StartDraftUploadRequest.expected_size_bytes <= DOC_RAW_MAX_BYTES`. Multipart remains absent unless measured accepted files make single create-only PUT materially inadequate.
+`DraftUploadAllocation.max_bytes = DOC_RAW_MAX_BYTES`; `StartDraftUploadRequest.expected_size_bytes <= DOC_RAW_MAX_BYTES`.
+
+Multipart, recursive archive inspection, compression-ratio thresholds and DAM-scale upload machinery remain absent. A later measured ordinary controlled document that cannot fit these ceilings is a bounded admission-limit reopen, not permission to raise limits silently.
 
 ---
 
@@ -1122,76 +1193,170 @@ A capability that allows exactly `maxBytes` bytes is a valid stricter realizatio
 
 ---
 
-# 9. Generation / runtime conformance proof
+# 9. Generation / provider feasibility and runtime conformance proof
 
-Disposable probe pins (evidence only, not dependency authorization):
+Disposable probe pins are evidence only; they do not pre-authorize T8-G runtime/toolchain choices:
 
 ```text
 Go          oapi-codegen v2.8.0 strict-server
 TypeScript  openapi-typescript 7.13.0 paths/components
+S3 probe    AWS SDK for Go v2 service/s3 v1.106.2
 ```
 
-Probe must prove:
+## 9.1 Generated boundary feasibility — PASS
+
+A disposable OpenAPI 3.0.3 probe exercised the actual T8-E encoding patterns rather than a scalar-only toy schema:
 
 ```text
-spec validates as OpenAPI3.0.3 before codegen
-additionalProperties:false creates no arbitrary generated map/index authority
-required/optional/nullable remain distinct
-closed enums finite
-oneOf unions avoid any/untyped escape
-safe-integer bounds survive TS generation
-multiple success statuses form closed typed response set
-per-operation Problems need no default response
-strict-server unexpected errors route through canonical RFC9457 500 serializer
-incoming request validation is separately demonstrated, not assumed from strict generation
-65,536-byte extension is enforced by central request boundary
-unknown JSON/query/bodyless-body cases reject exactly as §2.2
-one Go wire package + one TS paths/components output remain sole generated authorities
-no generator/provider field leaks into Product wire
+additionalProperties:false
+required nullable member
+optional non-nullable member
+closed string enum
+safe-integer maximum 9007199254740991
+oneOf + discriminator union
+multiple success responses 200 + 201
+operation-specific RFC9457 response schemas
+strict Go server response objects
+TypeScript paths/components
 ```
 
-Runtime path:
+Execution evidence:
+
+```text
+oapi-codegen v2.8.0
+  generator built successfully
+  runner Go 1.24.13 automatically acquired Go 1.26.7 because generator requires Go >=1.25
+  generated Go compiled
+  generated Go tests PASS
+
+openapi-typescript 7.13.0
+  generated declarations successfully
+  TypeScript 5.9.2 strict noEmit probe PASS
+```
+
+Observed generated properties:
+
+```text
+Go
+  fixed objects gained no AdditionalProperties field
+  required nullable stayed non-omitempty
+  optional member stayed omitempty
+  required nullable Page.next_cursor serialized as explicit null
+  strict response set contained distinct 200 and 201 JSON response objects
+
+TypeScript
+  closed enum -> "active" | "retired"
+  next_cursor -> string | null
+  required_nullable -> required string | null
+  optional_nonnullable -> optional string
+  200 and 201 response keys both present
+  negative compile probes rejected undeclared enum, missing required nullable,
+    extra fixed-object member and unknown discriminator
+```
+
+`oapi-codegen` represents `oneOf` internally with private `json.RawMessage` union storage plus typed conversion helpers. That is generated encoding mechanism, not a public `any`/map, provider identifier or second DTO authority.
+
+The generator's build-time Go requirement is **not** a MetalDocs runtime Go-version decision; T8-G remains free to select the compatible runtime/toolchain floor.
+
+## 9.2 Direct S3 PUT constraint feasibility — PASS
+
+A disposable AWS SDK Go v2 presign probe used:
+
+```text
+PutObjectInput:
+  ContentLength = 12345
+  IfNoneMatch   = "*"
+```
+
+and produced:
+
+```text
+Content-Length=["12345"]
+If-None-Match=["*"]
+X-Amz-SignedHeaders=content-length;host;if-none-match
+```
+
+Therefore the concrete reference provider can bind both exact body length and create-only precondition in the signed PUT request without POST-form/multipart.
+
+Browser feasibility also closes the public contract:
+
+```text
+If-None-Match   browser-settable request header; not Fetch-forbidden
+Content-Length  script-forbidden but user-agent generated from the fixed Blob/File body
+cross-origin PUT uses normal provider CORS preflight for returned browser-settable headers
+```
+
+Exact provider CORS configuration belongs T8-G. T8-E requires only that `required_headers` be returned and applied verbatim and that the upload body have known fixed length.
+
+## 9.3 Closed ledger fixture proof — PASS
+
+A mechanical Lead proof compared the candidate ledger against the canonical Product/T6 census and special profiles:
+
+```text
+ledger rows                         78
+row numbers                         exact 1..78
+method+path census                  exact match; zero missing/extra
+operationId                         78 unique
+family partition                    3 / 26 / 4 / 10 / 34 / 1
+Idempotency-Key POST creations      exact accepted 10
+ETag concurrency domains            13 GET/mutation domains
+exact-byte application resources    exact accepted 4
+operation 79                         absent
+```
+
+The proof also checks that unsafe application operations use a CSRF-bearing request profile and that JSON-body operations carry the closed structural/media/size validation family where applicable.
+
+The final OpenAPI must expand proposal macros (`A`, `B`, `U`, `J`, etc.) into explicit per-operation response schemas; macros never survive as executable ambiguity.
+
+## 9.4 Runtime conformance contract
+
+T8-E closes the proof architecture; it does not fabricate an application runtime while implementation is blocked:
 
 ```text
 raw HTTP
--> route/raw limits/session/CSRF
--> central OpenAPI + strict-request validation
--> generated typed request
+-> route/raw envelope limit
+-> ApplicationSession
+-> CSRF for unsafe request
+-> central OpenAPI + strict request validation
+-> generated typed request boundary
 -> semantic application
--> generated typed response
+-> generated typed response boundary
 -> HTTP
--> contract fixture validates exact status/headers/body/Problem
+-> contract fixture validates exact status + headers + body/Problem
 ```
 
-Required negative fixtures additionally cover:
+Required negative/edge fixture classes:
 
 ```text
 all 78 rows and no 79th
+unknown path ->404; undeclared method ->405 exact Allow
+unknown JSON/query member and duplicate scalar/member rejection
+bodyless operation rejects a body
+wrong media/content coding and 65,536-byte JSON ceiling
 role bundles/scope matrix
-wrong-domain/stale ETags + exact-current PUT exception
+wrong-domain/tampered/stale ETags + exact-current PUT exception
 stale DRAFT always412
-PROFILE_REPLACE matrix
-Idempotency-Key replay/different fingerprint/24h expiry
-cursor tamper/filter replay
+PROFILE_REPLACE If-Match/If-None-Match matrix
+Idempotency-Key replay/different fingerprint/24h expiry/current-AuthZ recheck
+cursor tamper/filter replay/ordering
 complete creation/options arrays
 upload exact Content-Length/create-once/shared15min expiry + completion size re-proof
+100 MiB raw / 256 MiB expanded / 4096-entry admission boundaries
+duplicate/traversal/encrypted/invalid package rejection
 Governance Step historical label snapshot survives current-route relabel
 Audit operation/resource/facts combinations exclude provider_binding.disabled
-router404/405 without implicit HEAD/OPTIONS
 exact bytes verified before response commit
 Range/redirect/206/304/compression absent
 Content-Digest == exact body SHA-256
-corrupt semantic bytes ->500 with zero success bytes
+corrupt semantic bytes ->500 internal.content_integrity with zero success bytes
+semantic byte-copy mutations may emit only their declared internal.content_integrity path
 ReplaySnapshot <=2048
 PDF-source RequireOfficialRendition creates no duplicate bytes/job
-all measured document ceilings
 ```
 
-No generic production response-buffer validator is added. Generated typed output + contract tests remain accepted minimum.
+No generic production response-buffer validator is added. Generated typed output plus targeted contract tests remain the accepted minimum. Actual runtime execution of these fixtures belongs to the later validation/implementation program once a runtime exists.
 
-Current Lead execution environment has Go1.23.2/Node22 but not the pinned generator binaries and no direct package-network access; executable generation/compile probe remains **OPEN**, never papered over by documentation evidence.
-
-External evidence checked: OpenAPI3.0.3; RFC9110; RFC9457; RFC9530; OWASP upload/archive resource controls; AWS S3 PutObject/conditional-write/SigV4 content-length behavior; current `oapi-codegen` and `openapi-typescript` docs.
+External evidence checked during T8-E includes OpenAPI 3.0.3, RFC9110, RFC9457, RFC9530, Fetch forbidden-header behavior, OWASP archive/upload resource controls, current AWS S3 PutObject/presigning behavior, controlled-document upload limits, Stripe/Adyen idempotency practice, and current `oapi-codegen` / `openapi-typescript` behavior.
 
 ---
 
@@ -1236,17 +1401,21 @@ The two upstream material findings were resolved by the smallest owner-local cor
 
 # 11. Remaining closure gate
 
+The measurement, generated-boundary feasibility, provider presign feasibility and ledger-census fixture obligations are closed at candidate level.
+
+Remaining Lead gate:
+
 ```text
-A. representative DOCX/PDF measurement -> freeze §7 numeric ceilings
-B. disposable pinned Go+TS generation/compile/type probe
-C. exact contract fixtures over all 78 rows
-D. final whole-candidate Structural Inversion / YAGNI / overengineering / global-coherence pass
-E. only then create review/t8e-fable from exact candidate HEAD
-F. Lead adjudication
+A. run one final whole-candidate Structural Inversion / YAGNI / overengineering / global-coherence attack
+B. close every surviving Lead finding without speculative capability
+C. revalidate exact candidate HEAD + intended 5-file durable/work diff + required CI
+D. only if A→C converge, create review/t8e-fable from that exact candidate HEAD
+E. independent Fable challenge
+F. Lead adjudication of Fable evidence
 G. explicit operator ratification
 ```
 
-Until A→D converge:
+Until A→C converge:
 
 ```text
 T8-E ACTIVE
