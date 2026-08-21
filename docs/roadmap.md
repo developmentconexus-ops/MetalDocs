@@ -27,16 +27,19 @@ T8-E — Executable Wire Contract, active in Draft PR #136 on branch `arch/t8e-w
 
 Accepted work through the previous four T8-E layers is preserved at `docs/reference/t8e-checkpoint.md`. The current application census is 78 operations and is owned by `docs/product/journeys.md` plus `docs/decisions/api-operation-census.md`.
 
-The active candidate now contains the closed 78-operation request/success/header/problem/filter/action ledger. Final promotion is blocked only by two evidence-triggered bounded upstream reconciliations plus the remaining measurement/executable proofs recorded in `docs/work/current/proposal.md`.
+The active candidate contains the closed 78-operation request/success/header/problem/filter/action ledger. The two material upstream contradictions exposed by that ledger were operator-approved and reconciled on 2026-08-20:
+
+```text
+T8-D  Governance Step label + immutable attempt label snapshot
+T3    unreachable ProviderSubjectBinding-disabled Audit census entry removed
+```
+
+The direct-PUT exact-length concern was resolved subtractively without reopening T8-C: the existing `PresignCreate(handle,maxBytes,ttl)` seam is sufficient when T8-E supplies `maxBytes=expected_size_bytes` and the provider PUT profile binds that value as exact `Content-Length`.
 
 ## Exact next action
 
 ```text
-adjudicate the two bounded contradictions exposed by the executable ledger
-→ T8-D Governance Step label + immutable label snapshot
-→ T3 unreachable ProviderSubjectBinding-disabled Audit census entry
-→ reconcile only those implicated durable authorities after explicit operator approval
-→ measure representative DOCX/PDF corpus and freeze raw/expanded/ZIP ceilings
+measure representative DOCX/PDF corpus and freeze raw/expanded/ZIP ceilings
 → run pinned Go + TypeScript generation/compile/type probe
 → prove exact request/response fixtures across all 78 operation rows
 → final Structural Inversion / YAGNI / overengineering / global-coherence pass
@@ -45,9 +48,7 @@ adjudicate the two bounded contradictions exposed by the executable ledger
 → explicit operator ratification
 ```
 
-The direct-PUT exact-length concern does **not** require a T8-C reopen: the existing `PresignCreate(handle,maxBytes,ttl)` seam is sufficient when the T8-E consumer supplies `maxBytes=expected_size_bytes` and the provider PUT profile binds that value as exact `Content-Length`.
-
-Do not reopen the accepted T8-E checkpoint or any completed T1→T8-D decision by preference. Only the two named material contradictions above are bounded reopen candidates; Product/T6 operation census remains closed at 78.
+Do not reopen the accepted T8-E checkpoint or completed T1→T8-D decisions by preference. Product/T6 operation census remains closed at 78; new material evidence reopens only the authority it actually implicates.
 
 ## Remaining architecture program
 
