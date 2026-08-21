@@ -12,24 +12,13 @@ summary: Branch-only T8-H adversarial review ledger for cross-stage realization 
 > **Implementation:** BLOCKED
 > **Scope:** T8-A→T8-G coherence only; T9 is not open.
 
-This is temporary branch-only work. It must not enter `main`. Durable meaning lives in the owning authorities; mutable program status lives only in `docs/roadmap.md`.
+This is temporary branch-only work. Durable authority lives in the owning T8 documents and mutable program state lives only in `docs/roadmap.md`. This ledger must not enter `main`.
 
-## 1. Review objective
+## 1. Review question
 
-T8-H asks whether T8-A→T8-G form one executable technical realization without:
+> Do T8-A→T8-G form one executable technical realization without duplicate/missing authority, incompatible assumptions, removed required seams or accidental complexity created by the architecture itself?
 
-```text
-duplicate or missing authority
-incompatible assumptions
-removed required seams
-repeated correctness machinery
-speculative capability
-accidental complexity created by the architecture itself
-```
-
-The review follows DevelopmentConexus Engineering Method v1.0.0. Accepted stages reopen only on material evidence, never preference.
-
-Bounded primary pack:
+Bounded review pack:
 
 ```text
 T8-A  docs/architecture/technical-baseline.md
@@ -41,227 +30,141 @@ T8-F  docs/architecture/frontend.md
 T8-G  docs/architecture/runtime.md
 ```
 
-Additional files were opened only for concrete authority/routing seams.
+Additional authority was opened only for concrete seams: frontend read-symmetry provenance, T8-F/T8-G ratification records, decision register and documentation/CI governance.
 
 ## 2. Opening revalidation
 
 ```text
 main                              0b4ef6ef891b01f907804cff4bd3c0022aebad80
-expected SHA                       MATCH
+expected main SHA                  MATCH
 open PRs                           0
-T8-H branch                        arch/t8h-global-coherence
+candidate branch                   arch/t8h-global-coherence
 Draft PR                           #148
-closeout PR #147                   MERGED
-PR #147 head                       ed0ff1c2883d92b65f6502cfa90798abb1cf8ed3
-CI #1079                           SUCCESS
-CI #1080                           SUCCESS
-CI #1080 job required              SUCCESS
+T8-G closeout PR #147              MERGED
+opening required CI                #1079 / #1080 SUCCESS
 ```
 
-Remote historical/review branches are housekeeping/provenance only.
+Remote historical/candidate/review branches are housekeeping only and do not control stage state.
 
 ## 3. Whole-T8 attack result
 
 | Seam | Result |
 |---|---|
-| T8-A → T8-B clean-slate derivation | PASS |
-| T8-B → T8-C package/consumer fit | H3 found; operator-approved bounded precision assembled |
-| T8-C → T8-D transaction/Audit/AuthZ/idempotency/GC/jobs | PASS |
-| T8-D → T8-E persistence/concurrency → wire | PASS |
-| T8-E → T8-F fresh-navigation/read symmetry | H2 found; operator-approved authority consolidation assembled |
-| T8-F → T8-G concrete runtime consumers | PASS |
-| Whole-T8 mutable status authority | H1 found; operator-approved authority cleanup assembled |
-| Authentication / CSRF | PASS |
+| T8-A → T8-B legacy-shape inheritance | PASS |
+| T8-B → T8-C dependency/package completeness | H3 FOUND / CORRECTED |
+| T8-C → T8-D transaction/Audit/AuthZ/idempotency/GC/River persistence | PASS |
+| T8-D → T8-E ETag/CSRF/replay/exact-byte executability | PASS |
+| T8-E → T8-F fresh-navigation/read symmetry | H2 FOUND / CORRECTED |
+| T8-F → T8-G concrete runtime consumers/YAGNI | PASS |
+| sole mutable status authority | H1 FOUND / CORRECTED |
 | Authorization single ALLOW/default-DENY authority | PASS |
-| same-commit Audit / transaction | PASS |
-| River durable intent | PASS |
-| idempotency / replay | PASS |
-| exact content / exact-byte delivery | PASS |
-| OfficialRendition | PASS |
-| PostgreSQL Search baseline | PASS |
-| application operation census | PASS — 78; operation 79 absent |
+| same-local-commit Audit | PASS |
+| River transaction fit | PASS |
+| idempotency key/fingerprint/replay/24h semantics | PASS |
+| exact-content authority/storage/wire/runtime spool | PASS |
+| same-PDF reuse + conditional DOCX→PDF | PASS |
+| canonical PostgreSQL Search / no dormant external engine | PASS |
+| operation census | PASS — 78; operation 79 absent |
 
-## 4. H1 — mutable status authority duplication
+Current River `database/sql` support was checked as external mechanism evidence and remains compatible with the accepted T8-C/T8-D transaction seam. No new substrate decision was required.
 
-### Finding
+## 4. H1 — mutable status duplication
 
-Durable T8-F/T8-G authority and ratification records retained progression snapshots such as `INTEGRATION PENDING`, `T8-G NOT OPEN` and `T8-H NOT OPEN`, while repository law makes `docs/roadmap.md` the sole mutable stage/status authority.
+**Root cause:** durable architecture/ratification documents captured future program-state snapshots even though roadmap is the sole mutable status authority.
 
-### Operator adjudication
+**Approved correction:** preserve immutable ratification evidence; remove stale integration/downstream-stage assertions; route current progression only to roadmap.
 
-```text
-APPROVED
-```
-
-### Assembled correction
-
-```text
-preserve immutable ratification/review facts
-remove mutable downstream-stage/integration snapshots
-remove INTEGRATION PENDING from current decision dispositions
-point current integration/stage/implementation/next-action state to docs/roadmap.md
-```
-
-Affected durable surfaces:
-
-```text
-docs/architecture/frontend.md
-docs/architecture/runtime.md
-docs/decisions/t8f-ratification.md
-docs/decisions/t8g-ratification.md
-docs/decisions/index.md
-```
-
-No Product or T8 semantic meaning changed.
+**Result:** T8-F/T8-G architecture records, ratification records and decision register no longer act as mutable roadmap copies.
 
 ## 5. H2 — executable wire authority split
 
-### Finding
+**Root cause:** a valid T8-E precision discovered during T8-F remained as a live schema override in `frontend-read-symmetry.md` instead of being folded back into the exact wire SSOT.
 
-The effective operation-47 `DocumentOfficialView` required `frontend-read-symmetry.md` to supersede the schema declared by `wire-contract.md`, leaving two live executable wire sources.
-
-### Operator adjudication
+**Approved correction:** `wire-contract.md` now owns the complete effective `DocumentOfficialView`, including:
 
 ```text
-APPROVED
+open_revision?: OpenRevisionRoutingReference
+active_obsolescence_request_id?: Uuid
 ```
 
-### Assembled correction
+with their exact existence/disclosure laws. `frontend-read-symmetry.md` remains routed decision provenance only and no longer supersedes an executable schema.
 
-`docs/architecture/wire-contract.md` now contains:
+No operation, Permission, Product capability or persisted Document pointer was added.
 
-```text
-OpenRevisionRoutingReference
-DocumentOfficialView.open_revision?
-DocumentOfficialView.active_obsolescence_request_id?
-exact existence + disclosure presence laws
-absence-is-not-nonexistence law
-follow-up Authorization/lifecycle recheck law
-```
+## 6. H3 — missing maintenance application leaf
 
-`docs/decisions/frontend-read-symmetry.md` now preserves decision rationale/provenance only and explicitly does not supersede executable schema. `docs/index.md` routes executable-wire work to `wire-contract.md` alone.
+**Root cause:** T8-C later admitted the concrete T5-J GC consumer inside the already-existing `application` class, but T8-B's frozen package projection was not reflected.
 
-Wire effect remains:
-
-```text
-operations added       0
-operations removed     0
-application census     78
-operation 79           absent
-Permissions added      0
-Problems added         0
-persistence pointers   0
-```
-
-## 6. H3 — missing accepted maintenance leaf
-
-### Finding
-
-T8-C ratified T5-J managed-content GC choreography at `internal/application/maintenance`, but T8-B's frozen package projection omitted that already-accepted leaf.
-
-### Operator adjudication
-
-```text
-APPROVED
-```
-
-### Assembled correction
-
-T8-B now projects:
+**Approved correction:** T8-B now includes:
 
 ```text
 internal/application/maintenance
-  current consumer = T5-J managed-content GC choreography
-  class = existing non-semantic application class
 ```
 
-It adds no semantic owner, public owner surface, dependency class, runtime shell or Product operation.
+for T5-J managed-content GC choreography only. No semantic owner, public owner surface, dependency class, runtime shell or application operation was added.
 
-## 7. Challenged seams with no material finding
-
-### Imported `wiki/...` strings
-
-Documentation governance classifies the remaining imported `wiki/...` authority strings as non-navigational provenance. No cleanup is justified.
-
-### River / `database/sql`
-
-Current River upstream support includes `riverdatabasesql`; its transaction form uses `*sql.Tx` and transactional insertion can share the caller transaction. This fits the accepted T8-C/D transaction seam and T8-G in-process worker topology.
-
-### Security / content / state
-
-No second Authorization evaluator, Product lifecycle truth, exact-content authority, durable frontend entity store, Redis dependency, external Search authority, generic outbox/event bus or provider-key Product identity survived the attack.
-
-## 8. Correction proof contract
-
-The corrected candidate must prove:
+## 7. H1–H3 proof
 
 ```text
-P1  roadmap is the sole mutable stage/status/next-action authority
-P2  affected T8-F/T8-G durable records contain no stale integration/downstream-stage state
-P3  effective DocumentOfficialView schema + disclosure laws live in wire-contract.md
-P4  frontend-read-symmetry.md is provenance, not second executable schema authority
-P5  application/maintenance is present in T8-B with no new dependency class edge
-P6  application census remains exactly 78 and operation 79 absent
-P7  required candidate CI passes
+P1  roadmap sole mutable stage/status/next-action authority               PASS
+P2  stale T8-F/T8-G progression snapshots removed                         PASS
+P3  effective DocumentOfficialView lives in wire-contract.md               PASS
+P4  frontend-read-symmetry.md is provenance, not executable schema SSOT   PASS
+P5  application/maintenance present with no new dependency class           PASS
+P6  canonical application census = 78; operation 79 absent                 PASS
+P7  required CI #1095                                                      PASS
 ```
 
-Independent Fable challenge follows only after the exact corrected candidate satisfies this proof contract.
+CI #1093 caught a real defect during this proof: after H2 consolidation, the provenance document was initially unrouted. It is now reachable through the decision register without returning to the executable-wire route.
 
-## 9. CI quality audit — separate from T8 architecture findings
+## 8. CI proportionality review
 
-The operator requested a proportionality review because required CI has produced repeated red runs.
-
-Current evidence:
+Evidence showed both useful protection and avoidable red noise:
 
 ```text
 CI #1081
-  failed only because git diff --check rejected three Markdown trailing-space hard breaks
-  corrected mechanically
-  same gate CI #1082 then passed
+  FAIL only on three Markdown trailing-space findings
+  no architecture/property failure
 
-review PR #145
-  structurally valid Fable Evidence PR
-  CI #1064 failure by workflow design
+review PR #145 / CI #1064
+review PR #146 / CI #1068
+  structurally valid Evidence PRs
+  workflow deliberately forced red after successful isolation validation
 
-review PR #146
-  structurally valid converged Fable Evidence PR
-  CI #1068 failure by workflow design
+CI #1093
+  FAIL on unrouted durable document
+  material repository-structure defect; correct blocker
 ```
 
-The current review-branch path validates isolation and then deliberately executes `exit 1`. Repository Standard v1 requires review isolation to be proven; it does not require a correct Evidence PR to be red.
-
-Provisional classification:
+Operator-approved correction applied to `.github/workflows/ci.yml`:
 
 ```text
-KEEP / BLOCK
-  architecture-only tracked-path envelope while implementation is blocked
-  required bootstrap surfaces + bootstrap budget
-  docs/work absence from merge candidate/main
-  router/reachability proof
-  required provenance/archive refs
+KEEP BLOCKING
+  architecture-only path envelope
+  bootstrap + budget
+  sole-roadmap leakage guard
+  durable routing/reachability
+  docs/work merge-candidate exclusion
+  required authority presence
+  archive/provenance reachability
 
-REDESIGN
-  valid review branch should PASS isolation check, not fail by design
-  forward-obligation proof should compare document rows to its own summary,
-    not duplicate 21/3/27/51 as workflow authority
-
-DOWNGRADE FROM REQUIRED BLOCKER
-  generic Markdown trailing-whitespace failure; it is formatting hygiene,
-  and in Markdown two trailing spaces can be intentional syntax
-
-ADD SMALL OPERATIONAL IMPROVEMENT
-  cancel superseded CI runs for the same PR
+CHANGE
+  valid Draft review/* + correct candidate base + ai-dialog-only delta -> PASS
+  review/* marked ready or isolation violation -> FAIL
+  forward-obligation counts derive from the document's own declarations
+  Markdown whitespace -> warning only
+  superseded same-PR runs -> cancelled
 ```
 
-No CI workflow correction has been applied yet. It is a separate operator decision and must not be smuggled into H1–H3.
+The workflow correction commit `bb8164f1f8cc784268f5f1f7515614c4703a37af` passed required CI **#1096**. The protected aggregate context remains named `required`.
 
-## 10. Current T8-H decision
+## 9. Current T8-H state
 
 ```text
-T8-H outcome            NOT YET RATIFIED
-H1                       APPROVED / CORRECTION ASSEMBLED
-H2                       APPROVED / CORRECTION ASSEMBLED
-H3                       APPROVED / CORRECTION ASSEMBLED
+H1                       APPROVED / CORRECTED / PROVEN
+H2                       APPROVED / CORRECTED / PROVEN
+H3                       APPROVED / CORRECTED / PROVEN
+CI proportionality       APPROVED / CORRECTED / PROVEN ON #1096
 Product reopen           NO
 T1→T7 reopen             NO
 T8-A reopen              NO
@@ -271,4 +174,4 @@ T9                       NOT OPEN
 implementation           BLOCKED
 ```
 
-Next: prove P1–P7 on the exact candidate, resolve the bounded CI-quality decision, then perform fresh independent challenge.
+Next: required CI on the exact current candidate, then a fresh isolated Fable challenge of the corrected Whole-T8 package and CI proportionality. Reviewer findings remain Evidence and may reopen only the smallest authority they materially implicate.
