@@ -32,6 +32,7 @@ Start here after `AGENTS.md`, then read `roadmap.md`, then only the owning docum
 | Documentation governance | [Documentation rules](development/documentation.md) | Product architecture |
 | Repository-local engineering / CI / Git | [Engineering rules](development/engineering-rules.md) | Global Method text duplicated locally |
 | Executable application wire | [Wire contract](architecture/wire-contract.md) | Temporary work/review history / old OpenAPI |
+| Frontend realization | [Frontend](architecture/frontend.md) | Removed legacy frontend / speculative runtime or visual-framework choices |
 
 ## Reading law
 

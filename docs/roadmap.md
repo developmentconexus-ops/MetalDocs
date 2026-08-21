@@ -15,7 +15,7 @@ REPOSITORY RESET                      MERGED / OPERATOR-RATIFIED
 REPOSITORY STANDARD V1 ALIGNMENT      MERGED
 PRODUCT / OWNERSHIP                   OPERATOR-APPROVED
 T1 → T8-E                             CLOSED / OPERATOR-RATIFIED
-T8-F FRONTEND REALIZATION             NEXT / NOT STARTED
+T8-F FRONTEND REALIZATION             OPEN / ACTIVE
 T8-G → T12                            NOT OPEN
 IMPLEMENTATION                        BLOCKED
 LEGACY IMPLEMENTATION                 ABSENT FROM LIVE TREE
@@ -23,11 +23,39 @@ LEGACY IMPLEMENTATION                 ABSENT FROM LIVE TREE
 
 ## Current gate
 
-T8-E — Executable Wire Contract is **CLOSED / OPERATOR-RATIFIED / INTEGRATED** as of 2026-08-21.
+T8-F — Frontend Realization is **OPEN / ACTIVE** as of 2026-08-21 after explicit operator authorization from current `main @ 6443986672f4f183cff90b76e96e48ebe1c34594`.
+
+The isolated candidate branch is:
+
+```text
+arch/t8f-frontend-realization
+```
+
+The bounded T8-F authority is `docs/architecture/frontend.md`, derived only from the accepted frontend/API semantics in `docs/product/journeys.md` plus the ratified executable wire in `docs/architecture/wire-contract.md`. The frontend-planning derivation order is coverage → human goals/flows → screen/routes → vertical traces → state/transport/read-model/editor boundaries → package topology → adversarial subtraction.
+
+Initial Lead derivation closes the following candidate facts without reopening Product or T8-E:
+
+```text
+accepted application operations      78 / 78 have concrete frontend consumers
+orphaned operations                  0
+invented application operations      0
+operation 79                         absent
+stable SPA route meanings            exact accepted T6 route set
+frontend semantic owner added        none
+server-state authority               TanStack Query / server truth
+parallel global server store         absent
+manual parallel DTO/API authority    absent
+generic frontend Authorization       absent
+interactive DOCX runtime             one adapter boundary
+T8-G                                 not open
+implementation                       blocked
+```
+
+No material upstream falsifier has been found in this first derivation. T8-F remains a candidate until repository verification, required adversarial review under the current Repository Standard process, and explicit operator ratification.
+
+T8-E — Executable Wire Contract remains **CLOSED / OPERATOR-RATIFIED / INTEGRATED** as of 2026-08-21.
 
 PR #136 was squash-merged into `main` as `5568788d6322396f230db82e0cd0da027778f55e`. The merged commit carries tree `41b0742628d927c65b4e4a841c125b33ed2fedca`, exactly matching the final ratified candidate tree that passed required CI #1032. The absorbed `arch/t8e-wire-contract` branch and the earlier `review/t8e-fable` Evidence branch have both been deleted.
-
-T8-F — Frontend Realization is **NEXT / NOT STARTED**. This closeout does not open T8-F and does not authorize implementation.
 
 The reconciled T8-E contract is the ratified durable authority at `docs/architecture/wire-contract.md`. The application census remains 78 operations and is owned by `docs/product/journeys.md` plus `docs/decisions/api-operation-census.md`.
 
@@ -86,15 +114,17 @@ required CI                          #1032 SUCCESS on exact merged tree
 main merge                           5568788d6322396f230db82e0cd0da027778f55e
 ```
 
-Operator ratification occurred explicitly on **2026-08-21**.
+Operator ratification of T8-E occurred explicitly on **2026-08-21**.
 
 ## Exact next action
 
 ```text
-explicit operator authorization to open T8-F
-→ start fresh from current main @ 5568788d6322396f230db82e0cd0da027778f55e
-→ read AGENTS.md → docs/index.md → docs/roadmap.md → only the bounded T8-F authority pack routed from there
-→ derive the smallest Frontend Realization contract
+publish/revalidate the bounded T8-F candidate on arch/t8f-frontend-realization
+→ run required repository CI on the exact candidate
+→ perform Lead coherence/subtraction attack against the 78-operation coverage and vertical traces
+→ obtain the independent review/evidence required by the current Repository Standard process
+→ adjudicate material findings against current Product/T8-E authority
+→ explicit operator ratification before integration
 → do not open T8-G and do not implement Product code
 ```
 
@@ -105,8 +135,8 @@ Do not reopen completed T1→T8-E or the 78-operation Product/T6 census by prefe
 | Stage | Owns | Opens / exits |
 |---|---|---|
 | T8-E — Executable Wire Contract | Exact OpenAPI application wire, schemas, headers, problems, ETags, idempotency, pagination, upload/exact-byte contract, generated Go/TypeScript boundaries | CLOSED / OPERATOR-RATIFIED / INTEGRATED |
-| T8-F — Frontend Realization | Route tree, feature/package topology, generated transport consumption, query/state behavior, read-model consumption, editor/viewer boundaries | NEXT / NOT STARTED; opens only on explicit operator authorization from current `main` |
-| T8-G — Runtime / Process / Deployment | Binaries/processes, River workers, renderer/provider boundary, startup/readiness/shutdown, configuration/secrets, trust/network boundaries, observability, recovery/runtime profiles | Opens after T8-F supplies its concrete runtime consumers; exits by ratification |
+| T8-F — Frontend Realization | Route tree, feature/package topology, generated transport consumption, query/state behavior, read-model consumption, editor/viewer boundaries | OPEN / ACTIVE; exits only by explicit operator ratification after candidate verification/review |
+| T8-G — Runtime / Process / Deployment | Binaries/processes, River workers, renderer/provider boundary, startup/readiness/shutdown, configuration/secrets, trust/network boundaries, observability, recovery/runtime profiles | Opens after T8-F supplies and ratifies its concrete runtime consumers; exits by ratification |
 | T8-H — Whole-T8 Global Coherence Review | Cross-check backend, persistence, wire, frontend, and runtime realization as one system | Opens after T8-A→T8-G close; exits with no unresolved material contradiction |
 | T9 — Golden Flows & Validation Baseline | Falsifiable composed-system flows and proof classes: contract, integration, concurrency, security, recovery, E2E, restore | Opens after Whole T8 coherence; exits by ratified validation baseline |
 | T10 — Transition / Cutover | Any real current→target transition, data/schema transition, switch-over, rollback barriers, cutover readiness | Opens after T9 baseline is known; no compatibility mechanism survives without a named property and deletion condition |
