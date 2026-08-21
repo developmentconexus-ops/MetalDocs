@@ -3,6 +3,7 @@
 > **Status:** ACTIVE / OPERATOR-RATIFIED TECHNICAL AUTHORITY  
 > **Ratified:** 2026-08-18  
 > **Post-T5 Fable bounded amendment:** 2026-08-18 — obsolescence-withdraw AuthZ + provider-disable alignment  
+> **T8-E bounded precision:** 2026-08-20 — unreachable ProviderSubjectBinding-disabled Audit census entry removed  
 > **Repository:** `developmentconexus-ops/MetalDocs`  
 > **Branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131  
 > **Decision baseline:** `wiki/architecture/rebaseline-decision-registry.md`  
@@ -570,7 +571,7 @@ This permits least-privilege Area Governance Viewer/Auditor without requiring Au
 ### Authentication / Organization / Access
 
 ```text
-ProviderSubjectBinding accepted / disabled / replaced
+ProviderSubjectBinding accepted / replaced
 User created / offboarded / re-enabled
 UserProfile erased when lawful-erasure action itself requires evidence
 Area created / renamed / retired / re-enabled
