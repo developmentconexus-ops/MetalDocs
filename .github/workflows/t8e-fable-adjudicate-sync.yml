@@ -22,7 +22,7 @@ jobs:
           set -euo pipefail
           python3 - <<'PYEXTRACT'
           from pathlib import Path
-          t = Path('.github/workflows/t8e-promote-sync.yml').read_text()
+          t = Path('.github/workflows/t8e-promote-final.yml').read_text()
           marker = "        run: |\n"
           start = t.index(marker) + len(marker)
           lines = t[start:].splitlines()
