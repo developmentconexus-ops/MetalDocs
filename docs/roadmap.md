@@ -15,7 +15,7 @@ REPOSITORY RESET                      MERGED / OPERATOR-RATIFIED
 REPOSITORY STANDARD V1 ALIGNMENT      MERGED
 PRODUCT / OWNERSHIP                   OPERATOR-APPROVED
 T1 → T8-G                             CLOSED / OPERATOR-RATIFIED / INTEGRATED
-T8-H WHOLE-T8 GLOBAL COHERENCE        OPEN / ACTIVE
+T8-H WHOLE-T8 GLOBAL COHERENCE        OPEN / ACTIVE / CORRECTIONS ASSEMBLED
 T9 → T12                              NOT OPEN
 IMPLEMENTATION                        BLOCKED
 LEGACY IMPLEMENTATION                 ABSENT FROM LIVE TREE
@@ -31,11 +31,28 @@ Opening base:
 main                               0b4ef6ef891b01f907804cff4bd3c0022aebad80
 open PRs at opening                0
 active candidate branch            arch/t8h-global-coherence
+active Draft PR                    #148
 Product implementation             BLOCKED
 T9                                 NOT OPEN
 ```
 
 The opening `main` commit is the T8-G closeout squash from PR #147. Its candidate HEAD `ed0ff1c2883d92b65f6502cfa90798abb1cf8ed3` passed required CI **#1079** and **#1080**; CI #1080 job `required` completed successfully. The squash merge therefore opened T8-H from the expected integrated T8-G state.
+
+T8-H found three material coherence seams. The operator approved all three bounded corrections:
+
+```text
+H1  mutable stage/integration snapshots duplicated outside docs/roadmap.md
+    -> remove mutable snapshots; retain immutable ratification evidence
+
+H2  effective operation-47 DocumentOfficialView split across two live wire authorities
+    -> fold the already-ratified read-symmetry precision into wire-contract.md;
+       retain frontend-read-symmetry.md as provenance only
+
+H3  accepted application/maintenance leaf omitted from T8-B topology projection
+    -> reflect the existing T5-J GC consumer inside the existing application class
+```
+
+The corrections are assembled on PR #148. They create no new Product capability, semantic owner, Permission, persistence authority, dependency class, runtime component or application operation.
 
 Active branch-only review ledger:
 
@@ -43,7 +60,7 @@ Active branch-only review ledger:
 docs/work/current/t8h-global-coherence.md
 ```
 
-The ledger is temporary work, not authority, and must not enter `main`. It currently records three material cross-stage coherence findings for operator adjudication before any accepted T8 authority is corrected.
+The ledger is temporary work, not authority, and must not enter `main`.
 
 ### Integrated T8-G baseline
 
@@ -139,16 +156,18 @@ parallel global server store         absent
 interactive DOCX runtime             one adapter boundary
 ```
 
-The bounded T8-E-FR read-symmetry precision ratified with T8-F remains in force and changes none of those counts.
+The bounded T8-E-FR read-symmetry meaning remains unchanged; T8-H only consolidates its executable representation into the T8-E wire SSOT.
 
 ## Exact next action
 
 ```text
-operator adjudication of the material H1–H3 findings in the active T8-H branch-only ledger
-→ apply only approved bounded coherence corrections to the owning T8 authorities
-→ prove the corrections preserve the 78-operation census and operation 79 absence
-→ run required CI on the candidate
-→ perform a fresh independent Fable challenge if material authority/topology corrections survive adjudication
+prove the operator-approved H1–H3 corrections against the exact PR #148 candidate
+→ prove roadmap remains the sole mutable status authority
+→ prove one executable wire SSOT and the accepted maintenance leaf
+→ prove the application census remains exactly 78 and operation 79 absent
+→ run required CI on the exact candidate
+→ adjudicate the bounded CI-quality audit separately; do not weaken material repository protections
+→ perform a fresh independent Fable challenge of the corrected T8-H candidate
 → do not begin T9 and do not implement Product code
 ```
 
@@ -160,10 +179,10 @@ Do not reopen completed T1→T8-G or the 78-operation Product/T6 census by prefe
 
 | Stage | Owns | Opens / exits |
 |---|---|---|
-| T8-E — Executable Wire Contract | Exact OpenAPI application wire, schemas, headers, problems, ETags, idempotency, pagination, upload/exact-byte contract, generated Go/TypeScript boundaries | CLOSED / OPERATOR-RATIFIED / INTEGRATED; T8-E-FR precision ratified with T8-F |
+| T8-E — Executable Wire Contract | Exact OpenAPI application wire, schemas, headers, problems, ETags, idempotency, pagination, upload/exact-byte contract, generated Go/TypeScript boundaries | CLOSED / OPERATOR-RATIFIED / INTEGRATED; T8-E-FR meaning retained and executable representation consolidated in the wire SSOT |
 | T8-F — Frontend Realization | Route tree, feature/package topology, generated transport consumption, query/state behavior, read-model consumption, editor/viewer boundaries | CLOSED / OPERATOR-RATIFIED / INTEGRATED |
 | T8-G — Runtime / Process / Deployment | Binaries/processes, River workers, renderer/scanner/provider boundaries, startup/readiness/shutdown, configuration/secrets, trust/network boundaries, observability, recovery/runtime profiles | CLOSED / OPERATOR-RATIFIED / INTEGRATED |
-| T8-H — Whole-T8 Global Coherence Review | Cross-check backend, persistence, wire, frontend, runtime and their accepted upstream authorities as one system | OPEN / ACTIVE; material findings require operator adjudication before bounded authority corrections |
+| T8-H — Whole-T8 Global Coherence Review | Cross-check backend, persistence, wire, frontend, runtime and their accepted upstream authorities as one system | OPEN / ACTIVE; H1–H3 operator-approved and assembled; proof + independent challenge pending |
 | T9 — Golden Flows & Validation Baseline | Falsifiable composed-system flows and proof classes | NOT OPEN; opens only after Whole-T8 coherence closes |
 | T10 — Transition / Cutover | Real current→target transition and rollback barriers | NOT OPEN; opens after T9 baseline |
 | T11 — Implementation Program & Execution Graph | Bounded work graph and proof obligations | NOT OPEN; opens after T1→T10 accepted |
