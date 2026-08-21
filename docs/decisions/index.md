@@ -30,6 +30,8 @@ This is the compact current register. It points to the owning semantic authority
 | T8-C | Internal contracts | CURRENT / RATIFIED | Authority-aligned owner/resolver contract model | `../architecture/interfaces.md` |
 | T8-D | Persistence | CURRENT / RATIFIED | Owner-namespaced PostgreSQL relational core and concurrency realization | `../architecture/persistence.md` |
 | T8-E | Executable wire contract | CURRENT / RATIFIED | Exact 78-operation OAS 3.0.3 application wire is binding; no operation 79 without material Product/T6 reopen | `../architecture/wire-contract.md` |
+| T8-E-FR | Document Official frontend read symmetry | REFINED / OPERATOR-RATIFIED PRECISION | Operation 47 additionally exposes disclosure-safe current open-Revision and active-obsolescence routing references; census remains 78 | `frontend-read-symmetry.md` + `../architecture/wire-contract.md` |
+| T8-F | Frontend Realization | CURRENT / OPERATOR-RATIFIED / INTEGRATION PENDING | Coverage-first semantic/lens frontend realization is binding; 78/78 covered, no operation 79, no client authority duplication | `../architecture/frontend.md` + `t8f-ratification.md` |
 | RESET | Repository clean-slate reset | CURRENT / OPERATOR-RATIFIED | Superseded implementation remains absent; required provenance stays reachable | `repository-reset.md` |
 | REPO-STD-V1 | Repository operating envelope | CURRENT ORGANIZATIONAL BASELINE / ALIGNED | Repository Standard v1 alignment is merged; local repository controls preserve that operating envelope | `../roadmap.md` + `../development/documentation.md` + `../development/engineering-rules.md` |
 
