@@ -7,7 +7,7 @@ summary: Owns T8-F frontend route/lens realization, interaction coverage, genera
 
 # T8-F — Frontend Realization
 
-> **Status:** OPEN / ACTIVE CANDIDATE. Operator-approved Fable Round-1 corrections are incorporated here; T8-F is not yet ratified. Program stage/status and implementation permission remain exclusively in `../roadmap.md`.
+> **Ratification:** OPERATOR-RATIFIED on 2026-08-21 after required CI #1047 and bounded Fable Round 2 CONVERGED. Integration through PR #139 remains pending; program stage/status and implementation permission remain exclusively in `../roadmap.md`.
 
 Product/API meaning remains in `../product/journeys.md`; the executable wire remains `wire-contract.md` plus the operator-approved bounded T8-E precision in `../decisions/frontend-read-symmetry.md`. This authority realizes those accepted semantics for the browser frontend. It creates no new Product owner, lifecycle, Permission, DTO authority, or API operation.
 
@@ -567,9 +567,9 @@ read-only PDF presentation
 
 T8-F does not choose binaries/processes, runtime host, deployment topology, CDN, container layout, provider CORS configuration, secrets, workers, readiness, observability, recovery profiles or buffering strategy. No SSR, service worker, BFF, websocket/realtime channel or editor-session service is a Launch runtime consumer.
 
-## 18. Candidate gate
+## 18. Ratified gate
 
-T8-F remains OPEN / ACTIVE until repository verification, bounded Fable Round 2 and explicit operator ratification converge.
+T8-F is **CLOSED / OPERATOR-RATIFIED** on the candidate branch as of 2026-08-21 after repository verification, Fable Round-1 adjudication, bounded Fable Round 2 **CONVERGED**, and explicit operator ratification. Integration into `main` remains pending PR #139 and is a separate gate.
 
 Minimum preserved properties:
 
@@ -593,4 +593,4 @@ T8-G                              NOT OPEN
 Product implementation            BLOCKED
 ```
 
-Opening/correcting this candidate does not authorize T8-G or Product code.
+Ratification does not authorize T8-G or Product code. T8-G remains unopened until T8-F is integrated/revalidated from `main` and the operator explicitly authorizes the next stage.
