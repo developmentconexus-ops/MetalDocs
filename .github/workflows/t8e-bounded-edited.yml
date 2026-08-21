@@ -1,0 +1,41 @@
+name: T8-E Bounded Edited Trigger
+
+on:
+  pull_request:
+    types: [edited]
+
+permissions:
+  contents: write
+
+jobs:
+  reconcile:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+      - name: Execute staged fail-closed reconciliation
+        shell: bash
+        run: |
+          set -euxo pipefail
+          python3 - <<'PYEXTRACT'
+          from pathlib import Path
+          t = Path('.github/workflows/t8e-bounded-reconcile.yml').read_text()
+          start_marker = "          python3 - <<'PY'\n"
+          end_marker = "\n          PY\n"
+          start = t.index(start_marker) + len(start_marker)
+          end = t.index(end_marker, start)
+          lines = t[start:end].splitlines()
+          script = '\n'.join(line[10:] if line.startswith('          ') else line for line in lines) + '\n'
+          Path('/tmp/t8e-reconcile.py').write_text(script)
+          PYEXTRACT
+          python3 /tmp/t8e-reconcile.py
+          git diff --check
+          git diff -- docs/architecture/content-integrity.md docs/architecture/async-and-search.md docs/architecture/interfaces.md docs/architecture/persistence.md docs/work/current/proposal.md docs/roadmap.md
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add docs/architecture/content-integrity.md docs/architecture/async-and-search.md docs/architecture/interfaces.md docs/architecture/persistence.md docs/work/current/proposal.md docs/roadmap.md
+          git commit -m 'docs(architecture): reconcile approved T8-E bounded package'
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
