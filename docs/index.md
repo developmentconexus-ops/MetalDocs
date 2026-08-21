@@ -33,7 +33,7 @@ Start here after `AGENTS.md`, then read `roadmap.md`, then only the owning docum
 | Repository-local engineering / CI / Git | [Engineering rules](development/engineering-rules.md) | Global Method text duplicated locally |
 | Executable application wire | [Wire contract](architecture/wire-contract.md); for Document Official routing-reference precision also [Frontend read symmetry](decisions/frontend-read-symmetry.md) | Temporary work/review history / old OpenAPI |
 | Frontend realization | [Frontend](architecture/frontend.md) + [T8-F ratification](decisions/t8f-ratification.md) | Removed legacy frontend / speculative runtime or visual-framework choices |
-| Runtime / process / deployment | [Runtime](architecture/runtime.md) | Removed legacy runtime/deploy topology / speculative scale infrastructure |
+| Runtime / process / deployment | [Runtime](architecture/runtime.md) + [T8-G ratification](decisions/t8g-ratification.md) | Removed legacy runtime/deploy topology / speculative scale infrastructure |
 
 ## Reading law
 
