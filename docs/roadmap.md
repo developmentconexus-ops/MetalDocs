@@ -48,15 +48,23 @@ strict request split        kin-openapi + minimal envelope-guard probe PASS
 
 The direct-PUT concern remains resolved subtractively without reopening T8-C: the existing `PresignCreate(handle,maxBytes,ttl)` seam is sufficient when T8-E supplies `maxBytes=expected_size_bytes`; the portable property is an at-most bound, while the reference S3 profile is stronger and signs exact `Content-Length`. Completion derives the actual descriptor independently, so no client-size truth is persisted.
 
-The final Lead coherence attack found one remaining bounded upstream precision package in T8-D's **transaction census only**: remove mandatory Audit where T3 does not require it, make required T3 evidence/multi-event paths explicit, make SUBMIT River intent conditional on a real activated effect, and name the already-ratified User re-enable transition. No table/state/API/permission/worker/capability is added.
+The final Lead coherence attack exposed one consolidated **bounded upstream coherence package**, recorded in `docs/work/current/proposal.md` §§8.4–8.6:
+
+```text
+T8-D               transaction/Audit + expired-idempotency precision
+T4/T5/T8-C/T8-D    no renderer/job for already-PDF required PDF rendition
+T8-C/T8-D           reconstructible server-side CSRF synchronizer secret for GET /session
+```
+
+The package is subtractive/precision-only: no Product operation, owner, lifecycle state, permission, table family, generic worker, second cookie or new API is added.
 
 ## Exact next action
 
 ```text
-operator adjudicates the bounded T8-D transaction-census precision package recorded in docs/work/current/proposal.md §8.4
-→ if approved, reconcile only docs/architecture/persistence.md
+operator adjudicates the bounded coherence package in proposal §§8.4–8.6
+→ if approved, reconcile only the implicated T4/T5/T8-C/T8-D lines
 → rerun exact whole-candidate Structural Inversion / YAGNI / overengineering / global-coherence delta
-→ revalidate main/base + exact candidate HEAD + intended 5-file diff + required CI
+→ revalidate main/base + exact candidate HEAD + intended authority/work diff + required CI
 → only then create isolated review/t8e-fable from exact candidate HEAD
 → independent Fable challenge
 → Lead adjudication
