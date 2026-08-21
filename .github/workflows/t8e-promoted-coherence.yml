@@ -60,7 +60,6 @@ jobs:
           exact=[r[1] for r in rows if 'exact bytes`' in r[3] or 'exact PDF bytes`' in r[3]]
           assert exact==['getRevisionDraftSource','getSubmissionSource','getReleaseSource','getOfficialRenditionContent'],exact
 
-          # Fable-adjudicated material properties.
           assert 'SubmissionRepresentationGate { required:boolean, satisfied:boolean }' in wire
           assert 'attention_required' not in wire
           assert 'OAS_BRANCH' in wire and 'FIXTURE_PRESENCE' in wire
@@ -84,7 +83,6 @@ jobs:
           assert 'validation.failed' not in by_id['searchProviderSubjects']
           assert 'validation.failed' not in by_id['listDocuments']
 
-          # Promotion/governance closure.
           assert 'architecture/wire-contract.md' in index
           assert 'reference/t8e-checkpoint.md' not in index
           assert 'T8-E' in decisions and 'wire-contract.md' in decisions
@@ -96,7 +94,8 @@ jobs:
           assert 'docs/architecture/wire-contract.md' in ci
           assert 'docs/reference/t8e-checkpoint.md' not in ci
           assert "expected = {'PRESERVE': 21, 'REOPEN': 3, 'DEFERRED': 27}" in ci
-          assert 'T8-E EXECUTABLE WIRE CONTRACT         ACTIVE / DRAFT PR #136' in roadmap
+          assert 'T8-E EXECUTABLE WIRE CONTRACT' in roadmap
+          assert 'ACTIVE / DRAFT PR #136' in roadmap
           assert 'rerun exact whole-candidate Global Coherence + required CI on the promoted tree' in roadmap
 
           print('ledger_rows=78')
