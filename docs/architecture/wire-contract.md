@@ -7,7 +7,7 @@ summary: Owns the exact 78-operation OpenAPI application wire, reusable schemas,
 
 # T8-E executable wire contract
 
-> **Ratification:** PENDING explicit operator ratification. Program stage/status and implementation permission remain exclusively in `../roadmap.md`.
+> **Ratification:** OPERATOR-RATIFIED on 2026-08-21. Program stage/status and implementation permission remain exclusively in `../roadmap.md`.
 
 Product/API meaning remains in `../product/journeys.md` + `../decisions/api-operation-census.md`. This authority owns only the executable application-wire realization of the accepted **78 application operations**. Operation 79 is a material Product/T6 reopen.
 
