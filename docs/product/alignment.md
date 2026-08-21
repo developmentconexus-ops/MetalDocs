@@ -1,13 +1,12 @@
 # Whole-Product Alignment Review — Adjudicated GCR Authority
 
-> **Status:** DURABLE ADJUDICATED GCR — **PRODUCT CONTRACT + A1–A10 + 4+1 OWNERSHIP APPROVED / T1→T7 TECHNICAL REBASELINE APPROVED / T1 ACTIVE**  
+> **Status:** DURABLE ADJUDICATED GCR — **PRODUCT CONTRACT + A1–A10 + 4+1 OWNERSHIP APPROVED / T1→T7 TECHNICAL REBASELINE APPROVED**  
 > **Date:** 2026-08-18  
-> **Implementation:** BLOCKED  
-> **Product authority:** `wiki/architecture/launch-v1-product-contract.md`  
-> **Ownership authority:** `wiki/architecture/launch-v1-ownership-topology.md`  
-> **Active technical authority:** `wiki/architecture/r10-technical-architecture.md`
+> **Product authority:** `contract.md`  
+> **Ownership authority:** `../architecture/ownership.md`  
+> **Current program stage / implementation permission / next action:** `../roadmap.md`
 
-This page records the operator-adjudicated Whole-Product Global Coherence Review. It is durable decision authority for the A1–A10 dispositions below; **current technical-stage routing is now owned by `wiki/architecture/r10-technical-architecture.md`**.
+This page records the operator-adjudicated Whole-Product Global Coherence Review. It is durable decision authority for the A1–A10 dispositions below. Historical `wiki/...` source strings remain provenance only under documentation governance; current stage routing, implementation permission and exact next action are owned exclusively by `../roadmap.md`.
 
 ## Trigger and adjudication
 
@@ -133,7 +132,7 @@ Binding law:
 
 > **Defer the capability; preserve the evolution seam. Prepare the seam, not the dormant implementation.**
 
-The named horizon in `launch-v1-ownership-topology.md` is evidence for technical choices:
+The named horizon in the accepted ownership topology is evidence for technical choices:
 
 ```text
 Launch+:
@@ -170,7 +169,7 @@ R10-C                            → PAUSED HISTORICAL CANDIDATE / DO NOT REPAIR
 old R10-D/E/F                    → stage labels superseded by T5/T6/T7
 ```
 
-Old artifacts remain evidence/provenance only. A surviving invariant must be carried into the active T-stage rather than treated as authority by file age.
+Old artifacts remain evidence/provenance only. A surviving invariant must be carried into the accepted T-stage rather than treated as authority by file age.
 
 ---
 
@@ -194,22 +193,17 @@ T7 — Historical Migration & Cutover
 → code
 ```
 
-This sequence is now owned by `wiki/architecture/r10-technical-architecture.md`.
+This is an immutable record of the technical descent approved at the Whole-Product GCR. Current stage progression is not owned here; it is owned by `../roadmap.md` and the routed current T-stage authorities.
 
-## Current gate
+## Ratification boundary
+
+The durable facts established by this page are:
 
 ```text
-Product Contract        ✅
-Whole-Product GCR       ✅ A1–A10
-Ownership topology      ✅ 4+1
-T1→T7 decomposition     ✅
-T1                      ACTIVE NON-AUTHORITATIVE CANDIDATE
-T2→T7                   NOT OPEN
-implementation          BLOCKED
+Product Contract        APPROVED
+Whole-Product GCR       APPROVED A1–A10
+Ownership topology      APPROVED 4+1
+T1→T7 decomposition     APPROVED
 ```
 
-Active T1 staging packet:
-
-`docs/superpowers/analysis/2026-08-18-r10-t1-semantic-state-invariants-candidate.md`
-
-**NEXT = operator adjudication of T1.**
+This page does not own current stage, integration status, implementation permission or next action. Read `../roadmap.md` for those mutable program facts.
