@@ -15,7 +15,7 @@ REPOSITORY RESET                      MERGED / OPERATOR-RATIFIED
 REPOSITORY STANDARD V1 ALIGNMENT      MERGED
 PRODUCT / OWNERSHIP                   OPERATOR-APPROVED
 T1 → T8-G                             CLOSED / OPERATOR-RATIFIED / INTEGRATED
-T8-H WHOLE-T8 GLOBAL COHERENCE        OPEN / ACTIVE / CORRECTIONS PROVEN
+T8-H WHOLE-T8 GLOBAL COHERENCE        OPEN / ACTIVE / CORRECTED
 T9 → T12                              NOT OPEN
 IMPLEMENTATION                        BLOCKED
 LEGACY IMPLEMENTATION                 ABSENT FROM LIVE TREE
@@ -36,9 +36,11 @@ Product implementation             BLOCKED
 T9                                 NOT OPEN
 ```
 
-The opening `main` commit is the T8-G closeout squash from PR #147. Its candidate HEAD `ed0ff1c2883d92b65f6502cfa90798abb1cf8ed3` passed required CI **#1079** and **#1080**; CI #1080 job `required` completed successfully. The squash merge therefore opened T8-H from the expected integrated T8-G state.
+The opening `main` commit is the T8-G closeout squash from PR #147. Its candidate HEAD `ed0ff1c2883d92b65f6502cfa90798abb1cf8ed3` passed required CI **#1079** and **#1080**; CI #1080 job `required` completed successfully.
 
-T8-H found three material coherence seams. The operator approved all three bounded corrections:
+## T8-H coherence corrections
+
+The Whole-T8 adversarial pass found three material seams. The operator approved all three bounded corrections:
 
 ```text
 H1  mutable stage/integration snapshots duplicated outside docs/roadmap.md
@@ -46,7 +48,7 @@ H1  mutable stage/integration snapshots duplicated outside docs/roadmap.md
 
 H2  effective operation-47 DocumentOfficialView split across two live wire authorities
     -> fold the already-ratified read-symmetry precision into wire-contract.md;
-       retain frontend-read-symmetry.md as provenance only
+       retain frontend-read-symmetry.md as routed provenance only
 
 H3  accepted application/maintenance leaf omitted from T8-B topology projection
     -> reflect the existing T5-J GC consumer inside the existing application class
@@ -54,7 +56,7 @@ H3  accepted application/maintenance leaf omitted from T8-B topology projection
 
 The corrections create no new Product capability, semantic owner, Permission, persistence authority, dependency class, runtime component or application operation.
 
-Correction proof completed on the candidate:
+Correction proof:
 
 ```text
 P1  roadmap remains sole mutable stage/status/next-action authority       PASS
@@ -63,12 +65,34 @@ P3  effective DocumentOfficialView schema/laws live in wire-contract.md   PASS
 P4  frontend-read-symmetry.md is routed provenance, not schema SSOT       PASS
 P5  application/maintenance is present with no new dependency class       PASS
 P6  application census remains exactly 78; operation 79 absent            PASS
-P7  required CI #1094                                                      PASS
+P7  required CI #1095                                                      PASS
 ```
 
-CI #1093 materially helped the proof: after H2 removed the precision record from the executable-wire route, repository reachability correctly rejected it as an unrouted durable document. The correction routes the provenance record through the decision register while keeping executable-wire routing singular. CI #1094 then passed.
+CI #1093 materially helped the proof: after H2 removed the precision record from the executable-wire route, repository reachability correctly rejected it as an unrouted durable document. The correction now routes the provenance record through the decision register while keeping executable-wire routing singular.
 
-A separate CI-quality audit also found low-signal/red-by-design behavior that is not required to protect T8 semantics. No workflow change has been applied without separate operator adjudication.
+## CI quality correction
+
+A bounded proportionality audit found that the `required` gate mixed material repository protections with avoidable red noise. The operator approved the smallest correction, now applied in `.github/workflows/ci.yml`:
+
+```text
+KEEP BLOCKING
+  architecture-only tracked-path envelope while implementation is blocked
+  bootstrap surfaces + <=20 KiB budget
+  sole-roadmap leakage guard
+  durable-document routing/reachability
+  docs/work exclusion from merge candidates/main
+  required authority presence
+  archive/provenance reachability
+
+CORRECT
+  valid review/* Evidence PR -> PASS when Draft + isolated + candidate-based
+  review/* marked ready or violating isolation -> FAIL
+  forward-obligation counts -> derive from document declarations, not workflow constants
+  Markdown whitespace -> warning only, not architecture failure
+  superseded runs for the same PR -> cancel automatically
+```
+
+The workflow correction itself passed required CI **#1096**. The `required` context name and repository protection binding remain unchanged.
 
 Active branch-only review ledger:
 
@@ -78,84 +102,9 @@ docs/work/current/t8h-global-coherence.md
 
 The ledger is temporary work, not authority, and must not enter `main`.
 
-### Integrated T8-G baseline
+## Integrated T8 baseline
 
-T8-G — Runtime / Process / Deployment remains **CLOSED / OPERATOR-RATIFIED / INTEGRATED** as of 2026-08-21.
-
-PR #144 was squash-merged into `main` as:
-
-```text
-1a5b3b5e0e05794175a724eed9d92802ee1bf705
-```
-
-The merge commit carries tree:
-
-```text
-87434c378aa622e2ef1c73c30f9e26e69cd1a55d
-```
-
-That tree is exactly the tree of the final authorized T8-G HEAD:
-
-```text
-01b1f021665a100fffc71d7387c5f4672e1323b9
-```
-
-The same authorized tree passed required CI **#1077** while Draft and required CI **#1078** after PR #144 was marked ready. The squash merge therefore integrated the exact authorized and verified tree.
-
-Ratified durable authority:
-
-```text
-docs/architecture/runtime.md
-+ docs/decisions/t8g-ratification.md
-```
-
-Independent review closure remains:
-
-```text
-Fable Round 1 PR #145  CLOSED / UNMERGED / F1 MATERIAL + F2-F4 MINOR / adjudicated
-Fable Round 2 PR #146  CLOSED / UNMERGED / F1-F4 CLOSED / CONVERGED / 0 MATERIAL
-Round 3                   NOT JUSTIFIED
-```
-
-The integrated T8-G Global Maximum remains:
-
-```text
-one modular-monolith application runtime
-+ one PostgreSQL product-state database
-+ River workers in the application process
-+ one active ManagedContentStore
-+ one private MalwareInspector
-+ one private conditional DOCX→PDF renderer
-+ external OIDC provider boundary
-+ verified ephemeral exact-byte spool
-+ fail-closed recovery profile
-+ OpenTelemetry / OTLP observability baseline
-+ one-shot migration / job / recovery operations
-+ proven third-party mechanisms before local infrastructure
-```
-
-The integrated subtraction remains:
-
-```text
-Redis                             absent
-separate worker deployment         absent
-BFF / SSR                         absent
-WebSocket/realtime                absent
-external Search                   absent
-custom scheduler/event bus         absent
-service mesh                      absent
-Kubernetes requirement             absent
-custom telemetry framework         absent
-custom queue/migration/OIDC/S3     absent
-operation 79                       absent
-Product implementation             BLOCKED
-```
-
-## Integrated T8-E / T8-F baseline
-
-T8-E and T8-F remain **CLOSED / OPERATOR-RATIFIED / INTEGRATED**.
-
-Application wire/frontend closure remains:
+T8-A→T8-G remain operator-ratified. T8-E/T8-F/T8-G remain integrated. Whole-T8 closure continues to preserve:
 
 ```text
 accepted application operations      78
@@ -169,7 +118,14 @@ stable SPA route meanings            exact accepted T6 route set
 frontend semantic owner added        none
 frontend Authorization engine        absent
 parallel global server store         absent
-interactive DOCX runtime             one adapter boundary
+one modular-monolith application runtime
+one PostgreSQL product-state database
+River workers in-process
+one active ManagedContentStore
+private conditional renderer + MalwareInspector
+verified ephemeral exact-byte spool
+Redis / BFF / realtime / external Search / generic event bus absent
+Product implementation               BLOCKED
 ```
 
 The bounded T8-E-FR read-symmetry meaning remains unchanged; T8-H only consolidates its executable representation into the T8-E wire SSOT.
@@ -177,11 +133,12 @@ The bounded T8-E-FR read-symmetry meaning remains unchanged; T8-H only consolida
 ## Exact next action
 
 ```text
-operator adjudication of the bounded CI-quality correction
-→ if approved, apply only the proportional CI changes and re-run the required gate
-→ preserve the material repository-envelope/routing/provenance protections
-→ perform a fresh independent Fable challenge of the corrected T8-H candidate
+run required CI on the exact current T8-H candidate
+→ create isolated review/t8h-fable from that exact candidate
+→ review branch adds only docs/work/current/ai-dialog.md
+→ fresh independent Fable challenge attacks H1-H3 corrections + Whole-T8 regression + CI proportionality
 → adjudicate any material reviewer finding against current authority
+→ if converged, prepare T8-H ratification/closure candidate
 → do not begin T9 and do not implement Product code
 ```
 
@@ -193,10 +150,10 @@ Do not reopen completed T1→T8-G or the 78-operation Product/T6 census by prefe
 
 | Stage | Owns | Opens / exits |
 |---|---|---|
-| T8-E — Executable Wire Contract | Exact OpenAPI application wire, schemas, headers, problems, ETags, idempotency, pagination, upload/exact-byte contract, generated Go/TypeScript boundaries | CLOSED / OPERATOR-RATIFIED / INTEGRATED; T8-E-FR meaning retained and executable representation consolidated in the wire SSOT |
+| T8-E — Executable Wire Contract | Exact OpenAPI application wire, schemas, headers, problems, ETags, idempotency, pagination, upload/exact-byte contract, generated Go/TypeScript boundaries | CLOSED / OPERATOR-RATIFIED / INTEGRATED; T8-E-FR meaning retained and executable representation consolidated in wire SSOT |
 | T8-F — Frontend Realization | Route tree, feature/package topology, generated transport consumption, query/state behavior, read-model consumption, editor/viewer boundaries | CLOSED / OPERATOR-RATIFIED / INTEGRATED |
 | T8-G — Runtime / Process / Deployment | Binaries/processes, River workers, renderer/scanner/provider boundaries, startup/readiness/shutdown, configuration/secrets, trust/network boundaries, observability, recovery/runtime profiles | CLOSED / OPERATOR-RATIFIED / INTEGRATED |
-| T8-H — Whole-T8 Global Coherence Review | Cross-check backend, persistence, wire, frontend, runtime and their accepted upstream authorities as one system | OPEN / ACTIVE; H1–H3 approved, assembled and proven; CI-quality adjudication + independent challenge pending |
+| T8-H — Whole-T8 Global Coherence Review | Cross-check backend, persistence, wire, frontend, runtime and accepted upstream authorities as one system | OPEN / ACTIVE; H1-H3 + CI proportionality corrected; independent challenge next |
 | T9 — Golden Flows & Validation Baseline | Falsifiable composed-system flows and proof classes | NOT OPEN; opens only after Whole-T8 coherence closes |
 | T10 — Transition / Cutover | Real current→target transition and rollback barriers | NOT OPEN; opens after T9 baseline |
 | T11 — Implementation Program & Execution Graph | Bounded work graph and proof obligations | NOT OPEN; opens after T1→T10 accepted |
