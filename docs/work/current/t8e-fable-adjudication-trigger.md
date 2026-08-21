@@ -1,1 +1,1 @@
-Temporary synchronize trigger for the already-adjudicated T8-E Fable correction patch. Delete before promotion/clean-head verification.
+Temporary synchronize trigger for T8-E durable promotion. Promotion job deletes this file and all remaining harness/work/checkpoint surfaces.
