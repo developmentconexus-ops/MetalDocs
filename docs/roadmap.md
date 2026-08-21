@@ -128,7 +128,7 @@ T8-E-FR changes none of those counts.
 
 ```text
 explicit operator authorization to open T8-G
-→ start fresh from current main @ 711b8526ebacea9e15034459f85fc37707a32ab4
+→ start fresh from current `main` and revalidate its exact SHA at execution time
 → read AGENTS.md → docs/index.md → docs/roadmap.md → only the bounded T8-G authority pack routed from there
 → derive the smallest Runtime / Process / Deployment contract from the accepted T8-A→T8-F consumers
 → do not open T8-H and do not implement Product code
