@@ -34,16 +34,26 @@ T8-D  Governance Step label + immutable attempt label snapshot
 T3    unreachable ProviderSubjectBinding-disabled Audit census entry removed
 ```
 
-The direct-PUT exact-length concern was resolved subtractively without reopening T8-C: the existing `PresignCreate(handle,maxBytes,ttl)` seam is sufficient when T8-E supplies `maxBytes=expected_size_bytes` and the provider PUT profile binds that value as exact `Content-Length`.
+Document-admission measurement/probes and executable generator/provider feasibility evidence are now complete enough for the Launch candidate:
+
+```text
+DOC_RAW_MAX_BYTES       100 MiB
+DOCX_EXPANDED_MAX_BYTES 256 MiB
+DOCX_MAX_ZIP_ENTRIES    4096
+Go boundary             oapi-codegen v2.8.0 probe PASS
+TypeScript boundary     openapi-typescript 7.13.0 probe PASS
+direct S3 PUT           signed exact Content-Length + If-None-Match:* probe PASS
+```
+
+The direct-PUT exact-length concern remains resolved subtractively without reopening T8-C: the existing `PresignCreate(handle,maxBytes,ttl)` seam is sufficient when T8-E supplies `maxBytes=expected_size_bytes` and the provider PUT profile binds that value as exact `Content-Length`.
 
 ## Exact next action
 
 ```text
-measure representative DOCX/PDF corpus and freeze raw/expanded/ZIP ceilings
-→ run pinned Go + TypeScript generation/compile/type probe
-→ prove exact request/response fixtures across all 78 operation rows
-→ final Structural Inversion / YAGNI / overengineering / global-coherence pass
-→ only then create isolated review/t8e-fable from exact candidate HEAD
+prove exact ledger/census/profile fixtures across all 78 operation rows
+→ run final whole-candidate Structural Inversion / YAGNI / overengineering / global-coherence attack
+→ if and only if no material contradiction survives, create isolated review/t8e-fable from exact candidate HEAD
+→ independent Fable challenge
 → Lead adjudication
 → explicit operator ratification
 ```
