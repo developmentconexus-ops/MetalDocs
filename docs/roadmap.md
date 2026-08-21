@@ -43,16 +43,21 @@ DOCX_MAX_ZIP_ENTRIES    4096
 Go boundary             oapi-codegen v2.8.0 probe PASS
 TypeScript boundary     openapi-typescript 7.13.0 probe PASS
 direct S3 PUT           signed exact Content-Length + If-None-Match:* probe PASS
+strict request split        kin-openapi + minimal envelope-guard probe PASS
 ```
 
-The direct-PUT exact-length concern remains resolved subtractively without reopening T8-C: the existing `PresignCreate(handle,maxBytes,ttl)` seam is sufficient when T8-E supplies `maxBytes=expected_size_bytes` and the provider PUT profile binds that value as exact `Content-Length`.
+The direct-PUT concern remains resolved subtractively without reopening T8-C: the existing `PresignCreate(handle,maxBytes,ttl)` seam is sufficient when T8-E supplies `maxBytes=expected_size_bytes`; the portable property is an at-most bound, while the reference S3 profile is stronger and signs exact `Content-Length`. Completion derives the actual descriptor independently, so no client-size truth is persisted.
+
+The final Lead coherence attack found one remaining bounded upstream precision package in T8-D's **transaction census only**: remove mandatory Audit where T3 does not require it, make required T3 evidence/multi-event paths explicit, make SUBMIT River intent conditional on a real activated effect, and name the already-ratified User re-enable transition. No table/state/API/permission/worker/capability is added.
 
 ## Exact next action
 
 ```text
-prove exact ledger/census/profile fixtures across all 78 operation rows
-→ run final whole-candidate Structural Inversion / YAGNI / overengineering / global-coherence attack
-→ if and only if no material contradiction survives, create isolated review/t8e-fable from exact candidate HEAD
+operator adjudicates the bounded T8-D transaction-census precision package recorded in docs/work/current/proposal.md §8.4
+→ if approved, reconcile only docs/architecture/persistence.md
+→ rerun exact whole-candidate Structural Inversion / YAGNI / overengineering / global-coherence delta
+→ revalidate main/base + exact candidate HEAD + intended 5-file diff + required CI
+→ only then create isolated review/t8e-fable from exact candidate HEAD
 → independent Fable challenge
 → Lead adjudication
 → explicit operator ratification
