@@ -34,6 +34,7 @@ Start here after `AGENTS.md`, then read `roadmap.md`, then only the owning docum
 | Executable application wire | [Wire contract](architecture/wire-contract.md) | Temporary work/review history, precision provenance, old OpenAPI |
 | Frontend realization | [Frontend](architecture/frontend.md) + [T8-F ratification](decisions/t8f-ratification.md) | Removed legacy frontend / speculative runtime or visual-framework choices |
 | Runtime / process / deployment | [Runtime](architecture/runtime.md) + [T8-G ratification](decisions/t8g-ratification.md) | Removed legacy runtime/deploy topology / speculative scale infrastructure |
+| Golden Flows / validation proof baseline | [Validation baseline](architecture/validation-baseline.md) + [T9 ratification](decisions/t9-ratification.md) | Temporary T9 review Evidence, implementation test code, transition mechanics |
 
 ## Reading law
 
