@@ -25,21 +25,26 @@ LEGACY IMPLEMENTATION                 ABSENT FROM LIVE TREE
 
 T11 — Implementation Program & Execution Graph is **OPEN / ACTIVE** on Draft PR #162 after explicit operator authorization on 2026-08-22.
 
-Temporary branch-only Lead candidate:
+Temporary branch-only T11 candidate pack:
 
 ```text
 docs/work/current/t11-implementation-program.md
+docs/work/current/t11-node-completion-contracts.md
+docs/work/current/t11-frontend-readiness.md
 ```
 
-The Lead is Evidence/work product, not durable authority. T11 does not authorize Product implementation, does not begin T12 and does not reopen accepted Product/T1→T10 authority by preference.
+The pack is Evidence/work product, not durable authority. The implementation-program Lead owns the candidate graph/closure; its two companions define mandatory node-exit and frontend implementation-readiness precision. All must be absorbed or removed before integration.
 
-Opening proof:
+T11 does not authorize Product implementation, does not begin T12 and does not reopen accepted Product/T1→T10 authority by preference.
+
+Opening / refinement proof:
 
 ```text
 opening integrated main               cae6ba48df5d611959c0390e0f2b9b8194d62a9d
 opening branch                         arch/t11-implementation-program
 Draft PR                               #162
 operator T11 authorization             EXPLICIT / 2026-08-22
+operator node/frontend precision       EXPLICIT / 2026-08-22
 application operations                 78
 operation 79                           ABSENT
 Product implementation                 BLOCKED
@@ -163,11 +168,19 @@ T7 remains binding: Launch has no historical business corpus to migrate. Any con
 ## Exact next action
 
 ```text
-finish the T11 Lead candidate on Draft PR #162
-→ preserve the hybrid bounded execution DAG and exact 78-operation single-assignment closure unless evidence falsifies it
-→ run required CI on the exact candidate HEAD
-→ present the exact Lead candidate and proof for explicit operator approval before independent review
-→ if approved, create isolated review/t11-fable from the exact approved candidate following Repository Standard v1
+continue the T11 candidate on Draft PR #162
+→ derive the MetalDocs Frontend Coverage Matrix from accepted Product/T6/T8-E/T8-F authority; do not draw wireframes before coverage is reconciled
+→ derive the material interaction-surface inventory from that matrix
+→ derive a Screen Contract for every material surface
+→ derive the Navigation/Data Graph and prove every target identity/read path
+→ classify and resolve any material coverage finding; never invent operation 79 or a screen-shaped API
+→ only after those contracts are coherent, draw functional low/mid-fidelity wireframes for every material screen/safe-action state
+→ derive the Material Interaction Ledger and bidirectional frontend↔backend trace
+→ reconcile 78/78 frontend operation coverage with zero invented/orphaned operation
+→ feed the completed frontend pack back into the S1→S7 Node Completion Contracts
+→ run required CI on the exact completed T11 candidate HEAD
+→ present the exact completed Lead/candidate pack for explicit operator approval before independent review
+→ only then create isolated review/t11-fable from the exact approved candidate following Repository Standard v1
 → adjudicate reviewer Evidence against current authority; correct only material defects
 → require bounded re-review until MATERIAL=0 or route the smallest justified reopen
 → only after convergence, prepare durable T11 authority + ratification evidence and remove temporary T11 work files
@@ -175,7 +188,7 @@ finish the T11 Lead candidate on Draft PR #162
 → do not implement Product code while the roadmap implementation gate remains BLOCKED
 ```
 
-T11 is active only as an architecture/planning stage. T12 remains not open. Product implementation remains blocked.
+T11 is active only as an architecture/planning stage. T8-F remains closed unless the frontend readiness exercise produces material evidence requiring the smallest bounded reopen. T12 remains not open. Product implementation remains blocked.
 
 ## Remaining architecture program
 
@@ -187,7 +200,7 @@ T11 is active only as an architecture/planning stage. T12 remains not open. Prod
 | T8-H — Whole-T8 Global Coherence Review | Cross-check backend, persistence, wire, frontend, runtime and accepted upstream authorities as one system | CLOSED / OPERATOR-RATIFIED / INTEGRATED |
 | T9 — Golden Flows & Validation Baseline | Falsifiable composed-system flows and proof classes | CLOSED / OPERATOR-RATIFIED / INTEGRATED |
 | T10 — Transition / Cutover | Real current→target transition, authority edge, recovery and rollback barriers | CLOSED / OPERATOR-RATIFIED / INTEGRATED |
-| T11 — Implementation Program & Execution Graph | Bounded work graph and proof obligations | OPEN / ACTIVE candidate on Draft PR #162 |
+| T11 — Implementation Program & Execution Graph | Bounded work graph, exact node-exit states, frontend implementation-readiness and proof obligations | OPEN / ACTIVE candidate on Draft PR #162 |
 | T12 — Adversarial Implementation-Readiness | Independent implementation-readiness attack | NOT OPEN; opens only after T11 closure |
 
 ## Final implementation gate
