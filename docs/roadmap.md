@@ -33,6 +33,7 @@ docs/work/current/t11-node-completion-contracts.md
 docs/work/current/t11-frontend-readiness.md
 docs/work/current/t11-frontend-coverage.md
 docs/work/current/t11-frontend-surfaces.md
+docs/work/current/t11-screen-contracts.md
 ```
 
 The pack is Evidence/work product, not durable authority. The implementation-program Lead owns graph/closure; companions define mandatory node-exit and frontend implementation-readiness precision. All temporary files must be absorbed or removed before integration.
@@ -51,9 +52,9 @@ application operations                 78
 operation 79                           ABSENT
 F1 frontend coverage                   COMPLETE / 16 human goals / 78 operations
 F1 material T11 findings               5 found / 5 adjudicated / 0 unresolved
-F2 material surface inventory          COMPLETE CANDIDATE / 36 surfaces
-F2 new Product/T8-F gap                0
-Product/T8-F semantic reopen           NOT JUSTIFIED by current evidence
+F2 material surface inventory          COMPLETE / 36 surfaces
+F3 Screen Contracts                    36/36 derived / 35 READY / 1 BLOCKED
+F3-F01                                 MATERIAL responsible-owner candidate read gap
 Product implementation                 BLOCKED
 ```
 
@@ -69,7 +70,53 @@ S6  Obsolescence + Audit                                           4
 TOTAL                                                             78
 ```
 
-Predecessor durable T10 authority:
+## Current bounded finding — F3-F01
+
+The accepted later responsible-owner replacement journey requires a human-selectable target satisfying:
+
+```text
+existing MetalDocs User
++ same Company
++ current eligibility = ENABLED
+```
+
+Current wire gives `getDocumentResponsibleOwner` current owner + ETag, but no complete least-privilege candidate source for every valid replacement state. `DocumentCreationOptionsView.responsible_owner_candidates` is creation-context truth and may exclude retired/inactive existing-Document context even though replacement has no active Area/DocumentType predicate. Admin `listUsers` is not a valid dependency for the normal `area_manager` owner-management journey.
+
+Recommended smallest bounded precision, pending explicit operator approval:
+
+```text
+existing operation 47 getDocument
+→ DocumentOfficialView gains optional derived
+  responsible_owner_candidates?: UserReference[]
+
+presence:
+  caller may receive Document context
+  AND current document.owner.manage is ALLOW for this Document
+
+value:
+  complete current D4-eligible set
+  = existing ENABLED same-Company Users
+  deterministic user_id ASC
+
+replacement:
+  still revalidates target eligibility + If-Match atomically
+```
+
+This adds no capability, Permission, semantic owner, route or application operation. `operation 79` remains absent. The current wire already accepts complete non-truncated responsible-owner candidate projections and defines the same `user_id ASC` order in creation options; measured scale remains the existing T6 reopen trigger.
+
+Smallest accepted authorities implicated by the current analysis:
+
+```text
+T6 Product journeys — later owner-management presentation precision
+T8-E wire           — DocumentOfficialView optional field + presence/order/disclosure fixtures
+T8-F frontend       — OFF-03 consumes the accepted field
+```
+
+No accepted authority is edited until the operator explicitly approves this bounded correction. F4 and wireframing remain blocked until adjudication.
+
+## Predecessor T10 authority
+
+Durable T10 authority:
 
 ```text
 architecture/transition.md
@@ -80,8 +127,6 @@ Immutable T10 ratification evidence:
 ```text
 decisions/t10-ratification.md
 ```
-
-Current progression, implementation permission and exact next action remain owned here.
 
 ## T10 integrated proof
 
@@ -118,8 +163,6 @@ T10 closeout required CI               #1168 SUCCESS / #1169 SUCCESS
 T10 closeout / current main            cae6ba48df5d611959c0390e0f2b9b8194d62a9d
 ```
 
-The T10 squash merge integrated the exact authorized closure tree. PR #161 recorded completed integration and produced the current T11 opening base.
-
 ## Ratified T10 result
 
 ```text
@@ -130,7 +173,7 @@ B3  first post-seal authoritative R10 Product mutation / point of no return
 B4  authoritative recovery point exists + disposable serving estate fenced + canonical R10 serving activated
 ```
 
-Core transition law:
+Core transition law remains:
 
 ```text
 one-way greenfield activation
@@ -185,12 +228,13 @@ T7 remains binding: Launch has no historical business corpus to migrate. Contrar
 ## Exact next action
 
 ```text
-continue T11 frontend implementation-readiness on Draft PR #162
-→ F3 derive a Screen Contract for each of the 36 F2 material surfaces
-→ each Screen Contract must close accepted goal, route/lens, semantic owner, exact reads/writes, generated schema, target-identity source, T8-F state class, wire mechanics, material lifecycle/Problems, mutation cache/navigation consequence, server AuthZ/disclosure, browser proof, explicit non-authority and backend sufficiency
-→ classify any new material finding; never invent operation 79 or a screen-shaped API
-→ F4 derive the Navigation/Data Graph and prove every target identity/read path against the completed Screen Contracts
-→ only after F3→F4 are coherent, F5 draw functional low/mid-fidelity wireframes for every material screen/safe-action state
+operator adjudication of T11 finding F3-F01
+→ if approved, apply only the bounded T6/T8-E/T8-F responsible-owner read precision described above
+→ preserve exactly 78 application operations and operation-79 absence
+→ update F3 OFF-03 Screen Contract against the accepted corrected read
+→ rerun F3 sufficiency reconciliation; require 36/36 READY and zero unresolved MATERIAL finding
+→ then F4 derive Navigation/Data Graph and prove every target identity/read path
+→ only after F3→F4 coherence, F5 draw functional low/mid-fidelity wireframes
 → F6 derive Material Interaction Ledger
 → F7 execute final bidirectional frontend↔backend trace and reconcile 78/78 coverage
 → feed completed frontend pack into S1→S6 Node Completion Contracts
@@ -203,14 +247,14 @@ continue T11 frontend implementation-readiness on Draft PR #162
 → do not implement Product code while roadmap gate remains BLOCKED
 ```
 
-T11 is active only as architecture/planning. T8-F remains closed unless frontend-readiness evidence materially falsifies it. T12 remains not open. Product implementation remains blocked.
+T11 is active only as architecture/planning. T12 remains not open. Product implementation remains blocked.
 
 ## Remaining architecture program
 
 | Stage | Owns | Opens / exits |
 |---|---|---|
 | T8-E — Executable Wire Contract | Exact OpenAPI application wire, schemas, headers, problems, ETags, idempotency, pagination, upload/exact-byte contract, generated Go/TypeScript boundaries | CLOSED / OPERATOR-RATIFIED / INTEGRATED |
-| T8-F — Frontend Realization | Route tree, feature/package topology, generated transport consumption, query/state behavior, read-model consumption, editor/viewer boundaries | CLOSED / OPERATOR-RATIFIED / INTEGRATED |
+| T8-F — Frontend Realization | Route tree, feature/package topology, generated transport consumption, query/state behavior, read-model consumption, editor/viewer boundaries | CLOSED / OPERATOR-RATIFIED / INTEGRATED; bounded F3-F01 precision pending operator approval |
 | T8-G — Runtime / Process / Deployment | Binaries/processes, River workers, renderer/scanner/provider boundaries, startup/readiness/shutdown, configuration/secrets, trust/network boundaries, observability, recovery/runtime profiles | CLOSED / OPERATOR-RATIFIED / INTEGRATED |
 | T8-H — Whole-T8 Global Coherence Review | Cross-check backend, persistence, wire, frontend, runtime and accepted upstream authorities as one system | CLOSED / OPERATOR-RATIFIED / INTEGRATED |
 | T9 — Golden Flows & Validation Baseline | Falsifiable composed-system flows and proof classes | CLOSED / OPERATOR-RATIFIED / INTEGRATED |
