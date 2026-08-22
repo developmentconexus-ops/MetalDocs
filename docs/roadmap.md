@@ -34,6 +34,12 @@ docs/work/current/t11-wireframes.md
 docs/work/current/t11-interaction-ledger.md
 ```
 
+Reusable frontend implementation-readiness methodology:
+
+```text
+docs/development/functional-html-wireframe-method.md
+```
+
 Operator-approved bounded precision discovered during T11 frontend-readiness analysis:
 
 ```text
@@ -53,6 +59,7 @@ Draft PR                               #162
 operator T11 authorization             EXPLICIT / 2026-08-22
 operator node/frontend precision       EXPLICIT / 2026-08-22
 operator F3-F01 bounded correction     APPROVED / 2026-08-22
+Functional HTML Wireframe Method       ADDED / ROUTED / CI #1212 SUCCESS
 application operations                 78
 orphaned operations                    0
 invented operations                    0
@@ -64,12 +71,21 @@ accepted human goals                  16 / 16
 material frontend surfaces            36 / 36
 Screen Contracts                      36 / 36 READY
 Navigation/Data Graph                 COMPLETE
-functional wireframes                 COMPLETE CANDIDATE
+markdown functional wireframes         COMPLETE CANDIDATE
 Material Interaction Ledger           COMPLETE CANDIDATE
 bidirectional frontend↔backend trace  78 / 78
-unresolved MATERIAL frontend finding  0
+HTML functional prototype              REVIEW CANDIDATE / EXTERNAL ARTIFACT
+HTML stable Product routes             10 / 10
+HTML material surfaces                 36 / 36
+HTML operation manifest                78 / 78 unique
+HTML pattern vocabulary                PRESENT
+HTML trace metadata                    PRESENT
+HTML candidate SHA-256                 37378abfb7671767823f07552d9ef2feabad107d33451466d79159d7d7728a12
+unresolved MATERIAL frontend finding  0 before visual walkthrough
 Product implementation                BLOCKED
 ```
+
+The HTML prototype is deliberately an **external review artifact** while the repository remains architecture-first. Current Repository Standard v1 CI admits durable documentation as Markdown and blocks implementation surfaces. T11 does not weaken that allowlist merely to host a prototype. The prototype contains no real backend calls and is not Product runtime/frontend implementation. Its reviewed behavior must remain traceable to the repository-owned blueprint/wireframes/interaction ledger; if durable HTML hosting later becomes a real repository requirement, that policy change must be explicit rather than smuggled in through T11.
 
 Coverage-first frontend planning corrected the T11 decomposition twice without silently changing Product authority: first by removing an impossible Organization-before-Authentication ordering, then by proving that Document creation and Document Work cannot truthfully close as separate user-facing implementation nodes. The final semantic execution partition is:
 
@@ -94,6 +110,44 @@ Library
 ```
 
 No node may close as “backend complete; frontend later” when it owns a material user-facing claim.
+
+## Functional HTML prototype gate
+
+The reusable method now requires the frontend implementation-readiness candidate to survive an interactive HTML walkthrough before independent T11 review.
+
+The current HTML candidate is a single-file HTML/CSS/vanilla-JavaScript prototype derived from the accepted 36 Screen Contracts and Material Interaction Ledger. It provides:
+
+```text
+one AppShell vocabulary
+accepted stable route simulation only
+component-pattern catalog
+material tables/cards/forms/dialogs/drawers/viewer/editor regions
+interactive navigation
+material success/failure scenario simulation
+403 / 404 / 412 / CSRF / ambiguous-idempotency / upload-expiry / dependency / integrity states
+machine-readable data-* trace metadata
+10-route / 36-surface / 78-operation manifest
+zero real backend calls
+zero Product authority
+```
+
+The HTML prototype may reveal one of four classes of evidence:
+
+```text
+presentation/pattern defect
+  → correct prototype/T11 frontend detail only
+
+trace/navigation defect with accepted backend truth available
+  → correct T11 Screen Contract / blueprint / ledger
+
+accepted frontend realization contradiction
+  → smallest bounded T8-F reopen
+
+required accepted human goal not representable from current Product/wire truth
+  → smallest Product/T6/T8-E reopen; never a screen-shaped convenience API
+```
+
+No visual preference by itself reopens Product/architecture authority.
 
 ## Approved bounded responsible-owner precision — T8-E-RO
 
@@ -267,12 +321,16 @@ T7 remains binding: Launch has no historical business corpus to migrate. Contrar
 ## Exact next action
 
 ```text
-self-review the consolidated T11 candidate on Draft PR #162
-→ prove no placeholder/TODO, contradictory operation count, dead user-flow seam, stale superseded T11 route or unowned material proof obligation remains
-→ verify current candidate changed-file scope contains documentation/planning authority only; no Product implementation
-→ run required CI on the exact candidate HEAD
-→ present the exact candidate HEAD + CI + changed files for separate explicit operator approval before independent review
-→ only after that approval create isolated review/t11-fable from the exact approved candidate following Repository Standard v1
+operator visual walkthrough of the current Functional HTML prototype candidate
+→ inspect AppShell, route composition, tables/cards/forms/drawers/dialogs, reusable patterns and all material failure/recovery scenarios
+→ record any finding against the owning Screen Contract / interaction / route / backend trace; do not redesign by visual preference alone
+→ iterate the HTML candidate until the operator accepts the functional prototype behavior
+→ re-run HTML ↔ frontend blueprint ↔ Interaction Ledger reconciliation; require 36/36 surfaces and 78/78 operations with zero unbound material control
+→ record the final reviewed HTML artifact SHA-256 in this roadmap/PR checkpoint
+→ self-review the resulting consolidated T11 candidate and verify documentation-only repository scope
+→ run required CI on the exact repository candidate HEAD
+→ present the exact repository HEAD + CI + final HTML artifact hash for separate explicit operator approval before independent review
+→ only after that approval create isolated review/t11-fable from the exact approved candidate following Repository Standard v1 and provide the exact approved HTML artifact to the reviewer as Evidence
 → adjudicate reviewer Evidence against current authority; correct only material defects
 → require bounded re-review until MATERIAL=0 or route the smallest justified reopen
 → after convergence consolidate the approved T8-E-RO precision into the effective T6/T8-E/T8-F owning authorities
@@ -294,7 +352,7 @@ T11 is active only as architecture/planning. T12 remains not open. Product imple
 | T8-H — Whole-T8 Global Coherence Review | Cross-check backend, persistence, wire, frontend, runtime and accepted upstream authorities as one system | CLOSED / OPERATOR-RATIFIED / INTEGRATED |
 | T9 — Golden Flows & Validation Baseline | Falsifiable composed-system flows and proof classes | CLOSED / OPERATOR-RATIFIED / INTEGRATED |
 | T10 — Transition / Cutover | Real current→target transition, authority edge, recovery and rollback barriers | CLOSED / OPERATOR-RATIFIED / INTEGRATED |
-| T11 — Implementation Program & Execution Graph | Bounded work graph, exact node-exit states, frontend implementation-readiness and proof obligations | OPEN / ACTIVE candidate on Draft PR #162; consolidated candidate self-review/CI is current gate |
+| T11 — Implementation Program & Execution Graph | Bounded work graph, exact node-exit states, frontend implementation-readiness and proof obligations | OPEN / ACTIVE candidate on Draft PR #162; Functional HTML prototype walkthrough is current gate |
 | T12 — Adversarial Implementation-Readiness | Independent implementation-readiness attack | NOT OPEN; opens only after T11 closure |
 
 ## Final implementation gate
