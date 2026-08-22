@@ -4,23 +4,54 @@
 > **Parent:** B03 — Document Official / Ficha do Documento.  
 > **Purpose:** close the smallest Product/UX semantics required by the operator-mandated Launch V1 Document Discussion + `@mention` + in-app Notification capability before upstream Product/T3/T5/T6/T8-E/T8-F consolidation.  
 > **Implementation:** BLOCKED.  
-> **Census:** existing 78 operations / 10 Idempotency-Key creations remain current accepted authority until the bounded reopen is fully designed and ratified.
+> **Census:** existing 78 operations / 10 Idempotency-Key creations remain current accepted authority until the bounded reopen is fully designed and ratified.  
+> **Reasoning authority:** `developmentconexus-ops/conexus-methodology/METHOD.md` — DevelopmentConexus Engineering Method v1.0.0.
 
 ## 1. Analysis law
 
-Every decision in this mini-design follows:
+Every decision in this mini-design follows the canonical METHOD decision core proportionally:
 
 ```text
-current repository authority first
+Evidence
+→ Known / Inferred / Unknown / Deferred
+→ Root Cause
+→ Target Invariant
+→ Constraints
+→ Credible Alternatives
+→ Local Maximum vs Global Maximum
+→ Essential vs Accidental Complexity
+→ YAGNI / Overengineering / Future Cost
+→ Authority / Boundary when relevant
+→ Enforcement
+→ Proof Strategy
+→ Adversarial Challenge
+→ Decision
+→ Reopen Triggers
+```
+
+Repository-local application:
+
+```text
+current MetalDocs authority first
 → real user need / named consumer
 → alternatives independent of current implementation shape
 → legacy/reference evidence only as falsification/input, never authority
-→ inversion/adversarial test
-→ global-maximum comparison
-→ smallest coherent semantic change that closes the need
+→ structural inversion/adversarial test
+→ Global Maximum comparison
+→ smallest sustainable semantic change that closes the need
 → bidirectional impact across Product / T1–T10 / frontend / API
 → operator adjudication
 → upstream consolidation only after the mini-design closes
+```
+
+METHOD laws particularly binding here:
+
+```text
+mechanism != authority
+YAGNI must remove unsupported capability, not required invariants or justified seams
+prepare the seam, not the entire future capability
+new real consumer / changed requirement is a valid bounded-reopen trigger
+Global Maximum is not maximum abstraction or infrastructure
 ```
 
 Technology/framework/library choice is intentionally deferred until Product semantics are frozen. A framework may implement the accepted model; it may not define the model.
@@ -148,7 +179,7 @@ no official Release exists
 
 This contextual snapshot does not move Discussion ownership from Document to Revision and does not bind the message to WorkingContent/DRAFT. A later Release never rewrites the stored context of an older message.
 
-Rationale / global-maximum result:
+Rationale / Global Maximum result:
 
 - preserves stable-Document conversation across Revision changes;
 - preserves historical conversational context without turning Discussion into Revision history;
@@ -240,7 +271,7 @@ reply with explicit Mention -> normal Mention notification law
 
 Mention does not grant access, create a governance participant, change lifecycle state, or make a User a persistent Discussion member.
 
-Rationale / global-maximum result:
+Rationale / Global Maximum result:
 
 - preserves D1 read/write separation;
 - avoids information leakage from generic Company/User directories;
@@ -250,16 +281,39 @@ Rationale / global-maximum result:
 - keeps the initial Notification consumer closed to explicit mentions instead of inventing broad event-subscription semantics;
 - remains valid if the visual composer or chat library changes later.
 
-## 7. Open decisions
+## 7. Reference evidence for D4+ — NOT AUTHORITY
+
+Targeted external study is admitted only to test whether the candidate Notification model is a local custom invention or a stable industry pattern.
+
+Observed mature Inbox patterns:
+
+```text
+Knock      unseen / seen / read / archived; badge/filter/feed semantics
+MagicBell  unseen / unread / read / archived; mark-all + per-item state actions
+Novu       seen vs read distinction; read/unread + mark-all
+```
+
+This evidence supports evaluating a richer standard Inbox engagement model rather than assuming `UNREAD/READ` alone is globally sufficient. It does **not** authorize importing any vendor workflow, channel, subscriber, preference or delivery platform into MetalDocs.
+
+Mechanism study note:
+
+```text
+Novu self-host currently brings its own MongoDB + Redis + worker/WebSocket/service topology.
+MetalDocs current technical authority already selects PostgreSQL product state + one PostgreSQL-backed durable-job mechanism.
+```
+
+Therefore a full notification platform is not the default solution merely because its Inbox state model is useful reference evidence. D7/D8 must compare reuse only against the actual frozen MetalDocs requirements and the METHOD mechanism/authority law.
+
+## 8. Open decisions
 
 Close one at a time before upstream consolidation:
 
 ```text
-D4 Notification identity / unread-read lifecycle / navigation
+D4 Notification engagement lifecycle / identity / navigation
 D5 disclosure, offboarding, deletion/edit immutability behavior
 D6 smallest B01 shell impact
 D7 exact owner/state/API/async boundary and exact census delta
-D8 technology-spike requirements (framework/repo/library evaluation criteria only)
+D8 technology-spike requirements + framework/repo/library evaluation
 ```
 
 No B04+ baseline opens while a material B03 dependency remains unresolved.
