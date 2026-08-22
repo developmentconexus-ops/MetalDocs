@@ -15,75 +15,88 @@ REPOSITORY RESET                      MERGED / OPERATOR-RATIFIED
 REPOSITORY STANDARD V1 ALIGNMENT      MERGED
 PRODUCT / OWNERSHIP                   OPERATOR-APPROVED
 T1 → T8-H                             CLOSED / OPERATOR-RATIFIED / INTEGRATED
-T9                                     NEXT / NOT STARTED
-T10 → T12                              NOT OPEN
+T9 GOLDEN FLOWS / VALIDATION          CLOSED / OPERATOR-RATIFIED / INTEGRATION AUTHORIZED
+T10 → T12                             NOT OPEN
 IMPLEMENTATION                        BLOCKED
 LEGACY IMPLEMENTATION                 ABSENT FROM LIVE TREE
 ```
 
 ## Current gate
 
-T8-H — Whole-T8 Global Coherence Review is **CLOSED / OPERATOR-RATIFIED / INTEGRATED** as of 2026-08-21.
+T9 — Golden Flows & Validation Baseline is **CLOSED / OPERATOR-RATIFIED** as of 2026-08-21. The operator separately authorized squash integration of PR #154 after bounded independent Fable convergence.
 
-Integrated proof:
+The durable T9 authority is `architecture/validation-baseline.md`; immutable ratification evidence is `decisions/t9-ratification.md`. Temporary review/work Evidence does not land in the closure tree.
 
-```text
-opening main                       0b4ef6ef891b01f907804cff4bd3c0022aebad80
-final candidate PR                 #148
-final authorized candidate HEAD    213e3d7cb84130e282eec383b060577ca7580b48
-merge-candidate required CI        #1119 SUCCESS
-squash merge                       d7f5d59f5dab6bc369483f88d44f69b9f2712c27
-integrated main                    d7f5d59f5dab6bc369483f88d44f69b9f2712c27
-candidate tree                     a536233b634abec0874d2d488e470f057be2b759
-integrated main tree               a536233b634abec0874d2d488e470f057be2b759
-T8-H ratification                  EXPLICIT / 2026-08-21
-T8-H integration                   VERIFIED
-T9                                 NEXT / NOT STARTED
-Product implementation             BLOCKED
-```
-
-The squash merge integrated the exact authorized tree: the final candidate HEAD and `main @ d7f5d59f...` both resolve to tree `a536233b634abec0874d2d488e470f057be2b759`.
-
-The immutable T8-H ratification record is `docs/decisions/t8h-ratification.md`. It owns ratification evidence only; current progression, implementation permission and exact next action remain here.
-
-## Ratified T8-H result
-
-The Whole-T8 review closed three material coherence seams without reopening Product or any T1→T8-G semantic authority:
+Ratification proof:
 
 ```text
-H1  mutable program state
-    -> docs/roadmap.md is the sole current stage/status/implementation/next-action authority
-
-H2  executable DocumentOfficialView meaning
-    -> complete effective schema/presence law consolidated in docs/architecture/wire-contract.md
-
-H3  T5-J managed-content GC topology
-    -> internal/application/maintenance reflected inside the existing non-semantic application class
+opening main                           82832cce62d11ea90575fb484b97e3c934c03e37
+candidate PR                           #154
+operator-approved Lead candidate       2d5d127e95821eac355296e0a7f09c93aef6cef3
+Lead candidate required CI             #1127 SUCCESS
+Round-1 Evidence PR                    #155 CLOSED / UNMERGED
+Round-1 review CI                      #1128 SUCCESS
+Round-1 verdict                        NOT CONVERGED / MATERIAL=2
+technical correction commit            ca3a72d3f92eacea734bd1c583cd981e6e787bce
+independently reviewed candidate HEAD  eb7e0147cf575fe69290c231ea360af229917eeb
+corrected candidate required CI        #1130 SUCCESS
+Round-2 Evidence PR                    #156 CLOSED / UNMERGED
+Round-2 final review HEAD              27b7ce63a8c63169b6ac8b582ee49621e7c86355
+Round-2 review CI                      #1132 SUCCESS
+Round-2 verdict                        CONVERGED / MATERIAL=0
+Round 3                                NOT JUSTIFIED
+post-review status carrier             c5fba2b179e1e0a9a806df83654ea6daf6e67513
+status-carrier required CI             #1133 SUCCESS
+operator ratification                  EXPLICIT / 2026-08-21
+merge authorization                    EXPLICIT / 2026-08-21
 ```
 
-Ratified technical candidate and independent proof:
+The closure tree is valid only when the exact current PR HEAD passes required CI, the PR is Ready/mergeable, temporary `docs/work/**` T9 content is absent, and the merge uses expected-HEAD protection. Concrete closure/merge SHAs and CI runs are Git proof and do not need to be self-recorded inside the pre-merge roadmap.
+
+Round-1 adjudication closed two material proof gaps without reopening T1→T8:
 
 ```text
-corrected technical candidate      b940d4e105a8b837ecdac7f71233ff10d735cd5e
-candidate required CI              #1108 SUCCESS
-Fable Round 1 PR                    #149 CLOSED / UNMERGED / 1 MATERIAL / adjudicated
-Fable Round 2 PR                    #150 CLOSED / UNMERGED / CONVERGED / MATERIAL=0
-Fable Round 2 final HEAD            5564612d07dc0325ac9b81e441f551340872e59d
-Fable Round 2 CI                    #1110 SUCCESS
-Round 3                             NOT JUSTIFIED
-post-review status carrier          da0ffffc386a1335a866a9416cdcf7625de2ac02
-status-carrier required CI          #1112 SUCCESS
-operator ratification               EXPLICIT / 2026-08-21
-closure candidate                   8c2ae8515fecf513cfd699e9d0e53eb2551fd835
-closure required CI                 #1117 SUCCESS
-final candidate                     213e3d7cb84130e282eec383b060577ca7580b48
-final merge-candidate CI            #1119 SUCCESS
-integrated main                     d7f5d59f5dab6bc369483f88d44f69b9f2712c27
+F1  runtime wire-conformance ownership
+    → T9 V1 owns the future executable proof lane for accepted T8-E §9.4 fixture classes
+
+F2  authentication-boundary falsification
+    → GF1 causally attacks OIDC callback verification and ProviderSubjectBinding admission
 ```
 
-The post-review status carrier changed only roadmap plus the temporary T8-H ledger; it changed no independently reviewed technical authority. The temporary ledger was removed before merge candidacy. CI #1116 correctly rejected the first closure attempt because the new durable T8-H ratification record was not yet reachable; the decision register now routes it explicitly and #1117 passed.
+Four bounded MINOR precisions also made session lifecycle revocation, managed-content GC/backup-pin race, closed T3 §15 Audit-census coverage and concurrent Document-code allocation explicit. Round 2 confirmed all corrections and found no MATERIAL regression. Its only MINOR was a safe-direction execution-mode sentence; durable promotion resolves it by distinguishing T9 baseline ratification from future runtime proof execution.
 
-## Integrated T8 baseline preserved by T8-H
+## Ratified T9 baseline
+
+```text
+Golden Flows                         exactly 6
+cross-cutting validation properties exactly 10
+evidence classes                     exactly 6
+application operations               exactly 78
+orphaned operations                  0
+invented application operations      0
+operation 79                         absent
+new Permission                       none
+new semantic owner                   none
+T1→T8 reopen                         none
+Product implementation               BLOCKED
+```
+
+The six Golden Flows cover:
+
+```text
+GF1 identity / session / access / revocation
+GF2 governance configuration → atomic Document creation
+GF3 Revision authoring / upload admission / concurrency
+GF4 governance → Release / OfficialRendition
+GF5 official discovery / obsolescence / disclosure-safe routing
+GF6 runtime failure isolation / shutdown / backup-restore readiness
+```
+
+The ten cross-cutting properties cover canonical wire/runtime conformance, architecture dependency closure, AuthN/AuthZ/CSRF, transaction+Audit atomicity, idempotency/replay, ETag/concurrency, exact-content/malware/rendition integrity, River durable work, runtime readiness/resources/observability and backup/restore privacy/security readiness.
+
+T9 ratifies the **validation contract**, not an assertion that Product implementation already exists or has passed runtime tests. Later implementation/readiness work must execute or mechanically inspect the real production subject as required; mock-only, fixture-only and self-proving probes cannot close claims about real runtime/dependency behavior.
+
+## Integrated T8 baseline preserved by T9
 
 ```text
 accepted application operations      78
@@ -107,32 +120,31 @@ Redis / BFF / realtime / external Search / generic event bus absent
 Product implementation               BLOCKED
 ```
 
-The bounded T8-E-FR read-symmetry meaning remains unchanged and is executable only through the T8-E wire SSOT. The T8-H CI proportionality correction keeps material repository-envelope/routing/provenance protections blocking, keeps valid isolated Draft Evidence green, treats Markdown whitespace as warning-only, and keeps leftover merge-conflict markers blocking.
+The bounded T8-E-FR read-symmetry meaning remains executable only through the T8-E wire SSOT. T9 validates that contract; it creates no second wire/read authority.
 
 ## Exact next action
 
 ```text
-operator authorization to open T9 — Golden Flows & Validation Baseline
-→ if authorized, start fresh from integrated main @ d7f5d59f5dab6bc369483f88d44f69b9f2712c27
-→ derive the smallest falsifiable composed-system validation contract from accepted T1→T8 authority
-→ do not begin T10, T11 or T12
-→ do not implement Product code
+verify required CI on the exact current closure HEAD of PR #154
+→ mark PR #154 Ready without changing that HEAD
+→ obtain merge-candidate required CI on the same exact HEAD
+→ squash merge PR #154 using expected HEAD protection
+→ verify integrated tree / main
+→ record T9 integration status without opening T10
 ```
 
-No additional T8-H Fable round is justified. The two Round-2 MINOR safe-direction `Implementation remains BLOCKED` echoes are explicitly non-blocking and do not authorize implementation or contradict this roadmap.
-
-Candidate/review branch cleanup is non-authoritative housekeeping and does not open T9.
+T10 requires separate explicit operator authorization after T9 integration. T11/T12 remain closed. Product implementation remains blocked.
 
 ## Remaining architecture program
 
 | Stage | Owns | Opens / exits |
 |---|---|---|
-| T8-E — Executable Wire Contract | Exact OpenAPI application wire, schemas, headers, problems, ETags, idempotency, pagination, upload/exact-byte contract, generated Go/TypeScript boundaries | CLOSED / OPERATOR-RATIFIED / INTEGRATED; T8-E-FR meaning retained and executable representation consolidated in wire SSOT |
+| T8-E — Executable Wire Contract | Exact OpenAPI application wire, schemas, headers, problems, ETags, idempotency, pagination, upload/exact-byte contract, generated Go/TypeScript boundaries | CLOSED / OPERATOR-RATIFIED / INTEGRATED |
 | T8-F — Frontend Realization | Route tree, feature/package topology, generated transport consumption, query/state behavior, read-model consumption, editor/viewer boundaries | CLOSED / OPERATOR-RATIFIED / INTEGRATED |
 | T8-G — Runtime / Process / Deployment | Binaries/processes, River workers, renderer/scanner/provider boundaries, startup/readiness/shutdown, configuration/secrets, trust/network boundaries, observability, recovery/runtime profiles | CLOSED / OPERATOR-RATIFIED / INTEGRATED |
 | T8-H — Whole-T8 Global Coherence Review | Cross-check backend, persistence, wire, frontend, runtime and accepted upstream authorities as one system | CLOSED / OPERATOR-RATIFIED / INTEGRATED |
-| T9 — Golden Flows & Validation Baseline | Falsifiable composed-system flows and proof classes | NEXT / NOT STARTED; requires explicit operator authorization to open |
-| T10 — Transition / Cutover | Real current→target transition and rollback barriers | NOT OPEN; opens after T9 baseline |
+| T9 — Golden Flows & Validation Baseline | Falsifiable composed-system flows and proof classes | CLOSED / OPERATOR-RATIFIED / INTEGRATION AUTHORIZED |
+| T10 — Transition / Cutover | Real current→target transition and rollback barriers | NOT OPEN; requires separate operator authorization after T9 integration |
 | T11 — Implementation Program & Execution Graph | Bounded work graph and proof obligations | NOT OPEN; opens after T1→T10 accepted |
 | T12 — Adversarial Implementation-Readiness | Independent implementation-readiness attack | NOT OPEN; opens after T11 |
 
@@ -142,7 +154,7 @@ Implementation remains blocked until all are true:
 
 ```text
 T8  CLOSED / OPERATOR-RATIFIED / INTEGRATED
-T9  CLOSED / OPERATOR-RATIFIED
+T9  CLOSED / OPERATOR-RATIFIED / INTEGRATED
 T10 CLOSED / OPERATOR-RATIFIED
 T11 CLOSED / OPERATOR-RATIFIED
 T12 CLOSED / OPERATOR-RATIFIED
