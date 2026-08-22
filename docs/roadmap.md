@@ -39,8 +39,8 @@ The current frontend gate is:
 
 ```text
 B01 — App Shell + Global Information Architecture   LOCKED / OPERATOR-RATIFIED
-B02 — Library / discovery                           OPEN / CANDIDATE / NOT LOCKED
-B03 — Document Official                             NOT OPEN
+B02 — Library / discovery                           LOCKED / OPERATOR-RATIFIED
+B03 — Document Official                             NEXT / NOT OPEN
 ```
 
 B01 was operator-locked on 2026-08-22 after the revised **Home A — Central operacional** visual walkthrough. Its bounded durable record and canonical rendered structural artifact are:
@@ -52,15 +52,16 @@ docs/work/current/t11-b01-app-shell-wireframe.html
 
 B01 P9 Screen Contract / bidirectional trace and bounded P10 consolidation are complete in the B01 record. The lock freezes the current structural baseline but remains subject to the normal smallest-scope evidence-backed reopen law.
 
-B02 was opened as CANDIDATE after explicit operator continuation. Its bounded current record is:
+B02 was operator-locked on 2026-08-22 after iterative visual adjudication from table-first hypotheses to **C3 — Discovery-first Library with Por tipo + Por área**. Its bounded record and canonical rendered structural artifact are:
 
 ```text
 docs/work/current/t11-b02-library.md
+docs/work/current/t11-b02-library-wireframe.html
 ```
 
-B02 P6 reference study and P7 structural-hypothesis comparison are complete enough for operator visual review. Leading direction is a wide metadata table with top search/filter controls. `B02-F1` remains OPEN: the complete disclosure-safe human-readable option source for Document Type / Area / responsible-owner Library filters is not yet proven. B02 may be visually iterated but MUST NOT be set `LOCKED` until that feasibility finding is resolved.
+B02-F1 is resolved by the bounded `B02-LD` Library read-composition precision: the first page of the existing `listDocuments` operation supplies complete disclosure-safe discovery options for Document Type, Area and responsible owner from the actor's currently disclosable status universe. It adds no operation, owner, Permission or route; operation 79 remains absent. B02 P9 Screen Contract / bidirectional trace and bounded P10 consolidation are complete in the B02 record. The precision must be consolidated into effective T6/T8-E/T8-F owners before T11 integration.
 
-Only the operator may set `LOCKED`. B03 remains NOT OPEN.
+Only the operator may set `LOCKED`. B03 may now be opened as a future CANDIDATE but is not opened by this roadmap update itself.
 
 ## T11 fixed system invariants
 
@@ -171,8 +172,8 @@ Current block sequence:
 
 ```text
 B01  App Shell + Global Information Architecture   LOCKED / OPERATOR-RATIFIED
-B02  Library / discovery                            CURRENT / CANDIDATE / NOT LOCKED
-B03  Document Official                              NOT OPEN
+B02  Library / discovery                            LOCKED / OPERATOR-RATIFIED
+B03  Document Official                              NEXT / NOT OPEN
 B04  Document Work / authoring                      NOT OPEN
 B05  My Work                                        NOT OPEN
 B06  Governance                                     NOT OPEN
@@ -180,7 +181,7 @@ B07  History / Audit                                NOT OPEN
 B08  Administration                                 NOT OPEN
 ```
 
-Names/order after B01 remain candidate because later evidence may refine grouping without changing Product authority. Any B01 reopen follows the normal smallest-scope finding law and does not invalidate later work automatically.
+Names/order after B01 remain candidate because later evidence may refine grouping without changing Product authority. Any B01/B02 reopen follows the normal smallest-scope finding law and does not invalidate later work automatically.
 
 Each material block follows:
 
@@ -255,7 +256,7 @@ absence discloses neither candidate existence nor reason
 
 The list grants no authority and is outside the ResponsibleOwner ETag domain. Replacement still rechecks current AuthZ, D4 eligibility/offboarding serialization and `If-Match`.
 
-Before T11 integration, effective T6/T8-E/T8-F owners must consolidate this approved precision.
+Before T11 integration, effective T6/T8-E/T8-F owners must consolidate this approved precision together with the B02-LD Library discovery precision.
 
 ## T10 preserved authority
 
@@ -275,15 +276,18 @@ No historical business migration, dual Product authority, legacy fallback, compa
 
 ```text
 B01 remains LOCKED / operator-ratified
-→ B02 is OPEN / CANDIDATE / NOT LOCKED
-→ operator visually compare the rendered B02 Library hypotheses
-→ leading direction: wide metadata table + top search/filter controls
-→ iterate B02 hierarchy / density / filter placement from operator feedback
-→ resolve B02-F1 before any B02 LOCK: prove a complete disclosure-safe human-readable source for Type / Area / responsible-owner filter options, using the smallest accepted read-model owner and without silently adding operation 79
-→ only operator may LOCK B02
-→ only after B02 LOCK complete P9 Screen Contract / bidirectional trace and P10 bounded pattern consolidation
-→ do not open B03 as baseline before B02 LOCK
-→ do not generate B03+ in advance
+→ B02 remains LOCKED / operator-ratified
+→ preserve C3: search + Por tipo + Por área + secondary Responsible/Status + structured results
+→ preserve B02-LD first-page discovery-options precision; operation 79 remains absent
+→ NEXT: open B03 — Document Official as CANDIDATE only
+→ recover the smallest B03 authority + user-goal evidence
+→ study official-document reading/management references only where triggered
+→ compare genuine Document Official structural hypotheses when ambiguity is real
+→ perform lightweight data/action/navigation feasibility
+→ render only the B03 grayscale structural candidate
+→ operator + assistant visually adjudicate B03
+→ only operator may LOCK B03
+→ do not generate B04+ in advance
 → do not begin T12
 → do not implement Product code
 ```
@@ -292,13 +296,13 @@ B01 remains LOCKED / operator-ratified
 
 | Stage | Owns | State |
 |---|---|---|
-| T8-E | Executable application wire | CLOSED / INTEGRATED; T8-E-RO consolidation pending T11 close |
-| T8-F | Frontend realization | CLOSED / INTEGRATED; T8-E-RO consolidation pending T11 close |
+| T8-E | Executable application wire | CLOSED / INTEGRATED; T8-E-RO + B02-LD consolidation pending T11 close |
+| T8-F | Frontend realization | CLOSED / INTEGRATED; T8-E-RO + B02-LD consolidation pending T11 close |
 | T8-G | Runtime / process / deployment | CLOSED / INTEGRATED |
 | T8-H | Whole-T8 coherence | CLOSED / INTEGRATED |
 | T9 | Golden Flows / validation baseline | CLOSED / INTEGRATED |
 | T10 | Transition / cutover | CLOSED / INTEGRATED |
-| T11 | Implementation graph + implementation-readiness | OPEN / B01 LOCKED; B02 OPEN / CANDIDATE |
+| T11 | Implementation graph + implementation-readiness | OPEN / B01+B02 LOCKED; B03 NEXT / NOT OPEN |
 | T12 | Adversarial implementation-readiness | NOT OPEN |
 
 ## Final implementation gate
