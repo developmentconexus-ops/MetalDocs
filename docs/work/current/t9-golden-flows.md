@@ -45,24 +45,26 @@ presence of a file, dependency or config key without executing its property
 Legitimate negative controls attack the actual subject, for example:
 
 ```text
+forged/replayed/tampered OIDC callback
+verified provider subject with no current ProviderSubjectBinding
 stale real ETag
 same Idempotency-Key + changed semantic request
 required Audit append failure inside the real local transaction
 revoked/disabled current User or grant
+concurrent distinct Document creates competing for one code
 corrupt stored bytes against a real semantic descriptor
 stopped renderer/scanner dependency
 incompatible database schema
 missing required secret / impossible content envelope
 River redelivery/terminal failure
+backup-pin/GC race
 restore from a real backup recovery point
 SIGTERM during accepted work
 ```
 
 Tool identity is not authority. T8-G's current proof-backed candidates (for example Schemathesis, Testcontainers-Go, `govulncheck`, OSV-Scanner) may realize a proof lane only when they execute the required subject and falsifier.
 
-## 3. Evidence classes
-
-T9 uses six evidence classes. A flow/property selects only the classes required by its claim.
+## 3. Evidence classes — exactly 6
 
 | Class | Evidence | Cannot be replaced by |
 |---|---|---|
@@ -77,17 +79,27 @@ No class is mandatory when the protected property does not depend on it. Proport
 
 ## 4. Golden Flow set — exactly 6
 
-The six flows are a composition basis, not an operation-by-operation acceptance suite. Full 78-operation surface closure is proved separately by V1.
+The six flows are a composition basis, not an operation-by-operation acceptance suite. Full 78-operation closure is split deliberately:
+
+```text
+static census/schema/generated-projection closure
++
+runtime execution of the accepted T8-E wire-conformance fixture classes
++
+representative composed Golden Flows
+```
 
 ### GF1 — Identity, session, access and revocation
 
-**Purpose:** prove the browser authentication/access chain without moving Authorization into OIDC or React.
+**Purpose:** prove the complete browser trust chain from the OIDC boundary through current MetalDocs Authorization without moving Authorization into OIDC or React.
 
 Success lane:
 
 ```text
 external OIDC authentication
-→ ProviderSubjectBinding resolves exact User
+→ callback/exchange validates the external protocol result
+→ verified issuer+subject resolves one current ProviderSubjectBinding
+→ exact enabled User is resolved
 → HttpOnly ApplicationSession issued
 → synchronizer CSRF material obtained through authenticated session
 → Product read succeeds only after current User/Role/scope/domain checks
@@ -99,9 +111,14 @@ external OIDC authentication
 Required falsifiers:
 
 ```text
+forged/replayed/tampered callback — including invalid state/nonce/code/issuer — cannot create an ApplicationSession
+verified provider subject with no current ProviderSubjectBinding cannot obtain a session or auto-create a User
 provider role/group claim alone cannot grant MetalDocs Permission
 missing/wrong CSRF cannot reach unsafe semantic effect
 revoked/disabled current access cannot remain usable through stale browser/server cache
+expired ApplicationSession fails authentication
+session cookie replay after endSession fails authentication
+ProviderSubjectBinding replacement terminates all existing ApplicationSessions for that User
 OIDC network outage does not destroy an already-valid ApplicationSession
 non-disclosable resource stays non-disclosable
 ```
@@ -110,7 +127,7 @@ Minimum evidence: E2 + E3 + E4; E5 for the selected OIDC profile.
 
 ### GF2 — Governance configuration to atomic Document creation
 
-**Purpose:** prove that current administration/configuration can feed one real Document creation without duplicate truth or partial commit.
+**Purpose:** prove that current administration/configuration can feed one real Document creation without duplicate truth, stale configuration acceptance or partial commit.
 
 Success lane:
 
@@ -127,8 +144,9 @@ Required falsifiers:
 
 ```text
 stale configuration ETag cannot silently overwrite newer governance/config truth
-concurrent duplicate logical create cannot create two Documents or two accepted semantic effects
+concurrent retry of the same logical create cannot create two Documents or two semantic effects
 same key + changed semantic request is rejected
+two distinct concurrent logical creates in one numbering scope cannot commit the same Document code
 required Audit append failure rolls back the business mutation
 retired/ineligible referenced configuration cannot be accepted from stale preview
 number preview never reserves or becomes final authority
@@ -212,7 +230,7 @@ malicious/unscanned required governed bytes cannot cross the immutable governed 
 clean scan evidence must bind the exact bytes that are later admitted at the governed boundary
 ```
 
-Minimum evidence: E2 + E3 + E5 + E6; E4 for the browser governance/official lenses.
+Minimum evidence: E2 + E3 + E5 + E6; E4 for browser governance/official lenses.
 
 ### GF5 — Official discovery, obsolescence and disclosure-safe routing
 
@@ -281,6 +299,7 @@ River terminal required work
 
 backup/restore
   → DB + required exact-content manifest form a complete recovery point
+  → backup pin / GC exclusion prevents selected required content from disappearing during capture
   → restored sessions are invalidated before serving
   → privacy/security reconciliation completes before readiness
 ```
@@ -299,9 +318,11 @@ Minimum evidence: E2 + E5 + E6.
 
 ## 5. Cross-cutting validation matrix — exactly 10 properties
 
-### V1 — Product/wire census and generated projection coherence
+### V1 — Product/wire census, generated projections and runtime wire conformance
 
-Must prove against the canonical source:
+V1 has two distinct proof lanes and both are mandatory.
+
+**Static/structural lane — E1:**
 
 ```text
 application operations   = 78
@@ -310,9 +331,34 @@ invented                  = 0
 operation 79              = absent
 OpenAPI paths/operationIds/schemas/headers/Problems match accepted wire law
 generated Go/TypeScript projections compile and cannot widen closed wire vocabularies
+T8-E-FR read-symmetry precision is represented only through the wire SSOT; no parallel executable authority exists
 ```
 
 A deliberately added/removed/renamed operation or incompatible schema must make the real contract proof fail.
+
+**Runtime lane — E3, with E2/E4/E5 only where the fixture's protected property requires them:**
+
+Execute the accepted T8-E §9.4 wire-conformance fixture classes against the real composed HTTP path `transport → application → owners/mechanisms`; direct owner calls do not close this lane.
+
+The runtime suite must exercise the accepted classes, including at least:
+
+```text
+strict JSON/query decoding, including duplicate/unknown members
+body on bodyless operation rejection
+405 exact Allow behavior
+unsupported media/content-coding and 65,536-byte raw JSON ceiling
+PROFILE_REPLACE If-Match / If-None-Match matrix
+cursor tamper/filter-replay rejection + current AuthZ recheck across pages
+complete/non-truncated creation-options projections
+Content-Digest/body SHA-256 coherence
+Range rejection
+corrupt exact bytes cannot emit a successful complete response
+ReplaySnapshot <= 2048 and closed/stable replay shape
+same-PDF RequireOfficialRendition emits no duplicate bytes/job/renderer intent
+operation-specific Problem/header/status behavior from the canonical 78-row ledger
+```
+
+Each fixture class requires a positive case and at least one causal negative that makes the same production path fail when its invariant is violated. Property-attack tooling may help generate cases but never replaces the real composed path.
 
 ### V2 — Closed-world architecture dependency graph
 
@@ -322,18 +368,20 @@ Negative fixtures mutate the real import/SQL subject and run the same production
 
 ### V3 — Authentication, Authorization, disclosure and CSRF
 
-Must prove the canonical ALLOW/default-DENY authority is singular, current access is revocable, domain predicates fail closed, provider claims never become Product authorization, disclosure is respected, and unsafe browser requests require the accepted CSRF mechanism.
+Must prove the canonical ALLOW/default-DENY authority is singular, current access is revocable, domain predicates fail closed, provider claims never become Product authorization, OIDC callback results cannot bypass binding/session admission, disclosure is respected, and unsafe browser requests require the accepted CSRF mechanism.
 
 ### V4 — Transaction + required Audit atomicity
 
-For every representative transition class that requires same-local-commit evidence:
+The transition-class enumeration source is the **closed T3 §15 Required same-local-commit Audit census**, reconciled by later accepted T8-E precision. T9 must cover every required census class, using representative instances inside a class rather than sampling away entire classes.
+
+For each class:
 
 ```text
-semantic mutation + required Audit + required durable intent (when any)
+semantic mutation + every required Audit event + required durable intent (when any)
 commit together or none commit
 ```
 
-Inject failure after mutation but before required append/intent completion and prove no partial semantic commit survives.
+Inject failure after mutation but before required append/intent completion and prove no partial semantic commit survives. Offboarding multi-event teardown must remain reconstructible under the same transaction.
 
 ### V5 — Idempotency and replay
 
@@ -341,7 +389,7 @@ Must prove current-user + operationId + UUID scoping, normalized semantic finger
 
 ### V6 — Concurrency / ETag / narrow serialization
 
-Must prove stale whole-replacement semantics, stale DRAFT-specific semantics, protected current eligibility during correctness-critical transitions, one-open/effective uniqueness and accepted READ COMMITTED + narrow serialization/CAS behavior under real concurrent transactions.
+Must prove stale whole-replacement semantics, stale DRAFT-specific semantics, protected current eligibility during correctness-critical transitions, one-open/effective uniqueness, concurrent Document-code uniqueness across distinct commands, and accepted READ COMMITTED + narrow serialization/CAS behavior under real concurrent transactions.
 
 ### V7 — Exact content, malware and rendition integrity
 
@@ -349,7 +397,9 @@ Must prove semantic ExactContentDescriptor authority over provider identity, exa
 
 ### V8 — Durable work / River semantics
 
-Must prove at-least-once duplicate/redelivery safety for each activated named durable-effect class, current-state revalidation before effect/finalization, terminal visibility/redrive and separation between River mechanism state and Product truth.
+Must prove at-least-once duplicate/redelivery safety for **each activated named durable-effect class in the accepted T5 census**, including managed-content GC when active; current-state revalidation before effect/finalization; terminal visibility/redrive; and separation between River mechanism state and Product truth.
+
+For managed-content GC specifically, a stale cleanup intent must be unable to delete current WorkingContent, immutable governed content, current claim-protected content or backup-protected content after eligibility/reference/claim state changes.
 
 ### V9 — Runtime readiness, failure isolation, resource and observability laws
 
@@ -357,7 +407,9 @@ Must prove accepted `/livez`/`/readyz` distinction, dependency-scoped blast radi
 
 ### V10 — Backup/restore and privacy/security readiness
 
-Must prove a restorable recovery point contains the required PostgreSQL + exact-content set and that restore cannot serve until sessions/security/privacy reconciliation is complete. A restore that resurrects sessions or leaves required exact content unverifiable is a hard failure.
+Must prove a restorable recovery point contains the required PostgreSQL + exact-content set and that restore cannot serve until sessions/security/privacy reconciliation is complete.
+
+A causal backup-capture race must demonstrate that backup pin / GC exclusion protects the selected required content until capture completes. A restore that resurrects sessions, leaves required exact content unverifiable or bypasses privacy/security reconciliation is a hard failure.
 
 ## 6. Forward-obligation disposition in T9
 
@@ -394,12 +446,14 @@ T9 closure requires:
 6/6 Golden Flows have executable future proof plans with positive + causal negative cases
 10/10 cross-cutting properties have an identified production subject and falsifier
 78/78 application operations remain in canonical wire census with no invented operation
+T8-E §9.4 runtime wire-conformance classes execute against the real composed HTTP path
+all T3 §15 required same-local-commit Audit classes are represented in V4 proof
 all claim-relevant external mechanisms have a real-dependency proof lane
 no MATERIAL accepted invariant is closed by mocks-only evidence
 no unresolved contradiction is hidden as a test exemption/baseline waiver
 ```
 
-T9 does **not** require every one of the 78 operations to appear in an end-to-end Golden Flow. Operation-level contract/census conformance plus representative composed flows is the smaller and stronger architecture proof.
+T9 does **not** require every one of the 78 operations to appear in an end-to-end Golden Flow. Runtime operation/wire conformance plus representative composed flows is the smaller and stronger architecture proof.
 
 ## 8. Reopen / stop law
 
@@ -424,18 +478,61 @@ transition-only problem
 
 Preference, test convenience, framework fashion, old implementation shape and hypothetical future scale are not reopen triggers.
 
-## 9. Candidate exit criteria
+## 9. Fable Round 1 adjudication
 
-The T9 architecture candidate is ready for independent challenge only when:
+Independent Evidence PR #155 reviewed the exact operator-approved candidate `2d5d127e95821eac355296e0a7f09c93aef6cef3` and returned:
 
 ```text
-Golden Flow set remains exactly 6 unless a seventh protects a genuinely uncovered accepted property
+VERDICT = NOT CONVERGED
+MATERIAL findings = 2
+Round 2 justified = YES
+```
+
+Lead adjudication:
+
+```text
+F1 MATERIAL  ACCEPT
+  V1 now owns runtime execution of the T8-E §9.4 wire-conformance fixture classes
+  against the real composed E3 path, not only static census/schema/generation proof.
+
+F2 MATERIAL  ACCEPT
+  GF1 now attacks forged/replayed/tampered OIDC callback semantics and verified-but-unbound
+  provider subjects before ApplicationSession issuance.
+
+F3 MINOR     ACCEPT
+  GF1 explicitly covers expiry, endSession replay and binding-replacement session revocation.
+
+F4 MINOR     ACCEPT
+  V8/V10 explicitly name managed-content GC revalidation and backup-pin/GC capture race.
+
+F5 MINOR     ACCEPT
+  V4 binds its class enumeration to the closed T3 §15 same-local-commit Audit census.
+
+F6 MINOR     ACCEPT
+  GF2/V6 explicitly attack distinct concurrent Document creates competing for one code.
+
+F7 NOTE      TRACEABILITY ONLY
+  V1 explicitly records T8-E-FR read-symmetry as wire-SSOT-only executable meaning.
+
+F8 NOTE      NO CHANGE
+  rate limiting remains outside T9 because no accepted T1→T8 mechanism/invariant requires a limiter.
+```
+
+No T1→T8 authority reopens. Golden Flows remain 6, properties remain 10, evidence classes remain 6, application operations remain 78 and operation 79 remains absent.
+
+## 10. Candidate exit criteria
+
+The corrected T9 architecture candidate is ready for bounded Round 2 independent confirmation only when:
+
+```text
+Golden Flow set remains exactly 6 unless a genuinely uncovered accepted property is demonstrated
 cross-cutting property set remains exactly 10 unless a gap is demonstrated
+F1/F2 corrections are mechanically present without inventing a new authority or stage
 no flow invents Product meaning
 no proof depends on legacy implementation
 no T10/T11/T12 work is embedded
 implementation remains blocked
-required repository CI is green on the exact candidate HEAD
+required repository CI is green on the exact corrected candidate HEAD
 ```
 
-After operator acceptance of the Lead candidate, the next proportional gate is an isolated independent Fable challenge against the exact candidate. Reviewer Evidence does not become authority.
+Round 2 is a bounded confirmation of the Round-1 corrections, not a fresh unconstrained redesign. Reviewer Evidence remains non-authoritative and must remain isolated from the candidate/main tree.
