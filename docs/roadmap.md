@@ -32,6 +32,7 @@ docs/work/current/t11-implementation-program.md
 docs/work/current/t11-node-completion-contracts.md
 docs/work/current/t11-frontend-readiness.md
 docs/work/current/t11-frontend-coverage.md
+docs/work/current/t11-frontend-surfaces.md
 ```
 
 The pack is Evidence/work product, not durable authority. The implementation-program Lead owns graph/closure; companions define mandatory node-exit and frontend implementation-readiness precision. All temporary files must be absorbed or removed before integration.
@@ -50,6 +51,8 @@ application operations                 78
 operation 79                           ABSENT
 F1 frontend coverage                   COMPLETE / 16 human goals / 78 operations
 F1 material T11 findings               5 found / 5 adjudicated / 0 unresolved
+F2 material surface inventory          COMPLETE CANDIDATE / 36 surfaces
+F2 new Product/T8-F gap                0
 Product/T8-F semantic reopen           NOT JUSTIFIED by current evidence
 Product implementation                 BLOCKED
 ```
@@ -183,18 +186,17 @@ T7 remains binding: Launch has no historical business corpus to migrate. Contrar
 
 ```text
 continue T11 frontend implementation-readiness on Draft PR #162
-→ F2 derive the complete material interaction-surface/state inventory from the now-closed F1 Coverage Matrix
-→ prove every F2 surface is justified by an accepted human goal and backend contract; reject cosmetic over-fragmentation
-→ F3 derive a Screen Contract for every material surface
-→ F4 derive the Navigation/Data Graph and prove every target identity/read path
+→ F3 derive a Screen Contract for each of the 36 F2 material surfaces
+→ each Screen Contract must close accepted goal, route/lens, semantic owner, exact reads/writes, generated schema, target-identity source, T8-F state class, wire mechanics, material lifecycle/Problems, mutation cache/navigation consequence, server AuthZ/disclosure, browser proof, explicit non-authority and backend sufficiency
 → classify any new material finding; never invent operation 79 or a screen-shaped API
-→ only after F2→F4 are coherent, F5 draw functional low/mid-fidelity wireframes for every material screen/safe-action state
+→ F4 derive the Navigation/Data Graph and prove every target identity/read path against the completed Screen Contracts
+→ only after F3→F4 are coherent, F5 draw functional low/mid-fidelity wireframes for every material screen/safe-action state
 → F6 derive Material Interaction Ledger
 → F7 execute final bidirectional frontend↔backend trace and reconcile 78/78 coverage
-→ feed the completed frontend pack into S1→S6 Node Completion Contracts
-→ run required CI on the exact completed T11 candidate HEAD
+→ feed completed frontend pack into S1→S6 Node Completion Contracts
+→ run required CI on exact completed T11 candidate HEAD
 → present exact completed candidate for explicit operator approval before independent review
-→ only then create isolated review/t11-fable from the exact approved candidate
+→ only then create isolated review/t11-fable from exact approved candidate
 → adjudicate reviewer Evidence; re-review until MATERIAL=0 or smallest justified reopen
 → after convergence prepare durable T11 authority + ratification and remove temporary work files
 → do not begin T12
