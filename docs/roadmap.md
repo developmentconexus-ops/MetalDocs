@@ -15,7 +15,7 @@ REPOSITORY RESET                      MERGED / OPERATOR-RATIFIED
 REPOSITORY STANDARD V1 ALIGNMENT      MERGED
 PRODUCT / OWNERSHIP                   OPERATOR-APPROVED
 T1 → T9                               CLOSED / OPERATOR-RATIFIED / INTEGRATED
-T10                                   NEXT / NOT STARTED
+T10                                   OPEN / ACTIVE
 T11 → T12                             NOT OPEN
 IMPLEMENTATION                        BLOCKED
 LEGACY IMPLEMENTATION                 ABSENT FROM LIVE TREE
@@ -23,7 +23,41 @@ LEGACY IMPLEMENTATION                 ABSENT FROM LIVE TREE
 
 ## Current gate
 
-T9 — Golden Flows & Validation Baseline is **CLOSED / OPERATOR-RATIFIED / INTEGRATED** as of 2026-08-21.
+T10 — Transition / Cutover is **OPEN / ACTIVE** as of 2026-08-22 by explicit operator authorization.
+
+Opening proof:
+
+```text
+opening main                           fc7030e98021bdb55fa806df68821cf19ed1a40c
+opening branch                         arch/t10-transition-cutover
+open PRs before T10                    0
+T1 → T9                                CLOSED / OPERATOR-RATIFIED / INTEGRATED
+application operations                 78
+operation 79                           ABSENT
+T11 → T12                              NOT OPEN
+Product implementation                 BLOCKED
+legacy implementation                  ABSENT FROM LIVE TREE
+```
+
+The active branch-only Lead candidate is `docs/work/current/t10-transition-cutover.md`. It is temporary work/Evidence, not durable architecture authority.
+
+T10 must derive the smallest truthful technical activation/cutover/recovery contract from accepted T1→T9 authority. T7 already establishes that Launch has no historical business corpus to migrate; T10 may not manufacture ETL, dual-write, compatibility or old/new authority merely for transition convenience.
+
+The current Lead direction is one-way greenfield activation with five monotonic barriers:
+
+```text
+B0  source truth classified
+B1  target privately prepared
+B2  target proven before normal serving
+B3  canonical serving authority activated
+B4  first authoritative R10 Product mutation committed
+```
+
+Before B4, activation may be reversed only while no authoritative R10 Product mutation has committed. After B4, destructive return to disposable pre-R10/DEV/test state is forbidden; incidents become R10 recovery.
+
+## Integrated T9 result preserved by T10
+
+T9 — Golden Flows & Validation Baseline is **CLOSED / OPERATOR-RATIFIED / INTEGRATED**.
 
 Integrated proof:
 
@@ -53,11 +87,9 @@ integrated main tree                   3e0f9d494ea577310e632633c17dfd621f75bf1e
 T9 integration                         VERIFIED
 ```
 
-The squash merge integrated the exact authorized tree: final candidate `e8ee5f9e...` and `main @ 29c0c87c...` both resolve to tree `3e0f9d494ea577310e632633c17dfd621f75bf1e`.
+The durable T9 technical authority is `architecture/validation-baseline.md`. The immutable ratification snapshot is `decisions/t9-ratification.md`.
 
-The durable T9 technical authority is `architecture/validation-baseline.md`. The immutable ratification snapshot is `decisions/t9-ratification.md`. Current progression, implementation permission and exact next action remain here.
-
-## Ratified T9 result
+Ratified T9 envelope preserved by T10:
 
 ```text
 Golden Flows                         exactly 6
@@ -69,15 +101,23 @@ invented application operations      0
 operation 79                         absent
 new Permission                       none
 new semantic owner                   none
-T1→T8 reopen                         none
 Product implementation               BLOCKED
 ```
 
-The six Golden Flows cover identity/session/access/revocation; governance configuration→atomic Document creation; Revision authoring/upload/concurrency; governance→Release/OfficialRendition; official discovery/obsolescence/disclosure-safe routing; and runtime failure/shutdown/backup-restore readiness.
+## T10 source truth
 
-The ten cross-cutting properties cover wire/runtime conformance, architecture dependency closure, AuthN/AuthZ/CSRF, transaction+Audit atomicity, idempotency/replay, ETag/concurrency, exact-content/malware/rendition integrity, River durable work, runtime readiness/resources/observability and backup/restore privacy/security readiness.
+T7 remains binding:
 
-T9 ratifies a **falsifiable validation contract**, not an assertion that Product implementation already exists or has passed runtime tests. Later execution must target real production subjects/boundaries; mock-only, fixture-only and self-proving probes cannot close real runtime/dependency claims.
+```text
+pre-R10 MetalDocs business history   NONE
+required pre-R10 business corpus     NONE
+historical business migration        NOT REQUIRED
+DEV/test state preservation          REJECTED
+```
+
+A surviving external DEV/test database, managed-content store, OIDC client, deployment, ingress or secret/config resource receives no business-authority status merely because it exists. T10 inventories such technical estate only to make activation/cleanup truthful.
+
+If concrete evidence proves that real pre-R10 business truth or a required compatibility consumer exists, T10 stops and routes a bounded reopen to the smallest owning authority before migration design proceeds.
 
 ## Preserved integrated baseline
 
@@ -106,14 +146,16 @@ Product implementation               BLOCKED
 ## Exact next action
 
 ```text
-operator authorization to open T10 — Transition / Cutover
-→ if authorized, start fresh from the then-current integrated `main` containing this T9 closeout; revalidate its exact SHA before work
-→ derive the smallest truthful current→target transition and rollback-barrier contract from accepted T1→T9 authority
+complete the Lead T10 candidate on arch/t10-transition-cutover
+→ run required CI on the exact candidate HEAD
+→ operator reviews/adjudicates the one-way activation + B0→B4 rollback-barrier contract
+→ if operator accepts the Lead direction, open isolated Fable challenge from that exact candidate
+→ adjudicate any material falsifier against the smallest owning authority
 → do not begin T11 or T12
 → do not implement Product code
 ```
 
-T10 is **NEXT / NOT STARTED** and is not open without separate explicit operator authorization.
+No T10 implementation plan is authorized or created while Product implementation remains blocked. T10 owns transition architecture only.
 
 ## Remaining architecture program
 
@@ -124,7 +166,7 @@ T10 is **NEXT / NOT STARTED** and is not open without separate explicit operator
 | T8-G — Runtime / Process / Deployment | Binaries/processes, River workers, renderer/scanner/provider boundaries, startup/readiness/shutdown, configuration/secrets, trust/network boundaries, observability, recovery/runtime profiles | CLOSED / OPERATOR-RATIFIED / INTEGRATED |
 | T8-H — Whole-T8 Global Coherence Review | Cross-check backend, persistence, wire, frontend, runtime and accepted upstream authorities as one system | CLOSED / OPERATOR-RATIFIED / INTEGRATED |
 | T9 — Golden Flows & Validation Baseline | Falsifiable composed-system flows and proof classes | CLOSED / OPERATOR-RATIFIED / INTEGRATED |
-| T10 — Transition / Cutover | Real current→target transition and rollback barriers | NEXT / NOT STARTED; requires explicit operator authorization to open |
+| T10 — Transition / Cutover | Real current→target transition and rollback barriers | OPEN / ACTIVE; Lead candidate under operator-review path |
 | T11 — Implementation Program & Execution Graph | Bounded work graph and proof obligations | NOT OPEN; opens after T1→T10 accepted |
 | T12 — Adversarial Implementation-Readiness | Independent implementation-readiness attack | NOT OPEN; opens after T11 |
 
