@@ -4,7 +4,7 @@
 
 ## 1. Purpose
 
-T8-F already closes frontend semantic realization: accepted human goals, stable route/lens meanings, 78/78 operation consumers, generated transport consumption, TanStack Query/state behavior, ETag/idempotency/Problem handling and editor/viewer boundaries.
+T8-F already closes frontend semantic realization: human goals, stable route/lens meanings, 78/78 operation consumers, generated transport consumption, TanStack Query/state behavior, ETag/idempotency/Problem handling and editor/viewer boundaries.
 
 T11 closes a different question:
 
@@ -14,7 +14,7 @@ without inventing Product meaning, guessing a backend relationship,
 creating screen-shaped API, or deciding material UX behavior while coding?
 ```
 
-This is implementation-readiness precision, **not a T8-F reopen**. A material gap that proves accepted authority insufficient routes to the smallest implicated owner explicitly.
+This is implementation-readiness precision, not a T8-F reopen. A material gap that proves accepted authority insufficient routes explicitly to the smallest implicated owner.
 
 ## 2. Fixed envelope
 
@@ -35,7 +35,7 @@ interactive DOCX boundary              one adapter boundary
 Product implementation                 BLOCKED
 ```
 
-Stable Product routes remain:
+Stable Product routes remain exactly:
 
 ```text
 /documents
@@ -50,9 +50,9 @@ Stable Product routes remain:
 /admin/document-governance
 ```
 
-`/auth/login` and `/auth/callback` remain browser integration routes outside the 78-operation application census.
+`/auth/login` and `/auth/callback` remain browser AuthN integration routes outside the 78-operation application census.
 
-Route count is not screen count. One stable route may contain several material interaction states and may be progressively enriched by later T11 implementation tranches where the exact progression is declared.
+Route count is not screen count. One stable route may contain several material interaction surfaces and may be progressively enriched only where the T11 Node Completion Contracts say so.
 
 ## 3. Method
 
@@ -73,7 +73,7 @@ Reusable idea from Marketplace Central: **coverage before drawing**. Marketplace
 
 ## 4. F0 — Authority baseline — COMPLETE
 
-The frontend planning input must always retain:
+Planning input remains:
 
 ```text
 accepted human goal / Product journey
@@ -86,17 +86,15 @@ ETag/idempotency/exact-content requirements
 T9 browser/composed proof obligations
 ```
 
-F0 is represented by current Product/T6/T8-E/T8-F authority and the derived coverage artifact.
-
 ## 5. F1 — Frontend Coverage Matrix — COMPLETE
 
-Current artifact:
+Artifact:
 
 ```text
 docs/work/current/t11-frontend-coverage.md
 ```
 
-Closed result:
+Result:
 
 ```text
 accepted human goals mapped                 16 / 16
@@ -104,65 +102,42 @@ stable route/lens homes                     covered
 T8-F frontend consumer reconciliation       78 / 78
 T11 implementation assignment               78 / 78 exactly once
 operation 79                                absent
-material T11 coverage findings              5 found / 5 adjudicated
-unresolved MATERIAL coverage finding        0
+material T11 findings                       5 found / 5 adjudicated
+unresolved MATERIAL finding                 0
 Product/T8-F semantic reopen                not justified
 ```
 
-F1 materially corrected the open T11 graph:
+F1 corrected the T11 graph without changing Product/T8 authority.
+
+## 6. F2 — Material interaction-surface inventory — COMPLETE CANDIDATE
+
+Artifact:
 
 ```text
-old artificial order
-  Organization → Authentication/Authorization
-
-corrected first semantic tranche
-  Identity + Organization + Access
+docs/work/current/t11-frontend-surfaces.md
 ```
 
-It also closed dead-target risks by assigning `createDocumentRevision` + `listAuthoringWork` with the real Document Work target and `listGovernanceWork` with the real Governance Case target.
-
-## 6. F2 — Material interaction-surface inventory — NEXT
-
-A **surface** is a coherent user decision context, not necessarily a URL or React component.
-
-Create a distinct material surface/state when at least one changes materially:
+Result:
 
 ```text
-primary semantic truth shown
-safe user action
-mutation owner/operation
-required target identity
-OCC/idempotency/exact-byte behavior
-lifecycle context
-security/disclosure outcome
-recovery path after material failure
-editor/viewer mode
+stable SPA Product routes               10
+material frontend surfaces              36
+accepted human goals with surface       16 / 16
+new Product routes                       0
+application operations changed          0
+operation 79                             absent
+new Product/T8-F material gap            0
 ```
 
-Do not split merely for cosmetic loading spinners or visually different but semantically identical presentation.
+A surface is a coherent **user decision context**, not a URL/component. F2 splits only when semantic truth, safe action, owner/operation, navigation identity, OCC/idempotency/exact-byte behavior, lifecycle/disclosure, recovery or editor/viewer mode changes materially.
 
-Seed only — not final inventory:
+Cosmetic loading, responsive variants, success toasts, ordinary validation copy, page number and component boundaries do not create surfaces by themselves.
 
-```text
-Application shell / authenticated navigation
-Library / official discovery
-Document creation interaction
-Document Official
-Document Work
-My Work
-Governance Case
-Document History
-Audit
-Admin / Organization
-Admin / Access
-Admin / Document Governance
-```
+Cross-cutting material states such as 401, 403/404 disclosure, CSRF recovery, 412 OCC reconciliation, idempotent retry, upload expiry, dependency failure and exact-content integrity are attached to the surfaces that can reach them; they do not become global Product state or standalone Product routes.
 
-F2 must expand this seed until every F1 human goal/material state has a home and no surface requires invented backend truth.
+## 7. F3 — Screen Contracts — NEXT
 
-## 7. F3 — Screen Contract
-
-Every material surface MUST answer all claim-relevant questions before its wireframe can be accepted:
+Every one of the 36 material surfaces must answer all claim-relevant questions before wireframing:
 
 1. Which accepted human goal/journey does it serve?
 2. Which stable route/lens contains it?
@@ -181,7 +156,9 @@ Every material surface MUST answer all claim-relevant questions before its wiref
 15. What must the surface explicitly NOT own/infer?
 16. Does any required display/action need information absent from accepted 78-operation/read-model authority?
 
-Any material unanswered item blocks the wireframe.
+Any material unanswered item blocks F5 wireframing.
+
+Screen Contracts may reference accepted owner/wire authority rather than restating whole schemas, but must be sufficiently exact that a later implementer does not decide material behavior while coding.
 
 ## 8. F4 — Navigation / Data Graph
 
@@ -201,11 +178,11 @@ A missing required target identity is a material finding, not permission for a c
 
 ## 9. F5 — Wireframe law
 
-All material screens/surfaces and material safe-action state variants must be wireframed before T11 closes.
+All material screens/surfaces and materially different safe-action state variants must be wireframed before T11 closes.
 
 Wireframes are **functional low/mid-fidelity implementation contracts**, not visual-brand authority.
 
-They MUST show where relevant:
+They show where relevant:
 
 ```text
 page/surface hierarchy
@@ -223,7 +200,7 @@ dependency failure when it changes safe action
 read-only vs actionable regions
 ```
 
-They do not need to freeze ornamental pixel choices such as exact spacing, final palette, shadows/radii or micro-animation unless a material requirement depends on them.
+They do not freeze exact spacing, final palette, shadows/radii, micro-animation or other ornamental pixels unless a material requirement depends on them.
 
 **Freeze interaction meaning, not ornamental pixels.**
 
@@ -243,8 +220,6 @@ Every material control/action in accepted wireframes gets one ledger row:
 | Client consequence | query replacement/invalidation/refetch, local input, navigation |
 | Retry law | same logical command vs new semantic command |
 | Forbidden inference | authority client must not manufacture |
-
-This removes “button exists; API behavior decided later” ambiguity.
 
 ## 11. F7 — Bidirectional trace
 
@@ -268,7 +243,7 @@ every client state is classified by T8-F authority model
 zero invented Product state
 ```
 
-Final reconciliation:
+Final reconciliation remains:
 
 ```text
 application operations   78 / 78
@@ -293,7 +268,7 @@ required accepted human goal not safely representable from current wire/read mod
   → smallest Product/T6/T8-E owner reopen
 
 convenience endpoint without accepted Product need
-  → reject; redesign with accepted truth
+  → reject; redesign using accepted truth
 
 operation 79 proposal
   → hard STOP; explicit material Product/T6/T8-E reopen required
@@ -301,7 +276,7 @@ operation 79 proposal
 
 **Hard no screen-shaped API.** Wireframe/component convenience never authorizes a new Product operation.
 
-Conversely, a real accepted human goal must not be forced into frontend guessing merely to avoid a justified bounded reopen.
+A real accepted human goal must not be forced into frontend guessing merely to avoid a justified bounded reopen.
 
 ## 13. F9 — Frontend closure
 
@@ -310,12 +285,12 @@ Complete only when:
 ```text
 F1 Coverage Matrix complete
 F2 material surface inventory complete
-Screen Contract for every material surface
-Navigation/Data Graph complete
-wireframes for all material screens/safe-action states
-Material Interaction Ledger complete
-backend→frontend trace complete
-frontend→backend trace complete
+F3 Screen Contract for every material surface
+F4 Navigation/Data Graph complete
+F5 wireframes for all material screens/safe-action states
+F6 Material Interaction Ledger complete
+F7 backend→frontend trace complete
+F7 frontend→backend trace complete
 78/78 frontend operation coverage reconciled
 material state/concurrency/idempotency/exact-content behavior has implementation home
 no invented lifecycle/Authorization/server truth
@@ -323,7 +298,7 @@ no unresolved MATERIAL coverage finding
 operation 79 absent
 ```
 
-This closes **during T11**, before T12 and before Product implementation authorization.
+This closes during T11, before T12 and before Product implementation authorization.
 
 T12 can then attack:
 
@@ -342,21 +317,21 @@ Product journey
 
 Future semantic tranches implement the completed T11 frontend pack against real generated client/server paths. No S node may close as “backend complete, frontend follows later”.
 
-Stable route/lenses may be progressively enriched only as named in the Node Completion Contracts; no actionable dead target is allowed.
+Stable route/lenses may be progressively enriched only as named in Node Completion Contracts; no actionable dead target is allowed.
 
-P5 later proves realized frontend did not drift from reviewed T11 screen/wireframe contracts.
+P5 proves realized frontend did not drift from reviewed T11 screen/wireframe contracts.
 
 ## 15. Current status
 
 ```text
 F0 authority baseline                  COMPLETE
-F1 coverage matrix                     COMPLETE / 5 findings adjudicated
-F2 material surface inventory          NEXT / NOT STARTED
-F3 Screen Contracts                    NOT STARTED
+F1 Coverage Matrix                     COMPLETE / 5 findings adjudicated
+F2 material surface inventory          COMPLETE CANDIDATE / 36 surfaces
+F3 Screen Contracts                    NEXT / NOT STARTED
 F4 Navigation/Data Graph               NOT STARTED
 F5 wireframes                          NOT STARTED
 F6 Material Interaction Ledger         NOT STARTED
-F7 bidirectional reconciliation        PARTIAL via F1 / final not executed
+F7 bidirectional reconciliation        PARTIAL via F1/F2 / final not executed
 F8 finding classification              ACTIVE as evidence appears
 F9 frontend readiness closure          NOT REACHED
 ```
