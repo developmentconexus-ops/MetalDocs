@@ -15,7 +15,7 @@ REPOSITORY RESET                      MERGED / OPERATOR-RATIFIED
 REPOSITORY STANDARD V1 ALIGNMENT      MERGED
 PRODUCT / OWNERSHIP                   OPERATOR-APPROVED
 T1 → T10                              CLOSED / OPERATOR-RATIFIED / INTEGRATED
-T11                                   NEXT / NOT STARTED
+T11                                   OPEN / ACTIVE CANDIDATE
 T12                                   NOT OPEN
 IMPLEMENTATION                        BLOCKED
 LEGACY IMPLEMENTATION                 ABSENT FROM LIVE TREE
@@ -23,15 +23,35 @@ LEGACY IMPLEMENTATION                 ABSENT FROM LIVE TREE
 
 ## Current gate
 
-T10 — Transition / Cutover is **CLOSED / OPERATOR-RATIFIED / INTEGRATED** as of 2026-08-22 after bounded independent Fable convergence and authorized squash integration.
+T11 — Implementation Program & Execution Graph is **OPEN / ACTIVE** on Draft PR #162 after explicit operator authorization on 2026-08-22.
 
-Durable T10 authority:
+Temporary branch-only Lead candidate:
+
+```text
+docs/work/current/t11-implementation-program.md
+```
+
+The Lead is Evidence/work product, not durable authority. T11 does not authorize Product implementation, does not begin T12 and does not reopen accepted Product/T1→T10 authority by preference.
+
+Opening proof:
+
+```text
+opening integrated main               cae6ba48df5d611959c0390e0f2b9b8194d62a9d
+opening branch                         arch/t11-implementation-program
+Draft PR                               #162
+operator T11 authorization             EXPLICIT / 2026-08-22
+application operations                 78
+operation 79                           ABSENT
+Product implementation                 BLOCKED
+```
+
+Predecessor durable T10 authority:
 
 ```text
 architecture/transition.md
 ```
 
-Immutable ratification evidence:
+Immutable T10 ratification evidence:
 
 ```text
 decisions/t10-ratification.md
@@ -69,9 +89,12 @@ candidate tree                         c3de41e73ee153278e0869ac80640cc945ae26b2
 squash merge / integrated main         e8f415ec16df9cc2d4623981412e1ac21c3c6647
 integrated main tree                   c3de41e73ee153278e0869ac80640cc945ae26b2
 T10 integration                        VERIFIED
+T10 closeout PR                        #161
+T10 closeout required CI               #1168 SUCCESS / #1169 SUCCESS
+T10 closeout / current main            cae6ba48df5d611959c0390e0f2b9b8194d62a9d
 ```
 
-The squash merge integrated the exact authorized closure tree: candidate `cc408964...` and integrated `main @ e8f415ec...` both resolve to tree `c3de41e73ee153278e0869ac80640cc945ae26b2`.
+The T10 squash merge integrated the exact authorized closure tree: candidate `cc408964...` and integrated `main @ e8f415ec...` both resolve to tree `c3de41e73ee153278e0869ac80640cc945ae26b2`. PR #161 then recorded the completed integration and produced the current T11 opening base.
 
 Round-1 corrections remained bounded to T10. No T1→T9 authority reopened.
 
@@ -140,15 +163,19 @@ T7 remains binding: Launch has no historical business corpus to migrate. Any con
 ## Exact next action
 
 ```text
-operator authorization to open T11 — Implementation Program & Execution Graph
-→ if authorized, start fresh from the then-current integrated main containing this T10 closeout; revalidate its exact SHA before work
-→ derive the smallest bounded implementation work graph and proof obligations from accepted T1→T10 authority
-→ preserve the exact 78-operation census and operation-79 absence
+finish the T11 Lead candidate on Draft PR #162
+→ preserve the hybrid bounded execution DAG and exact 78-operation single-assignment closure unless evidence falsifies it
+→ run required CI on the exact candidate HEAD
+→ present the exact Lead candidate and proof for explicit operator approval before independent review
+→ if approved, create isolated review/t11-fable from the exact approved candidate following Repository Standard v1
+→ adjudicate reviewer Evidence against current authority; correct only material defects
+→ require bounded re-review until MATERIAL=0 or route the smallest justified reopen
+→ only after convergence, prepare durable T11 authority + ratification evidence and remove temporary T11 work files
 → do not begin T12
 → do not implement Product code while the roadmap implementation gate remains BLOCKED
 ```
 
-T11 is **NEXT / NOT STARTED** and is not open without separate explicit operator authorization. T12 remains closed. Product implementation remains blocked.
+T11 is active only as an architecture/planning stage. T12 remains not open. Product implementation remains blocked.
 
 ## Remaining architecture program
 
@@ -160,8 +187,8 @@ T11 is **NEXT / NOT STARTED** and is not open without separate explicit operator
 | T8-H — Whole-T8 Global Coherence Review | Cross-check backend, persistence, wire, frontend, runtime and accepted upstream authorities as one system | CLOSED / OPERATOR-RATIFIED / INTEGRATED |
 | T9 — Golden Flows & Validation Baseline | Falsifiable composed-system flows and proof classes | CLOSED / OPERATOR-RATIFIED / INTEGRATED |
 | T10 — Transition / Cutover | Real current→target transition, authority edge, recovery and rollback barriers | CLOSED / OPERATOR-RATIFIED / INTEGRATED |
-| T11 — Implementation Program & Execution Graph | Bounded work graph and proof obligations | NEXT / NOT STARTED; requires separate operator authorization |
-| T12 — Adversarial Implementation-Readiness | Independent implementation-readiness attack | NOT OPEN; opens after T11 |
+| T11 — Implementation Program & Execution Graph | Bounded work graph and proof obligations | OPEN / ACTIVE candidate on Draft PR #162 |
+| T12 — Adversarial Implementation-Readiness | Independent implementation-readiness attack | NOT OPEN; opens only after T11 closure |
 
 ## Final implementation gate
 
