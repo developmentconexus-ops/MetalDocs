@@ -15,7 +15,7 @@ REPOSITORY RESET                      MERGED / OPERATOR-RATIFIED
 REPOSITORY STANDARD V1 ALIGNMENT      MERGED
 PRODUCT / OWNERSHIP                   OPERATOR-APPROVED
 T1 → T9                               CLOSED / OPERATOR-RATIFIED / INTEGRATED
-T10                                   NEXT / NOT STARTED
+T10                                   CLOSED / OPERATOR-RATIFIED / INTEGRATION PENDING
 T11 → T12                             NOT OPEN
 IMPLEMENTATION                        BLOCKED
 LEGACY IMPLEMENTATION                 ABSENT FROM LIVE TREE
@@ -23,61 +23,84 @@ LEGACY IMPLEMENTATION                 ABSENT FROM LIVE TREE
 
 ## Current gate
 
-T9 — Golden Flows & Validation Baseline is **CLOSED / OPERATOR-RATIFIED / INTEGRATED** as of 2026-08-21.
+T10 — Transition / Cutover is **CLOSED / OPERATOR-RATIFIED** as of 2026-08-22 after bounded independent Fable convergence.
 
-Integrated proof:
+Durable T10 authority:
 
 ```text
-opening main                           82832cce62d11ea90575fb484b97e3c934c03e37
-candidate PR                           #154
-operator-approved Lead candidate       2d5d127e95821eac355296e0a7f09c93aef6cef3
-Lead candidate required CI             #1127 SUCCESS
-Round-1 Evidence PR                    #155 CLOSED / UNMERGED
-Round-1 review CI                      #1128 SUCCESS
-Round-1 verdict                        NOT CONVERGED / MATERIAL=2
-independently reviewed candidate HEAD  eb7e0147cf575fe69290c231ea360af229917eeb
-corrected candidate required CI        #1130 SUCCESS
-Round-2 Evidence PR                    #156 CLOSED / UNMERGED
-Round-2 final review HEAD              27b7ce63a8c63169b6ac8b582ee49621e7c86355
-Round-2 review CI                      #1132 SUCCESS
+architecture/transition.md
+```
+
+Immutable ratification evidence:
+
+```text
+decisions/t10-ratification.md
+```
+
+T10 ratification does **not** authorize merge, does not integrate T10 into `main`, does not open T11/T12 and does not authorize Product implementation.
+
+## T10 ratification proof
+
+```text
+opening main                           fc7030e98021bdb55fa806df68821cf19ed1a40c
+candidate Draft PR                     #158
+operator-approved original Lead        0b90f26690b2b2bbf627f0c72283ff14c0ce9b84
+original Lead required CI              #1153 SUCCESS
+Round-1 Evidence PR                    #159 CLOSED / UNMERGED
+Round-1 final review HEAD              0f47dfc2365433b5950fccac4b48106e7a7fa453
+Round-1 review CI                      #1155 SUCCESS
+Round-1 verdict                        NOT CONVERGED / MATERIAL=3
+technical correction commit            7c5bb3e0106657c6e0db993afbe8d646b0ac09d1
+independently reviewed candidate HEAD  c1afc292bc94f48bfd2146c3b4374342ff5c2701
+corrected candidate required CI        #1157 SUCCESS
+Round-2 Evidence PR                    #160 CLOSED / UNMERGED
+Round-2 final review HEAD              937aebf9688516d1b0b1245eb014c0a6c03d6e7e
+Round-2 review CI                      #1159 SUCCESS
 Round-2 verdict                        CONVERGED / MATERIAL=0
 Round 3                                NOT JUSTIFIED
-operator ratification                  EXPLICIT / 2026-08-21
-merge authorization                    EXPLICIT / 2026-08-21
-final authorized candidate HEAD        e8ee5f9e12cd9a933cd732b12549c7e48a42be52
-Draft required CI                      #1146 SUCCESS
-merge-candidate required CI            #1147 SUCCESS
-candidate tree                         3e0f9d494ea577310e632633c17dfd621f75bf1e
-squash merge / integrated main         29c0c87c3f659ce889b4210d487ee89a43d43d55
-integrated main tree                   3e0f9d494ea577310e632633c17dfd621f75bf1e
-T9 integration                         VERIFIED
+post-review status carrier             aadb2a81136dcf5020804c86738dc84c263d52f8
+status-carrier required CI             #1160 SUCCESS
+operator ratification                  EXPLICIT / 2026-08-22
+merge authorization                    NOT YET GRANTED
 ```
 
-The squash merge integrated the exact authorized tree: final candidate `e8ee5f9e...` and `main @ 29c0c87c...` both resolve to tree `3e0f9d494ea577310e632633c17dfd621f75bf1e`.
+Round-1 corrections remained bounded to T10. No T1→T9 authority reopened.
 
-The durable T9 technical authority is `architecture/validation-baseline.md`. The immutable ratification snapshot is `decisions/t9-ratification.md`. Current progression, implementation permission and exact next action remain here.
-
-## Ratified T9 result
+## Ratified T10 result
 
 ```text
-Golden Flows                         exactly 6
-cross-cutting validation properties exactly 10
-evidence classes                     exactly 6
-application operations               exactly 78
-orphaned operations                  0
-invented application operations      0
-operation 79                         absent
-new Permission                       none
-new semantic owner                   none
-T1→T8 reopen                         none
-Product implementation               BLOCKED
+B0  source truth classified
+B1  target privately prepared
+B2  exact production candidate proven + verified clean seal
+B3  first post-seal authoritative R10 Product mutation / point of no return
+B4  authoritative recovery point exists + disposable serving estate fenced + canonical R10 serving activated
 ```
 
-The six Golden Flows cover identity/session/access/revocation; governance configuration→atomic Document creation; Revision authoring/upload/concurrency; governance→Release/OfficialRendition; official discovery/obsolescence/disclosure-safe routing; and runtime failure/shutdown/backup-restore readiness.
+Core transition law:
 
-The ten cross-cutting properties cover wire/runtime conformance, architecture dependency closure, AuthN/AuthZ/CSRF, transaction+Audit atomicity, idempotency/replay, ETag/concurrency, exact-content/malware/rendition integrity, River durable work, runtime readiness/resources/observability and backup/restore privacy/security readiness.
+```text
+one-way greenfield activation
+proof before authority
+operations/provenance clean seal, never Product activation state
+first authoritative Product commit = point of no return
+authoritative recovery point before ordinary serving
+DEV/test user-serving paths fenced before ordinary serving
+single business authority
+post-B3 forward recovery only
+```
 
-T9 ratifies a **falsifiable validation contract**, not an assertion that Product implementation already exists or has passed runtime tests. Later execution must target real production subjects/boundaries; mock-only, fixture-only and self-proving probes cannot close real runtime/dependency claims.
+Explicitly absent:
+
+```text
+historical business migration
+generic ETL/import framework
+dual write
+dual Product authority
+legacy read fallback
+schema/API compatibility bridge
+Product activation marker/table/endpoint
+operation 79
+```
 
 ## Preserved integrated baseline
 
@@ -103,17 +126,24 @@ Redis / BFF / realtime / external Search / generic event bus absent
 Product implementation               BLOCKED
 ```
 
+T7 remains binding: Launch has no historical business corpus to migrate. Any contrary concrete evidence triggers the smallest bounded reopen rather than silent preservation or compatibility machinery.
+
 ## Exact next action
 
 ```text
-operator authorization to open T10 — Transition / Cutover
-→ if authorized, start fresh from the then-current integrated `main` containing this T9 closeout; revalidate its exact SHA before work
-→ derive the smallest truthful current→target transition and rollback-barrier contract from accepted T1→T9 authority
-→ do not begin T11 or T12
-→ do not implement Product code
+finish the T10 closure candidate on PR #158
+→ ensure docs/work/current/t10-transition-cutover.md is absent from the merge diff
+→ ensure durable transition authority + T10 ratification are routed
+→ run required CI on the exact closure candidate HEAD
+→ present the exact closure HEAD/CI for separate operator merge authorization
+→ if merge is authorized, mark PR #158 Ready without changing that HEAD
+→ obtain merge-candidate required CI on the same exact HEAD
+→ squash merge PR #158 using expected-HEAD protection
+→ verify integrated main/tree
+→ record T10 integration status without opening T11
 ```
 
-T10 is **NEXT / NOT STARTED** and is not open without separate explicit operator authorization.
+T11 requires **T10 integration plus separate explicit operator authorization**. T12 remains closed. Product implementation remains blocked.
 
 ## Remaining architecture program
 
@@ -124,8 +154,8 @@ T10 is **NEXT / NOT STARTED** and is not open without separate explicit operator
 | T8-G — Runtime / Process / Deployment | Binaries/processes, River workers, renderer/scanner/provider boundaries, startup/readiness/shutdown, configuration/secrets, trust/network boundaries, observability, recovery/runtime profiles | CLOSED / OPERATOR-RATIFIED / INTEGRATED |
 | T8-H — Whole-T8 Global Coherence Review | Cross-check backend, persistence, wire, frontend, runtime and accepted upstream authorities as one system | CLOSED / OPERATOR-RATIFIED / INTEGRATED |
 | T9 — Golden Flows & Validation Baseline | Falsifiable composed-system flows and proof classes | CLOSED / OPERATOR-RATIFIED / INTEGRATED |
-| T10 — Transition / Cutover | Real current→target transition and rollback barriers | NEXT / NOT STARTED; requires explicit operator authorization to open |
-| T11 — Implementation Program & Execution Graph | Bounded work graph and proof obligations | NOT OPEN; opens after T1→T10 accepted |
+| T10 — Transition / Cutover | Real current→target transition, authority edge, recovery and rollback barriers | CLOSED / OPERATOR-RATIFIED / INTEGRATION PENDING |
+| T11 — Implementation Program & Execution Graph | Bounded work graph and proof obligations | NOT OPEN; requires T10 integration + separate operator authorization |
 | T12 — Adversarial Implementation-Readiness | Independent implementation-readiness attack | NOT OPEN; opens after T11 |
 
 ## Final implementation gate
@@ -135,7 +165,7 @@ Implementation remains blocked until all are true:
 ```text
 T8  CLOSED / OPERATOR-RATIFIED / INTEGRATED
 T9  CLOSED / OPERATOR-RATIFIED / INTEGRATED
-T10 CLOSED / OPERATOR-RATIFIED
+T10 CLOSED / OPERATOR-RATIFIED / INTEGRATED
 T11 CLOSED / OPERATOR-RATIFIED
 T12 CLOSED / OPERATOR-RATIFIED
 Integrated Whole-R10 coherence = PASS

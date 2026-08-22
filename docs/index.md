@@ -25,7 +25,7 @@ Start here after `AGENTS.md`, then read `roadmap.md`, then only the owning docum
 | Backend topology | [Backend](architecture/backend.md) | Removed package tree |
 | Internal owner contracts | [Interfaces](architecture/interfaces.md) | Foreign-SQL legacy evidence unless named |
 | Persistence realization | [Persistence](architecture/persistence.md) | Old migrations/schema |
-| Transition / migration posture | [Transition](architecture/transition.md) | Old cutover plans |
+| Transition / migration / cutover | [Transition & cutover](architecture/transition.md) + [T10 ratification](decisions/t10-ratification.md) | Temporary T10 review Evidence, old cutover plans, speculative migration tooling |
 | Current decision dispositions | [Decision register](decisions/index.md) | Review chronology |
 | Preserved / reopen / deferred obligations | [Forward obligations](decisions/forward-obligations.md) | Old decision-registry corpus |
 | Repository reset / provenance | [Repository reset](decisions/repository-reset.md) | Unmerged branches unless exact provenance is required |
