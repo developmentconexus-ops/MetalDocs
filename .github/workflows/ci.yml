@@ -64,11 +64,27 @@ jobs:
             exit 1
           fi
           allowed_path() {
-            [[ "$1" =~ ^(AGENTS\.md|CLAUDE\.md|README\.md|\.gitignore|\.gitattributes|\.github/.+\.ya?ml|docs/.+\.md)$ ]]
+            if [[ "$1" =~ ^(AGENTS\.md|CLAUDE\.md|README\.md|\.gitignore|\.gitattributes|\.github/.+\.ya?ml|docs/.+\.md)$ ]]; then
+              return 0
+            fi
+            # P8 rendered visual evidence may use HTML only as temporary Draft work.
+            [[ "$PR_DRAFT" == "true" && "$1" =~ ^docs/work/current/[^/]+\.html$ ]]
           }
 
           allowed_path "docs/roadmap.md"
           allowed_path ".github/workflows/ci.yml"
+          if [[ "$PR_DRAFT" == "true" ]]; then
+            allowed_path "docs/work/current/p8-wireframe.html"
+          else
+            if allowed_path "docs/work/current/p8-wireframe.html"; then
+              echo "::error::temporary P8 HTML must be rejected outside Draft planning"
+              exit 1
+            fi
+          fi
+          if allowed_path "docs/t11-wireframe.html" || allowed_path "docs/work/current/nested/p8-wireframe.html"; then
+            echo "::error::P8 HTML escaped the bounded docs/work/current root"
+            exit 1
+          fi
           if allowed_path "src/main.go" || allowed_path "openapi/app.yaml" || allowed_path "migrations/001.sql"; then
             echo "::error::architecture-only allowlist accepted implementation path"
             exit 1
