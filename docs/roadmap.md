@@ -51,7 +51,7 @@ docs/work/current/t11-b01-app-shell.md
 docs/work/current/t11-b01-app-shell-wireframe.html
 ```
 
-B01 P9 Screen Contract / bidirectional trace and bounded P10 consolidation are complete in the B01 record. The lock freezes the current structural baseline but remains subject to the normal smallest-scope evidence-backed reopen law.
+B01 P9 Screen Contract / bidirectional trace and bounded P10 consolidation are complete in the B01 record. The lock freezes the current structural baseline but remains subject to the normal smallest-scope evidence-backed reopen law. The operator-required in-application Notification capability discovered during B03 may justify exactly such a bounded B01 reopen for notification chrome; no B01 structure is changed until that mini-design is ratified.
 
 B02 was operator-locked on 2026-08-22 after iterative visual adjudication from table-first hypotheses to **C3 — Discovery-first Library with Por tipo + Por área**. Its bounded record and canonical rendered structural artifact are:
 
@@ -68,7 +68,25 @@ B03 is now OPEN / CANDIDATE. Its bounded current record is:
 docs/work/current/t11-b03-document-official.md
 ```
 
-B03 authority recovery, targeted reference study, genuine A/B/C structural hypotheses and lightweight data/action feasibility are complete enough for operator visual review. Leading direction is **viewer-first + collapsible right information pane**. `B03-F1` remains OPEN: the official lens needs server-derived command-affordance hints for create Revision / replace responsible owner / create obsolescence / withdraw obsolescence without rebuilding Authorization in React. Candidate precision is `DocumentOfficialView.allowed_actions`, mirroring the existing GovernanceCase pattern and adding no operation, owner, Permission or route.
+Direct operator feedback plus bounded legacy evidence corrected the initial viewer-first hypothesis. Current B03 direction is **record/ficha first + deliberate distinct read-only official-content viewer**. The stable Document record must communicate identity, official truth, responsibility, current work/obsolescence context, history entry, management affordances and the operator-required Document Discussion surface.
+
+Two material B03 findings are now open:
+
+```text
+B03-F1
+server-derived command-affordance hints for
+create Revision / replace responsible owner / create obsolescence / withdraw obsolescence
+without rebuilding Authorization in React
+
+B03-F2
+operator-required stable-Document Discussion
++ @mention of current MetalDocs Users
++ required in-application Notification
+```
+
+B03-F2 is a genuine bounded Product/architecture reopen trigger. Current Product/T3/T5/T6/T8-E/T8-F authority has no Document Discussion semantic model, mention contract or Notification surface; Notifications were explicitly deferred absent a named consumer. The operator has now supplied that consumer and requires the capability before Launch V1.
+
+B03 is temporarily paused at the B03-F2 mini-design gate. The mini-design must close the user-visible semantics that can change B01/B03 and backend contracts before visual adjudication resumes. Framework/repository/library selection is explicitly later evidence work and may not define Product semantics.
 
 Only the operator may set `LOCKED`. B04 remains NOT OPEN.
 
@@ -86,6 +104,8 @@ ETag read / mutation domains          13 / 13
 exact-byte resources                  4
 Product implementation                BLOCKED
 ```
+
+These are the **currently accepted** system invariants. B03-F2 is an authorized material reopen candidate, not permission to silently change them. Exact operation, Permission, idempotency and async deltas are updated only after the Discussion/@Mention/Notification mini-design is operator-ratified and the smallest implicated authorities are explicitly reopened.
 
 The operator-approved T8-E-RO precision remains binding and adds no operation, Permission, owner or route.
 
@@ -182,7 +202,7 @@ Current block sequence:
 ```text
 B01  App Shell + Global Information Architecture   LOCKED / OPERATOR-RATIFIED
 B02  Library / discovery                            LOCKED / OPERATOR-RATIFIED
-B03  Document Official                              CURRENT / CANDIDATE / NOT LOCKED
+B03  Document Official                              CURRENT / CANDIDATE / NOT LOCKED; B03-F2 MINI-DESIGN GATE
 B04  Document Work / authoring                      NOT OPEN
 B05  My Work                                        NOT OPEN
 B06  Governance                                     NOT OPEN
@@ -242,9 +262,7 @@ P5 whole implementation proof closure
 T10 B2 → B3 → B4
 ```
 
-`33 + 10 + 22 + 9 + 4 = 78`.
-
-UX replanning may refine presentation but may not change the operation census or Product semantics without a material bounded reopen.
+`33 + 10 + 22 + 9 + 4 = 78` is the current accepted implementation partition. B03-F2 may require a bounded DAG/census amendment after ratification; no speculative count is assigned beforehand.
 
 ## T8-E-RO — approved responsible-owner precision
 
@@ -265,7 +283,7 @@ absence discloses neither candidate existence nor reason
 
 The list grants no authority and is outside the ResponsibleOwner ETag domain. Replacement still rechecks current AuthZ, D4 eligibility/offboarding serialization and `If-Match`.
 
-Before T11 integration, effective T6/T8-E/T8-F owners must consolidate this approved precision together with the B02-LD Library discovery precision and any later operator-approved B03 read precision.
+Before T11 integration, effective T6/T8-E/T8-F owners must consolidate this approved precision together with the B02-LD Library discovery precision and any later operator-approved B03 read/collaboration precision.
 
 ## T10 preserved authority
 
@@ -279,19 +297,30 @@ B0 source truth
 → B4 authoritative recovery point + serving fence + canonical activation
 ```
 
-No historical business migration, dual Product authority, legacy fallback, compatibility bridge, Product activation marker or operation 79 is introduced.
+No historical business migration, dual Product authority, legacy fallback, compatibility bridge or Product activation marker is introduced. Any future operation-census delta from B03-F2 must be explicitly ratified before it becomes current authority.
 
 ## Exact next action
 
 ```text
-B01 remains LOCKED / operator-ratified
+B01 remains LOCKED / operator-ratified, subject only to evidence-backed smallest-scope reopen
 → B02 remains LOCKED / operator-ratified
 → B03 is OPEN / CANDIDATE / NOT LOCKED
-→ operator visually compare the rendered B03 Document Official hypotheses
-→ leading direction: viewer-first + collapsible right information pane
-→ inspect material states: effective + open work, effective clean, obsolete, no official Release
-→ iterate B03 hierarchy / content-to-metadata ratio / action placement from operator feedback
-→ resolve B03-F1 before any B03 LOCK: prove server-derived command affordance hints without frontend Authorization duplication and without operation 79
+→ B03-F2 mini-design gate is CURRENT
+→ close, one decision at a time:
+     Discussion read/write eligibility
+     message/reply semantics
+     @mention candidate + validation semantics
+     in-app Notification create/read/unread/navigation semantics
+     information-disclosure/offboarding behavior
+     smallest B01 notification-chrome impact
+     smallest Product/T3/T5/T6/T8-E/T8-F reopen set
+→ do NOT select chat/notification framework before semantics are frozen
+→ operator ratifies mini-design
+→ consolidate only the smallest approved upstream authority delta
+→ update exact operation / Permission / idempotency / async census from approved delta
+→ apply bounded B01 reopen only if notification chrome requires it
+→ resume B03 record-first wireframe with real Discussion semantics
+→ resolve B03-F1 before any B03 LOCK
 → only operator may LOCK B03
 → only after B03 LOCK complete P9 Screen Contract / bidirectional trace and P10 bounded pattern consolidation
 → do not open B04 as baseline before B03 LOCK
@@ -304,13 +333,13 @@ B01 remains LOCKED / operator-ratified
 
 | Stage | Owns | State |
 |---|---|---|
-| T8-E | Executable application wire | CLOSED / INTEGRATED; T8-E-RO + B02-LD consolidation pending T11 close |
-| T8-F | Frontend realization | CLOSED / INTEGRATED; T8-E-RO + B02-LD consolidation pending T11 close |
+| T8-E | Executable application wire | CLOSED / INTEGRATED; T8-E-RO + B02-LD consolidation pending T11 close; B03-F2 may cause bounded reopen |
+| T8-F | Frontend realization | CLOSED / INTEGRATED; T8-E-RO + B02-LD consolidation pending T11 close; B03-F2 may cause bounded reopen |
 | T8-G | Runtime / process / deployment | CLOSED / INTEGRATED |
 | T8-H | Whole-T8 coherence | CLOSED / INTEGRATED |
 | T9 | Golden Flows / validation baseline | CLOSED / INTEGRATED |
 | T10 | Transition / cutover | CLOSED / INTEGRATED |
-| T11 | Implementation graph + implementation-readiness | OPEN / B01+B02 LOCKED; B03 OPEN / CANDIDATE |
+| T11 | Implementation graph + implementation-readiness | OPEN / B01+B02 LOCKED; B03 OPEN / B03-F2 MINI-DESIGN GATE |
 | T12 | Adversarial implementation-readiness | NOT OPEN |
 
 ## Final implementation gate
@@ -330,4 +359,4 @@ operator implementation authorization = explicit
 
 ## Reopen law
 
-Completed Product/R10 decisions reopen only on material evidence defined by the owning authority or the DevelopmentConexus Engineering Method. Preference, sunk cost, old implementation shape, hypothetical future capability or infrastructure fashion are not reopen triggers.
+Completed Product/R10 decisions reopen only on material evidence defined by the owning authority or the DevelopmentConexus Engineering Method. Preference, sunk cost, old implementation shape, hypothetical future capability or infrastructure fashion are not reopen triggers. The operator-required B03-F2 capability is material current-product evidence and is therefore a valid bounded reopen trigger.
