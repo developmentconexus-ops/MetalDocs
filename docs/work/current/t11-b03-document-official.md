@@ -1,41 +1,72 @@
 # T11 — B03 Document Official
 
 > **Status:** CANDIDATE / NOT LOCKED.  
-> **Block:** B03 — Document Official.  
+> **Block:** B03 — Document Official / Ficha do Documento.  
 > **Predecessors:** B01 + B02 are LOCKED / OPERATOR-RATIFIED.  
-> **Boundary:** stable Document official/current-management lens only; B04+ remain NOT OPEN.
+> **Legacy evidence:** `docs/work/current/t11-legacy-frontend-evidence.md` — EVIDENCE / NOT AUTHORITY.  
+> **Boundary:** stable Document official/current-management record plus deliberate official-content viewing surface; B04+ remain NOT OPEN.
 
-## 1. User need / mental model
+## 1. Correction from operator + legacy evidence
 
-B03 must answer the central MetalDocs question immediately:
+The first B03 candidate made the official-content viewer the page itself. Direct operator feedback rejected that collapse: entering a Document record and viewing its exact content are distinct user intentions.
+
+The pre-reset frontend independently supports that distinction:
 
 ```text
+Library
+→ content workspace / viewer / editor context
+→ full Document detail/ficha
+```
+
+The old workspace even linked explicitly to `Ver ficha completa do documento`.
+
+Decision for current B03:
+
+```text
+first viewer-first whole-page hypothesis  REJECTED / TOO COLLAPSED
+Document Official route                   record/ficha first
+Official content viewer                   distinct material surface entered deliberately
+Document Work                             remains B04 / separate accepted route
+Governance Case                           remains B06 / separate accepted route
+Full Document History                     remains B07 / separate accepted route
+```
+
+No legacy route is restored by this correction.
+
+## 2. User needs
+
+B03 must answer, in order:
+
+```text
+What Document is this?
 What is official right now?
+Who is responsible and where does it belong?
+What official Revision/content exists?
+Is newer work underway without replacing official truth?
+What can I safely do next?
+How do I deliberately read the exact official content?
+Where do I go for full history?
 ```
 
 Primary jobs:
 
 ```text
-When I open a document from the Library,
-I need the current official content to dominate the page,
-so that I can read the company truth without draft noise.
+When I open a result from the Library,
+I need a trustworthy ficha of the controlled Document,
+so I can understand identity, responsibility and official state before acting.
 
-When I need context,
-I need to understand code, title, current official Revision, status, Type, Area,
-responsible owner and effectivity/release timing,
-so that I know exactly what I am reading.
+When I want to read the actual official content,
+I need a deliberate View Document action,
+so the reading surface can maximize content without pretending to be the Document record.
 
-When I am authorized to manage the Document,
-I need clear next actions without confusing management with official content,
-so that I can continue/open work, start a new Revision, manage responsibility or
-initiate/manage obsolescence safely.
+When newer work exists,
+I need to see that it is separate from the official Revision,
+so DRAFT/SUBMITTED never overwrites my understanding of current official truth.
 ```
 
-The official lens never silently becomes DRAFT based on caller identity.
+## 3. Bounded current authority
 
-## 2. Bounded accepted authority
-
-Route:
+Stable route:
 
 ```text
 /documents/:document_id
@@ -47,30 +78,31 @@ Primary read:
 getDocument -> DocumentOfficialView
 ```
 
-Current shape supplies:
+Current official shape supplies:
 
 ```text
-stable document code/id
+stable Document id + code
 Document Type reference
 Area reference
 responsible owner reference
 DocumentOfficialStatus
-ReleasedRevisionView official? when official truth exists
+official? ReleasedRevisionView
   revision identity / ordinal
-  official title
-  release_id / released_at
+  governed official title
+  release_id + released_at
   exact source ContentSummary
-  representation = source_only | official_rendition
+  source_only | official_rendition representation
 open_revision? disclosure-safe routing reference
 active_obsolescence_request_id? disclosure-safe routing reference
 ```
 
-Supporting reads/actions already admitted:
+Supporting current operations remain:
 
 ```text
 getDocumentResponsibleOwner
 replaceDocumentResponsibleOwner
 createDocumentRevision
+getDocumentHistory                 // B07 owns full composition; supporting use must not derive current state
 getRelease / getReleaseSource
 getOfficialRenditionContent
 getObsolescenceRequest
@@ -78,121 +110,176 @@ createObsolescenceRequest
 withdrawObsolescenceRequest
 ```
 
-The operator-approved T8-E-RO precision additionally makes responsible-owner candidates available only when `document.owner.manage` applies to the exact Document. It adds no operation.
-
-## 3. Truth hierarchy
-
-B03 structure must preserve:
+## 4. Truth hierarchy
 
 ```text
 stable Document identity
 → current official truth
-→ supporting metadata
-→ disclosed work/governance context
-→ management actions
+→ classification/responsibility metadata
+→ bounded current work/obsolescence context
+→ management affordances
+→ historical evidence only as historical evidence
 ```
 
-Key laws:
+Laws:
 
 ```text
-newer DRAFT/SUBMITTED never replaces older EFFECTIVE content in this route
-open_revision is a routing hint, not official truth
-active obsolescence request does not make target obsolete before completion
-obsolete Document retains its last released official content
+newer DRAFT/SUBMITTED never replaces older EFFECTIVE content in B03
+open_revision is work routing, not official truth
+active obsolescence does not make the target obsolete before completion
+obsolete retains its last released official content
 before first Release, official content may be absent
+History/Audit never becomes current-state authority
 viewer output never becomes semantic content authority
 ```
 
-## 4. Reference study — P6
+## 5. Legacy information disposition applied to B03
 
-| Reference | Source observation | Candidate lesson | Mismatch / disconfirming evidence |
-|---|---|---|---|
-| Veeva Vault Doc Info | Document viewer is primary and sits beside a collapsible/resizable right information pane; header carries identity/state/actions. | Strong evidence for viewer-first split with metadata beside, not above, the document. | Vault exposes broad workflow, favorites, notifications, relationships, sharing and configurable lifecycle machinery outside MetalDocs Launch. |
-| M-Files metadata card | Selected document/content is paired with a right metadata card containing title and object properties. | Metadata can remain visible without displacing the document itself. | M-Files metadata card also edits generic workflow/permissions; MetalDocs must not merge Admin or DRAFT authority into the official lens. |
-| Qualio effective-vs-work separation | Normal document Library is for effective truth while draft/review/approval work is separately permissioned/workspace-oriented. | Official reader truth should stay clean even when work exists. | Qualio has broader QMS lifecycle/tasks and does not determine MetalDocs field hierarchy. |
-
-Reference URLs:
+### KEEP / current authority already supports
 
 ```text
-https://quality.veevavault.help/en/lr/9753/
-https://www.userguide.m-files.com/user-guide/latest/eng/metadata_card.html
-https://docs.qualio.com/en/articles/6526420-user-permissions
+code
+official governed title
+status
+current official Revision
+Document Type
+Area
+responsible owner
+released/effective date
+source / official representation
+format + file size where useful
+explicit open-work context
 ```
 
-## 5. P7 — structural hypotheses
-
-### A — Viewer-first + collapsible right info pane — LEADING
+### ADAPT, do not copy literally
 
 ```text
-Document header / identity / status
-+ disclosed work/obsolescence banner when relevant
-+ large official-content viewer
-+ compact right pane for metadata + secondary actions
+legacy revision lineage
+  → B03 shows bounded current-revision context + link to full History;
+    B07 owns the full timeline
+
+legacy approval/sign-off chain
+  → valuable accountability evidence, but current immutable governance facts live in History;
+    do not resurrect Approval as an owner or put a generic workflow widget on the ficha
+
+legacy content viewer
+  → distinct B03 material viewing surface, not the ficha itself
 ```
 
-Strengths:
+### DEFER / DROP from Launch B03
 
 ```text
-reading dominates
-metadata stays available
-management stays spatially secondary
-right pane can collapse for focused reading
-works naturally for PDF and read-only DOCX viewer modes
+next periodic review       DEFER Launch+
+distribution/coverage      DEFER Launch+
+comments                   DROP current Launch
+related artifacts          DROP/DEFER
+classification/tags        DROP current Launch
+public/share link          NOT ADMITTED
+user Publish command       DROP; Release is system-owned
 ```
 
-### B — Metadata summary first + full-width viewer below
+## 6. Candidate B03 record hierarchy
 
-Strength: excellent scan of document facts before content.
+Leading design question is now record composition, not viewer composition.
 
-Cost: every ordinary reader must pass through metadata before reaching the actual official document; poor for repeated reading.
-
-### C — Full-width viewer + details/action drawer on demand
-
-Strength: maximum content space and simple narrow-screen adaptation.
-
-Cost: important identity/owner/type/area context becomes too hidden for controlled-document confidence and management.
-
-Leading candidate is A.
-
-## 6. P7 lightweight data/action feasibility
-
-| Need | Required truth | Feasibility |
-|---|---|---|
-| Stable code | `document.code` | PRESENT-IN-AUTHORITY |
-| Official title + revision | `official.title` + revision ordinal | PRESENT-IN-AUTHORITY |
-| Status | `DocumentOfficialStatus` | PRESENT-IN-AUTHORITY |
-| Type / Area / responsible owner | references on `DocumentOfficialView` | PRESENT-IN-AUTHORITY |
-| Released/effective timing | `official.released_at` | PRESENT-IN-AUTHORITY |
-| Official content mode | source/representation descriptors + referenced exact-byte reads | PRESENT-IN-AUTHORITY |
-| Open work banner/routing | `open_revision?` | PRESENT-IN-AUTHORITY |
-| Active obsolescence context | `active_obsolescence_request_id?` | PRESENT-IN-AUTHORITY |
-| Owner-management selector | T8-E-RO responsible-owner candidates | APPROVED PRECISION / consolidation pending |
-| Exact command affordances | actor-safe hints for revision/owner/obsolescence commands | **FINDING B03-F1** |
-
-## 7. B03-F1 — command-affordance source
-
-Frontend authority forbids a client permission matrix. Yet the official page has four material write controls whose visibility/usefulness depends on current server Authorization + relationship/lifecycle predicates:
+### A — Sectioned ficha + explicit full viewer — LEADING
 
 ```text
-createDocumentRevision
-replaceDocumentResponsibleOwner
-createObsolescenceRequest
-withdrawObsolescenceRequest
+breadcrumb / back to Biblioteca
+↓
+Document hero
+  code
+  official title or truthful no-official-title state
+  status
+  official Revision
+  primary: Visualizar documento when official content exists
+  secondary: Baixar / Histórico as supported
+↓
+current-context banner
+  open Revision when disclosed
+  active obsolescence when disclosed
+↓
+Ficha / Sobre
+  Tipo
+  Área
+  Responsável
+  Revision oficial
+  Liberado em
+  source/official-representation label
+  format / size where useful
+↓
+Revisões
+  current official Revision
+  open Revision if disclosed
+  explicit Full History entry
+  no invented all-revisions snapshot
+↓
+Management
+  actions from server-derived hints only
 ```
 
-Current routing references solve context identity, but do not completely answer whether the actor may issue each command now.
+`Visualizar documento` enters a full B03-owned read-only content surface and provides an explicit Back to ficha control.
 
-Rejected repairs:
+### B — Tabbed ficha
 
 ```text
-reconstruct Role/Permission logic in React
-infer edit authority from open_revision presence/absence
-infer obsolescence authority from status alone
-show every dangerous command and use 403 as the normal discovery mechanism
-invent operation 79
+Visão geral | Conteúdo | Revisões
 ```
 
-Candidate smallest precision:
+All tabs remain presentation state on the accepted Document Official route. Benefit: compact organization. Risk: important official/work separation and responsibility facts can become hidden behind tabs; “Revisões” may drift into B07 ownership.
+
+### C — Two-column dossier
+
+```text
+left: identity / current Revision / responsibility / work context
+right: official-content summary card + actions
+lower: revisions / management
+```
+
+Benefit: dense professional scan. Risk: looks dashboard-like and can over-prioritize metadata cards over the Document record narrative.
+
+## 7. Distinct official-content viewer surface
+
+This is not B04.
+
+```text
+entry = explicit Visualizar documento from ficha
+mode = read-only
+```
+
+Current presentation laws:
+
+```text
+SourceOnly PDF
+  → exact Release source in PDF viewer
+
+SourceOnly DOCX
+  → accepted read-only DOCX adapter on exact Release source
+
+RequireOfficialRendition(PDF)
+  → exact OfficialRendition PDF is primary official view
+  → exact Release source remains separately available/labeled
+
+no official Release
+  → no fake viewer / no draft substitution
+```
+
+Candidate viewer shell:
+
+```text
+Back to ficha
+Document code + official Revision
+exact-content label
+page/zoom mechanics where technically supported
+Download exact official/source resource where admitted
+large content canvas
+```
+
+No edit/submit/governance controls appear in this viewer.
+
+## 8. B03-F1 — command-affordance source
+
+Frontend must not rebuild T3 Authorization. Candidate smallest precision remains:
 
 ```text
 DocumentOfficialAction =
@@ -207,82 +294,65 @@ DocumentOfficialView.allowed_actions: unique DocumentOfficialAction[]
 Law:
 
 ```text
-allowed_actions is UX guidance only
-values derive from the same canonical T3 permission/scope + Controlled Documents predicates
-used by command authorization, or a provably shared equivalent
-every command rechecks current canonical truth
-absence grants nothing and proves only current hint result
+server-derived UX hints only
+same canonical authorization/domain predicates or provably shared equivalent
+every command rechecks current truth
+no operation / owner / Permission / route added
 ```
 
-This mirrors the already-accepted `GovernanceCaseView.allowed_actions` pattern and adds no operation/owner/Permission/route.
+This follows the already accepted `GovernanceCaseView.allowed_actions` pattern.
 
-B03 cannot LOCK while B03-F1 remains unresolved.
+B03 cannot LOCK until the precision is reconciled into the effective current read authority or otherwise proven unnecessary.
 
-## 8. Official-content presentation candidates
+## 9. History boundary
+
+The legacy ficha showed a full lineage and sign-off chain. Current architecture deliberately owns full semantic history at:
 
 ```text
-SourceOnly PDF
-→ exact Release source is primary viewer content
-
-SourceOnly DOCX
-→ accepted read-only DOCX adapter on exact Release source
-
-RequireOfficialRendition(PDF)
-→ exact OfficialRendition PDF is primary viewer content
-→ exact Release source separately available/labeled
-
-no official Release yet
-→ no fake preview; explicit "Ainda não existe versão oficial" structural state
+/documents/:document_id/history
+getDocumentHistory -> DocumentHistoryPage
 ```
 
-Viewer controls may provide ordinary reading mechanics (page/zoom/download where technically supported) but may not invent lifecycle actions or alter exact-content authority.
-
-## 9. Candidate hierarchy
-
-Leading A candidate:
+B03 may show only information that does not create a second history authority:
 
 ```text
-breadcrumb back to Biblioteca
-↓
-code + official title + official status/revision
-↓
-context banner only when server discloses open work / active obsolescence
-↓
-main split
-  70–75% official viewer
-  25–30% collapsible information pane
-↓
-information pane
-  Tipo
-  Área
-  Responsável
-  Revisão oficial
-  Vigente/liberado em
-  representação/source semantics
-  link to Histórico (route only; B07 owns structure)
-↓
-management actions
-  only from server-returned hints
+current official Revision from DocumentOfficialView
+current disclosed open Revision from open_revision
+release timestamp / representation from official
+entry/link to full History
 ```
 
-Dangerous obsolescence action should not visually compete with ordinary reading or the primary work continuation action.
+Any richer inline historical summary must trace to `getDocumentHistory`, remain historical-only, tolerate 403/non-disclosure, and be proven not to duplicate B07 composition before it becomes part of the locked B03 baseline.
 
-## 10. Responsive/accessibility candidate
+## 10. Responsive/accessibility structure
 
 ```text
-desktop
-  viewer + right pane
+desktop ficha
+  sectioned readable record with clear primary action
 
-narrow
-  viewer primary
-  metadata pane becomes inline/collapsible section below header
-  management actions remain keyboard reachable
+narrow ficha
+  single-column semantic order
+  no loss of official/work distinction
+
+viewer
+  content-first, focus-managed entry/exit
+  exact title/revision also exposed as semantic text outside rendered document bytes
 ```
 
-The viewer cannot be the only source of title/status understanding for screen readers. Header/metadata remain semantic HTML. Pane collapse has explicit accessible control and focus return.
+No critical context depends on color, hover or the document renderer itself.
 
-## 11. P8 disposition
+## 11. P8 next disposition
 
-Render B03 only, comparing A/B/C. Do not design Document Work content/editor, Governance Case, History timeline or Admin screens inside this artifact.
+Render B03 record-first A/B/C plus the distinct read-only viewer transition.
 
-Operator visual adjudication is required before B03 LOCK.
+Do not design:
+
+```text
+Document Work editor/content mutation
+Governance Case decision UI
+full History timeline
+Audit
+Admin
+```
+
+The previous viewer-first B03 artifact remains rejected evidence and is not a baseline.
