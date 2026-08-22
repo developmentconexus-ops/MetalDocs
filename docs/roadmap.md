@@ -40,7 +40,8 @@ The current frontend gate is:
 ```text
 B01 — App Shell + Global Information Architecture   LOCKED / OPERATOR-RATIFIED
 B02 — Library / discovery                           LOCKED / OPERATOR-RATIFIED
-B03 — Document Official                             NEXT / NOT OPEN
+B03 — Document Official                             OPEN / CANDIDATE / NOT LOCKED
+B04 — Document Work / authoring                     NOT OPEN
 ```
 
 B01 was operator-locked on 2026-08-22 after the revised **Home A — Central operacional** visual walkthrough. Its bounded durable record and canonical rendered structural artifact are:
@@ -61,7 +62,15 @@ docs/work/current/t11-b02-library-wireframe.html
 
 B02-F1 is resolved by the bounded `B02-LD` Library read-composition precision: the first page of the existing `listDocuments` operation supplies complete disclosure-safe discovery options for Document Type, Area and responsible owner from the actor's currently disclosable status universe. It adds no operation, owner, Permission or route; operation 79 remains absent. B02 P9 Screen Contract / bidirectional trace and bounded P10 consolidation are complete in the B02 record. The precision must be consolidated into effective T6/T8-E/T8-F owners before T11 integration.
 
-Only the operator may set `LOCKED`. B03 may now be opened as a future CANDIDATE but is not opened by this roadmap update itself.
+B03 is now OPEN / CANDIDATE. Its bounded current record is:
+
+```text
+docs/work/current/t11-b03-document-official.md
+```
+
+B03 authority recovery, targeted reference study, genuine A/B/C structural hypotheses and lightweight data/action feasibility are complete enough for operator visual review. Leading direction is **viewer-first + collapsible right information pane**. `B03-F1` remains OPEN: the official lens needs server-derived command-affordance hints for create Revision / replace responsible owner / create obsolescence / withdraw obsolescence without rebuilding Authorization in React. Candidate precision is `DocumentOfficialView.allowed_actions`, mirroring the existing GovernanceCase pattern and adding no operation, owner, Permission or route.
+
+Only the operator may set `LOCKED`. B04 remains NOT OPEN.
 
 ## T11 fixed system invariants
 
@@ -173,7 +182,7 @@ Current block sequence:
 ```text
 B01  App Shell + Global Information Architecture   LOCKED / OPERATOR-RATIFIED
 B02  Library / discovery                            LOCKED / OPERATOR-RATIFIED
-B03  Document Official                              NEXT / NOT OPEN
+B03  Document Official                              CURRENT / CANDIDATE / NOT LOCKED
 B04  Document Work / authoring                      NOT OPEN
 B05  My Work                                        NOT OPEN
 B06  Governance                                     NOT OPEN
@@ -181,7 +190,7 @@ B07  History / Audit                                NOT OPEN
 B08  Administration                                 NOT OPEN
 ```
 
-Names/order after B01 remain candidate because later evidence may refine grouping without changing Product authority. Any B01/B02 reopen follows the normal smallest-scope finding law and does not invalidate later work automatically.
+Names/order after B01 remain candidate because later evidence may refine grouping without changing Product authority. Any locked-block reopen follows the normal smallest-scope finding law and does not invalidate later work automatically.
 
 Each material block follows:
 
@@ -256,7 +265,7 @@ absence discloses neither candidate existence nor reason
 
 The list grants no authority and is outside the ResponsibleOwner ETag domain. Replacement still rechecks current AuthZ, D4 eligibility/offboarding serialization and `If-Match`.
 
-Before T11 integration, effective T6/T8-E/T8-F owners must consolidate this approved precision together with the B02-LD Library discovery precision.
+Before T11 integration, effective T6/T8-E/T8-F owners must consolidate this approved precision together with the B02-LD Library discovery precision and any later operator-approved B03 read precision.
 
 ## T10 preserved authority
 
@@ -277,16 +286,15 @@ No historical business migration, dual Product authority, legacy fallback, compa
 ```text
 B01 remains LOCKED / operator-ratified
 → B02 remains LOCKED / operator-ratified
-→ preserve C3: search + Por tipo + Por área + secondary Responsible/Status + structured results
-→ preserve B02-LD first-page discovery-options precision; operation 79 remains absent
-→ NEXT: open B03 — Document Official as CANDIDATE only
-→ recover the smallest B03 authority + user-goal evidence
-→ study official-document reading/management references only where triggered
-→ compare genuine Document Official structural hypotheses when ambiguity is real
-→ perform lightweight data/action/navigation feasibility
-→ render only the B03 grayscale structural candidate
-→ operator + assistant visually adjudicate B03
+→ B03 is OPEN / CANDIDATE / NOT LOCKED
+→ operator visually compare the rendered B03 Document Official hypotheses
+→ leading direction: viewer-first + collapsible right information pane
+→ inspect material states: effective + open work, effective clean, obsolete, no official Release
+→ iterate B03 hierarchy / content-to-metadata ratio / action placement from operator feedback
+→ resolve B03-F1 before any B03 LOCK: prove server-derived command affordance hints without frontend Authorization duplication and without operation 79
 → only operator may LOCK B03
+→ only after B03 LOCK complete P9 Screen Contract / bidirectional trace and P10 bounded pattern consolidation
+→ do not open B04 as baseline before B03 LOCK
 → do not generate B04+ in advance
 → do not begin T12
 → do not implement Product code
@@ -302,7 +310,7 @@ B01 remains LOCKED / operator-ratified
 | T8-H | Whole-T8 coherence | CLOSED / INTEGRATED |
 | T9 | Golden Flows / validation baseline | CLOSED / INTEGRATED |
 | T10 | Transition / cutover | CLOSED / INTEGRATED |
-| T11 | Implementation graph + implementation-readiness | OPEN / B01+B02 LOCKED; B03 NEXT / NOT OPEN |
+| T11 | Implementation graph + implementation-readiness | OPEN / B01+B02 LOCKED; B03 OPEN / CANDIDATE |
 | T12 | Adversarial implementation-readiness | NOT OPEN |
 
 ## Final implementation gate
