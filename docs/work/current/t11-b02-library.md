@@ -17,15 +17,15 @@ I need to find it quickly by code or title,
 so that I can open the current official truth.
 
 When I do not know the exact code/title,
-I need to narrow the official collection using business metadata I understand,
-so that I can recognize the right document without opening many wrong records.
+I need to browse by a business concept I recognize, especially Document Type,
+so that I can narrow the collection before scanning records.
 
 When I browse the Library,
 I need drafts/submissions to stay out of the ordinary official collection,
 so that I do not confuse work-in-progress with valid company truth.
 ```
 
-Operator evidence from B01 also establishes a product-level preference for direct access to documents and a richer, task-oriented experience rather than a thin route launcher.
+Operator evidence on 2026-08-22 rejected a collection-dump-first experience for B02 and preferred the search-first structured-list direction, strengthened with visual Document Type browse cards before result disclosure.
 
 ## 2. Bounded accepted authority
 
@@ -51,24 +51,13 @@ ordering without q             code → document_id
 pagination                     cursor / seek; no offset; no total count
 ```
 
-`DocumentSummary` supplies:
-
-```text
-document.code
-official_revision.title when official truth exists
-official_revision.revision.ordinal
-Document Type reference
-Area reference
-responsible-owner User reference
-catalog status
-document_id for navigation
-```
+`DocumentSummary` supplies document code/id, official title/revision when present, Document Type reference, Area reference, responsible-owner User reference and catalog status.
 
 The Library never presents DRAFT/SUBMITTED as equivalent official truth. Those belong My Work / Document Work / Governance lenses.
 
 ## 3. Hard UX consequences of authority
 
-The current contract means B02 MUST NOT invent:
+B02 MUST NOT invent:
 
 ```text
 body/OCR/vector/full-text search
@@ -78,132 +67,175 @@ favorites
 recently accessed documents
 saved views
 arbitrary sort controls
-sortable columns that imply unsupported server order
 offset/page-number pagination
 total result count
-thumbnail/preview imagery absent from DocumentSummary
+thumbnail/preview imagery
+per-type document counts without admitted aggregation
 client-derived lifecycle truth
+hardcoded semantic icons for configurable Document Types
 ```
 
-Search and filters are URL/navigation context, not Product authority.
+Document Type is configurable. A robust visual tile therefore uses accepted `DocumentTypeReference.code + name` as its identity. A decorative generic document glyph is permissible; fixed semantic mappings such as `Policy = shield` are not Product authority.
 
-## 4. Reference study — P6
+## 4. Reference study — P6 update
 
 References are evidence only.
 
-| Reference | Source observation | Benefit | Mismatch / disconfirming evidence | Candidate lesson |
-|---|---|---|---|---|
-| Qualio Documents Library / 2024+ UX | Effective documents live in a dedicated Library; current UX emphasizes wider document tables, Title before Type, search/filter and action-oriented document handling. | Strong scanability for a controlled-document collection. | Qualio also has tags, full-text search and broader QMS capabilities that MetalDocs Launch does not admit. | Prefer a wide metadata table and prominent search, but only with MetalDocs fields/operations. |
-| Veeva Vault Library/Search | Search leads into document results and users can refine with metadata filters; search/filter state is prominent. | Good model for known-item lookup followed by narrowing. | Advanced search, auto-filtering, suggestions and configurable metadata are materially broader than MetalDocs. | Keep search + typed filters visible, but avoid advanced-search machinery. |
-| M-Files Search / Views | Search plus metadata filters/facets and views are central to finding documents/objects. | Shows value of metadata-driven browse when exact title/code is unknown. | Saved views, arbitrary metadata facets and personalized defaults require authority MetalDocs does not have. | Metadata filters are useful, but fixed Launch filters should stay simple and bounded. |
-| Carbon Data Table | Data tables are appropriate when users navigate many resources and compare structured attributes; toolbar can host search/filter/actions. | Fits code/title/type/area/owner comparison. | Sortable headers and generic table tooling are not automatically valid; MetalDocs server order is fixed. | Use table semantics without implying unsupported sorting or total-count pagination. |
+| Reference | Source observation | Candidate lesson | Mismatch / disconfirming evidence |
+|---|---|---|---|
+| Qualio Documents Library | Qualio explicitly warns an all-effective-document Library can be overwhelming and directs users to search/filter; later UX widened result tables after narrowing. | Do not make the unfiltered collection the only first impression. | Qualio has tags/full-text search that MetalDocs Launch does not. |
+| Veeva Vault search | Document Type can be selected as a search context before or while searching. | Document Type is a legitimate first-class discovery choice, not merely an advanced filter. | Veeva custom tabs/search collections are much broader than MetalDocs. |
+| M-Files Views | Objects can be categorized into views/grouping levels from metadata such as object type/class. | Metadata-led browse is valuable when the exact item is unknown. | Saved/configurable views and arbitrary metadata grouping exceed Launch authority. |
+| Carbon / enterprise collection patterns | Dense tables/lists remain useful after the user has narrowed a collection. | Preserve structured comparison in the result state rather than using preview-heavy cards for documents. | Generic sortable/faceted table features are not automatically admitted. |
 
-Reference URLs:
-
-```text
-https://docs.qualio.com/en/articles/9612864-august-24-new-qualio-user-experience
-https://quality.veevavault.help/en/lr/442/
-https://userguide.m-files.com/user-guide/latest/eng/searching.html
-https://carbondesignsystem.com/components/data-table/usage/
-```
-
-## 5. P7 — genuine structural hypotheses
-
-### A — Wide metadata table + top search/filter toolbar — LEADING
+Product inference:
 
 ```text
-page identity + New document
-large code/title search
-visible fixed filter controls/chips
-wide official-document table
-cursor-compatible incremental continuation
+search-first + Document Type browse
+→ optional secondary filters
+→ structured result list
 ```
 
-Strengths:
+The Type-card treatment itself is a MetalDocs hypothesis derived from these patterns; it is not copied reference authority.
+
+## 5. P7 adjudication and C2 hypothesis
+
+### A — Wide table first
+
+Structurally feasible but **not operator-preferred** because it exposes a dense register before the user has expressed search/browse intent.
+
+### B — Local filter rail + table
+
+Not preferred because B01 already owns a persistent global left navigation region; a second rail competes for width and orientation.
+
+### C — Search-first structured results
+
+**OPERATOR-PREFERRED DIRECTION**, refined to C2.
+
+### C2 — Discovery-first Library
+
+Initial state:
 
 ```text
-best cross-row comparison
-maximum use of available content width
-search and browse coexist without another navigation layer
-business metadata stays visible while scanning
-responsive degradation can move rows to structured list at narrow width
+Library identity + New document
+↓
+prominent code/title search
+↓
+Explore by Document Type cards
+  card identity = DocumentType.code + DocumentType.name
+  no counts
+  no hardcoded semantic icon authority
+↓
+More filters (Area / Responsible / status) as secondary narrowing
+↓
+no result dump yet
 ```
 
-### B — Filter rail + wide result table
+A result collection appears only after one of:
 
 ```text
-search across top
-left local filter rail
-results table on right
+search q entered
+Document Type selected
+explicit "View all documents"
 ```
 
-Strength: filters stay continuously visible and work well for browse-heavy users.
-
-Cost: B01 already owns a global left sidebar; a second persistent left rail compresses the Library and creates competing vertical navigation/filter regions. It becomes increasingly expensive on laptop widths.
-
-### C — Search-first structured result list
+Result state uses a structured list, not a preview card grid:
 
 ```text
-large search
-compact filter row
-one rich result row/card per Document
-metadata wraps below title
+official title primary
+code + official Revision
+Area
+Responsible owner
+catalog status
+Open action
+cursor continuation
 ```
 
-Strength: recognition is strong, responsive behavior is simple and title can dominate.
+This separates two tasks deliberately:
 
-Cost: poorer comparison across Type/Area/Owner/Revision, lower information density and more scrolling for a document register. No visual thumbnail/preview truth exists to justify a card/grid model.
+```text
+recognize a discovery context → cards / search
+compare actual documents      → structured list
+```
 
-## 6. Leading-candidate data feasibility
+## 6. C2 data feasibility
 
 | Need | Required truth | Feasibility |
 |---|---|---|
-| Row identity/navigation | `document_id`, `document.code` | PRESENT-IN-AUTHORITY |
+| Result identity/navigation | `document_id`, `document.code` | PRESENT-IN-AUTHORITY |
 | Official title/revision | `official_revision` | PRESENT-IN-AUTHORITY |
-| Type | `DocumentTypeReference` | PRESENT-IN-AUTHORITY |
-| Area | `AreaReference` | PRESENT-IN-AUTHORITY |
-| Responsible owner | `UserReference` | PRESENT-IN-AUTHORITY |
-| Catalog status | derived catalog status returned by server | PRESENT-IN-AUTHORITY |
-| Code/title lookup | `q` | PRESENT-IN-AUTHORITY |
-| Filter application | type/area/owner/status query inputs | PRESENT-IN-AUTHORITY |
-| Pagination | seek cursor + optional limit | PRESENT-IN-AUTHORITY |
-| Arbitrary sorting | no admitted sort parameter | DELIBERATELY ABSENT |
-| Total result count | no admitted count | DELIBERATELY ABSENT |
-| Human-readable complete filter option sources | complete, disclosure-safe Type/Area/Owner choices usable by an ordinary Library reader | **FINDING B02-F1** |
+| Result Type/Area/Owner/status | `DocumentSummary` references/status | PRESENT-IN-AUTHORITY |
+| Search | `q` | PRESENT-IN-AUTHORITY |
+| Apply Type/Area/Owner/status filters | existing `listDocuments` query inputs | PRESENT-IN-AUTHORITY |
+| Result pagination | seek cursor | PRESENT-IN-AUTHORITY |
+| Type card identity | `DocumentTypeReference.code + name` | PRESENT AS A SHAPE; **complete reader option source unresolved** |
+| Type counts | aggregation/total per type | DELIBERATELY ABSENT |
+| Arbitrary sorting | no admitted sort | DELIBERATELY ABSENT |
+| Complete human-readable filter option sources | reader-safe Type/Area/Owner choices | **FINDING B02-F1** |
 
-### B02-F1 — Library filter option source
+## 7. B02-F1 — Library discovery-option source
 
-The Product authority names Document Type, Area and responsible owner as core Library filters, and `listDocuments` accepts their opaque IDs. Current B02 authority does not yet prove a complete disclosure-safe source of human-readable selector options for an ordinary Library reader.
+The accepted Product already names Document Type, Area and responsible owner as core Library filters, and `listDocuments` accepts their opaque IDs. Yet the current frontend/wire authority does not prove how an ordinary reader obtains the complete, human-readable, disclosure-safe choices needed to use those filters or C2 Type cards.
 
-Rejected shortcuts:
+Existing surfaces are not silently reusable:
 
 ```text
-ask users to paste UUIDs
-reuse Admin directories regardless of access
-reuse document-creation/options outside its least-privilege creation purpose
-build options from only the current result page
-fetch the entire Library client-side and derive facets
-invent operation 79 silently
+Document Governance list/read → administration/configuration authority
+Organization User/Area lists  → organization administration authority
+DocumentCreationOptionsView   → purpose-built create eligibility; excludes reader-only users
+current DocumentPage items    → incomplete page-local sample, not a complete selector source
 ```
 
-This is a SCREEN-CONTRACT / read-composition finding. It does not justify changing Product semantics or the 78-operation census by preference. Before B02 can be LOCKED, resolve it through the smallest accepted owner/read-model precision or prove an existing disclosure-safe source already owns it.
+Rejected repairs:
 
-## 7. Candidate terminology
+```text
+hardcode Document Types
+ask users for UUIDs
+derive facet values from one result page
+load the whole Library client-side
+give ordinary readers Admin-directory access
+repurpose creation/options outside its trust purpose
+invent operation 79 without a bounded reopen
+```
+
+Resolution order before B02 LOCK:
+
+```text
+1. prove an existing disclosure-safe read already owns the choices
+2. otherwise test the smallest read-model/read-composition precision on accepted Library authority
+3. prove scale/disclosure/pagination for Type/Area/Owner options
+4. only if the 78-operation contract cannot realize the accepted Library filters coherently,
+   classify a material bounded upstream reopen rather than introducing a workaround
+```
+
+Operation 79 remains absent unless the repository's normal material-reopen law is actually satisfied and operator-authorized.
+
+## 8. Assumption register delta
+
+| Assumption | Evidence | Influence | Probe / status |
+|---|---|---|---|
+| Most deployments have a modest enough Document Type set that visual browse is useful | operator/domain hypothesis; Product permits configurable types but sets no count | C2 Type-card region | OPEN — test card behavior with small and large synthetic sets before LOCK |
+| Users benefit from narrowing intent before seeing the full register | direct operator evidence + external reference pattern | C2 initial state | VALIDATED for current candidate direction |
+
+A large type set must not force hidden arbitrary priorities. If the grid does not scale under realistic type counts, the Type browse interaction must be refined before B02 LOCK.
+
+## 9. Candidate terminology
 
 ```text
 Library                  → Biblioteca
-EFFECTIVE catalog mode   → Vigentes       (CANDIDATE user-facing label)
-OBSOLETE catalog mode    → Obsoletos      (CANDIDATE)
-CANCELLED catalog mode   → Cancelados     (CANDIDATE)
-Document Type            → Tipo de documento
-Area                     → Área
-Responsible owner        → Responsável
+Explore by Document Type → Explorar por tipo de documento
+EFFECTIVE                 → Vigentes       (candidate label)
+OBSOLETE                  → Obsoletos      (candidate label)
+CANCELLED                 → Cancelados     (candidate label)
+Document Type             → Tipo de documento
+Area                      → Área
+Responsible owner         → Responsável
 ```
 
-Technical lifecycle values remain server truth; these labels are presentation terminology only and remain candidate until operator adjudication.
+Technical lifecycle values remain server truth.
 
-## 8. P8 disposition
+## 10. P8 disposition
 
-Render A/B/C only for the B02 Library collection frame. The leading A candidate may be visually discussed, but **B02 cannot be operator-LOCKED while B02-F1 remains unresolved**.
+Current rendered candidate is **C2 — Discovery-first Library**. It is visually reviewable but cannot be LOCKED while B02-F1 or the material Document-Type-scale assumption remains unresolved.
 
 Do not pre-design Document Official, Document Work, Governance, History/Audit detail or Administration from this block.
