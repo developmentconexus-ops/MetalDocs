@@ -497,3 +497,60 @@ VERDICT = NOT CONVERGED
 MATERIAL findings = 2
 Round 2 justified = YES
 ```
+
+---
+
+## Fable Round 2 response — bounded confirmation
+
+```text
+Reviewer                  Fable (independent, isolated)
+Basis                     corrected candidate 4b0bf734e70e59e06008d401a0d3d12d9540310e (CI #1221 SUCCESS, verified live)
+Subject                   docs/development/functional-html-wireframe-method.md (v2.1, read whole)
+Correction delta          method document only (626+/980−); roadmap/index untouched (verified)
+Mode                      bounded confirmation of Round-1 findings + regression sweep — no fresh unconstrained redesign
+```
+
+### Material findings — both CLOSED
+
+- **FM-1 — CLOSED.** §4.6 is now a dedicated law: `LOCKED` is operator-only (restated in §6's vocabulary and §5.4); assistants/reviewers/tools may propose CANDIDATE/FINDING/REJECTED but MUST NOT set LOCKED. The three inconsistent progression rules are collapsed into one: the next material block must not be presented or generated as baseline until the current one is LOCKED, with a single explicit exception — operator-authorized parallel progression, under which the current block stays CANDIDATE and dependent decisions may not be treated as locked authority. The sentence "There is no assistant-judged substitute such as 'sufficiently coherent'" removes the old escape verbatim; §16.3 ends the block cycle at "OPERATOR LOCK", §23 states "Progression follows §4.6 exactly", and the closure checklist adds "Only the operator set LOCKED" and "No next material block became baseline before LOCK or explicit parallel authorization". Both smallest corrections (1, 2) landed as specified.
+- **FM-2 — CLOSED.** §16.1 defines the mandatory wireframe medium: a P8 candidate MUST be rendered/viewable; "Prose, markdown tables or textual boxes alone do not satisfy P8". Acceptable media are enumerated, the unstyled grayscale HTML/CSS skeleton is explicitly permitted as a P8 medium, and the P8/P11 boundary is defined as scope/fidelity — one bounded screen, structural hierarchy/proportions, placeholder content, no brand styling, no cross-flow obligation — "not technology", with "HTML may therefore appear in P8 without turning P8 into the final functional prototype phase" resolving the dual failure path exactly. The block ledger now requires "Rendered visual wireframe" as a field. Correction 3 landed as specified.
+
+### Important findings — all ten CLOSED
+
+- **FI-1 — CLOSED.** §12 "P4 exit law": P4 exits **CANDIDATE IA**, never LOCKED; global IA locks only through the first global-frame block cycle with a rendered artifact and operator adjudication; that lock is named the first mandatory whole-product coherence checkpoint (restated in §24 with P12 as the terminal one). Checklist: "P4 IA remained CANDIDATE until operator visual lock in the global-frame block."
+- **FI-2 — CLOSED.** §24 is the phase-scope table (P0–P5 global, P6–P9 per block, P10 incremental+terminal, P11 per block then assembled, P12–P14 global) and states "This table governs over any linear shorthand diagram." §34 itself was restructured into GLOBAL FOUNDATION / PER-BLOCK LOOP / ASSEMBLED CLOSURE, so the diagram and the table now agree.
+- **FI-3 — CLOSED.** §15.1 requires the data-feasibility line on each leading hypothesis before P8 lock — fields, identity sources, scale/pagination, sort/filter, preview truth, material writes — each marked PRESENT-IN-AUTHORITY or FINDING, explicitly "a lightweight feasibility gate, not a full Screen Contract", with P9 correctly retained after structure. The block cycle (§16.3) and ledger both carry the check. The Round-1 order adjudication (no reorder) is preserved.
+- **FI-4 — CLOSED.** §18.1: bounded consolidation pass after **each** block LOCK; graduation requires ≥2 locked screens sharing purpose/state-ownership/protected-semantics/accessibility/failure class; "Do not graduate a shared pattern mid-block"; §18.3 keeps terminal reconciliation. Ledger adds "Pattern consolidation — after LOCK".
+- **FI-5 — CLOSED.** §5.2 makes the assumption register a required artifact with the exact columns proposed (evidence level, phases/blocks influenced, P12 probe, status); §20 adds the mandatory assumption probe (VALIDATED / REJECTED / carried as FINDING); OPEN material assumptions block P14 (§20, §22 count, checklist).
+- **FI-6 — CLOSED.** Accessibility now has the P8 hooks: §16.2 adds keyboard/focus-order plausibility, heading/label structure, disclosure reachability and non-drag alternatives to the structural-decision list; §16.4 adds four accessibility/responsive walkthrough questions; new law §4.12 makes an inaccessible interaction model an invalid lock candidate; checklist: "Accessibility was checked during P8, not only after prototype."
+- **FI-7 — CLOSED.** §11's orphan disposition law gives exactly the three lawful dispositions (evidenced need+home / operator-adjudicated NOT-HUMAN-FACING or DEFERRED / UPSTREAM excess-capability finding) and states "Never invent a screen or user need merely to make an orphan count reach zero." §6 adds the NOT-HUMAN-FACING status; §22 rewords the count to "backend human operations without disposition 0"; §31 adds "excess/misaligned accepted backend capability" as classification step 6.
+- **FI-8 — CLOSED.** §12.1 introduces the durable user-language glossary (carried in handoff §21 and the artifact inventory); §17 adds FAILURE MESSAGE INTENT to the Screen Contract with the correct abstraction level ("not final copywriting") and a concrete stale-write example; §22 requires "material failure message intent defined". The success-condition list (§3) now includes "what must the user understand after that failure?".
+- **FI-9 — CLOSED.** §21 requires the post-visual-design structural-conformance check over the named dimensions (reading order, region priority, action placement, density class, navigation meaning, material visibility, responsive behavior), classifies mismatches by the normal finding law, and — as recommended — explicitly transfers the check into implementation review when visual design happens during LLM-built implementation ("it does not disappear"). §22 adds the zero-unresolved-defects count.
+- **FI-10 — CLOSED.** §7 is the proportionality section: an always-required core (the §4 laws, bounded authority, explicit need, operator lock, visual artifact, contract/trace, no screen-shaped API), a named-trigger table for P4/P6/P7/research instruments/ledger/assembled prototype, and the small single-block delta collapse (P0 → P1-delta → P8 → P9 → P11-delta) with "Do not force product-wide matrices or reference research when no trigger exists."
+
+### Optional findings — all six adopted
+
+FO-1 single-hypothesis justification (§4.5, §15 exit, ledger row); FO-2 disconfirming observation + bounded-browsing stop rule (§14); FO-3 data volatility, cold-start and export/print criteria (§15); FO-4 minimum artifact inventory (§25, correctly noting "does not require one file per row"); FO-5 validation timing semantics on form-like pattern entries (§18.2); FO-6 "content-integrity/exactness guarantees" replaces the product-flavored phrasing (§13). None introduced new mandatory ceremony.
+
+### Round-2 adversarial pass on the corrected text — no MATERIAL or IMPORTANT finding survived
+
+- **Proportionality regression (the brief's second question).** The corrections could have added ceremony; they did not. §7 converts previously blanket instruments into triggered ones, and every new mandatory element (register, glossary, feasibility line, conformance check) is either bounded to material scope or replaces a documented failure mode. The small-delta path is genuinely small. NOT SUSTAINED.
+- **Post-lock contract risk.** The §4.6 gate is P8-lock-based, so a next block may begin while the prior block's P9 contract is pending; a P9 finding could still reopen a locked structure the next block inherited. Attack not sustained as MATERIAL: the §15.1 feasibility line front-loads exactly the backend-fit class of P9 surprises, the finding law returns only to the smallest affected phase, and a contract-completeness gate before any next block would be the waterfall shape Round 1 declined. Residue recorded as **NOTE R2-N1**: the Lead may optionally advise completing P9 for structure-coupling contracts before a *dependent* block locks; realization discipline, not a contract gap.
+- **Medium catch-all.** §16.1's "other rendered visual equivalent" could be read loosely, but the explicit exclusion sentence ("Prose, markdown tables or textual boxes alone do not satisfy P8") bounds it decidably. Recorded as **NOTE R2-N2**; no correction required.
+- **Small-delta glossary.** The §7 single-block path does not name glossary maintenance; drift on tiny deltas is conceivable. The glossary is a durable artifact and §22 requires coherence at closure, so the loophole has no lawful exit. **NOTE R2-N3**, at the Lead's discretion.
+- **Deletion sweep (980 removed lines).** Verified nothing protective was lost in the compaction: all eleven v2.0 laws survive (plus new §4.12); flow-completeness rule retained (§10); reference discipline three-layer separation retained (§14); density/search/table-pattern chapters retained (§28–§30); smallest-reopen law retained and extended (§31); review protocol and checklist retained and strengthened (§32–§33). The removed §15.2/§19 question lists were compacted, not weakened — every attack class reappears in §16.4/§20. NO REGRESSION FOUND.
+- **Reusability/ontology.** No MetalDocs-specific vocabulary in v2.1; the one flagged term was generalized (FO-6). Frontmatter/summary updated consistently. CLEAN.
+- **LLM implementation-readiness re-check.** All eight invention questions from dimension M now have owners, including the two previously half-open: user-facing language (glossary + message intent) and process shape (§24 governing table + operator-only lock). CLOSED.
+
+### Verdict
+
+Both MATERIAL findings and all ten IMPORTANT findings are closed by corrections that match or improve on the Round-1 smallest-correction proposals; all six OPTIONAL refinements were adopted without proportionality cost. The three residual notes (R2-N1 dependent-block contract timing, R2-N2 medium catch-all wording, R2-N3 small-delta glossary mention) are non-blocking precision at the Lead's discretion and justify no further round. The methodology is converged and ready to be applied to MetalDocs starting from the global-frame block.
+
+```text
+VERDICT: CONVERGED
+MATERIAL: 0
+IMPORTANT: 0
+OPTIONAL: 3
+UNSUPPORTED_PREFERENCE: 0
+Round 3 justified = NO
+```
