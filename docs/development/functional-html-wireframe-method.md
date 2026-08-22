@@ -1,536 +1,1118 @@
 ---
-id: functional-html-wireframe-method
+id: frontend-product-experience-planning-method
 kind: methodology
 owner: development
-summary: Reusable coverage-first method for deriving implementation-ready frontend prototypes from accepted product, architecture, backend and API authority before production UI implementation.
+summary: Reusable authority-to-UX planning method for deriving coherent information architecture, screen structure, interaction patterns and functional HTML prototypes before production frontend implementation.
 ---
 
-# Functional HTML Wireframe Method
+# Frontend Product Experience Planning Method
 
-**Version:** 1.0  
+**Version:** 2.0  
 **Scope:** reusable across products and repositories  
-**Purpose:** make frontend implementation a realization of already-validated product/system decisions instead of a second design phase performed while coding.
+**Purpose:** make frontend implementation a realization of already-validated product, UX and system decisions instead of a new design/architecture phase performed while coding.
 
 ---
 
-## 1. Problem this method solves
+## 1. Why this method exists
 
-A frontend can be visually plausible and still be architecturally wrong.
+A frontend can be technically connected to the backend and still be a poor product.
 
-Common failure modes include:
+It can also be visually attractive and still be architecturally wrong.
+
+Typical failures include:
 
 ```text
+screens generated before understanding user goals
+navigation shaped by backend nouns instead of user mental models
+a table chosen only because data is list-shaped
+cards chosen only because they look modern
+important information hidden because hierarchy was never studied
 screen exists but backend cannot supply required truth
 button exists but no accepted operation owns the action
 route exists only because the UI wanted one
 frontend invents lifecycle/business state
 frontend authorization diverges from server authorization
-the same semantic component is implemented several different ways
+same interaction pattern is implemented several different ways
+component abstractions are created before repeated semantics are proven
 API is changed merely to make one screen easier
-important failure/concurrency states are discovered only during implementation
-backend is declared complete before its real user-facing consumer exists
-wireframe and implementation drift because the wireframe contains no machine-readable trace
+failure/concurrency states appear only during implementation
+backend is declared complete before its user-facing journey exists
+visual design silently changes information architecture or behavior
+LLM implements the product by improvising missing UX decisions in code
+wireframe and implementation drift because no vertical trace exists
 ```
 
-The method prevents those failures by deriving the frontend from accepted authority **before production UI code is written** and by ending with a navigable functional HTML prototype whose material controls are traceable to real system contracts.
+The method exists to stop those failures **before production frontend code is written**.
 
-The goal is not a pretty mockup.
+The target is not merely a collection of wireframes.
 
-The goal is:
+The target is a reviewed chain of reasoning:
 
 ```text
 accepted product/system authority
-→ complete user-capability coverage
-→ implementation-relevant surfaces
-→ exact screen contracts
-→ navigation/data graph
-→ reusable component-pattern vocabulary
-→ functional HTML prototype
-→ interaction ledger
-→ bidirectional frontend↔backend trace
-→ adversarial review
-→ implementation-ready frontend
+→ actors + user needs
+→ end-to-end user flows
+→ frontend coverage
+→ information architecture
+→ screen/surface inventory
+→ reference study
+→ competing layout hypotheses
+→ operator-reviewed structural wireframes
+→ exact screen/backend contracts
+→ derived reusable interaction patterns
+→ interactive low-fidelity HTML
+→ adversarial walkthrough
+→ visual-design handoff
+→ implementation readiness
 ```
 
 ---
 
-## 2. Core invariant
+## 2. Core principle
 
-Frontend planning is complete only when an implementer can build the production frontend without inventing material product behavior, backend relationships, navigation meaning, state authority, component semantics or failure handling while coding.
+> The frontend is the human-operable projection of the accepted product architecture, but its information architecture and interaction structure must still be deliberately designed for humans.
 
-For every material UI element, the implementation team must be able to answer:
+Backend authority does **not** uniquely determine good UX.
+
+For example, a backend collection does not automatically imply:
 
 ```text
-why does this exist?
-what accepted user goal does it serve?
+data table
+```
+
+The same accepted resource set could legitimately be presented as:
+
+```text
+table
+grid/cards
+master-detail
+categorized browse view
+search-first interface
+mixed browse + search
+multiple alternate views over the same truth
+```
+
+The correct presentation depends on user goals, frequency, scale, recognition needs, comparison needs, information density, context and future product seams.
+
+Therefore:
+
+```text
+backend coherence
+≠
+UX coherence
+```
+
+Both must be proven before implementation.
+
+---
+
+## 3. Success condition
+
+Frontend planning is complete only when a future implementer can build the production frontend without inventing material decisions in code.
+
+For every material screen, region and interaction, the team must be able to answer:
+
+```text
+who is the user?
+what are they trying to accomplish?
+why does this screen/region exist?
+why is the information organized this way?
+why is this presentation pattern appropriate?
+what alternatives were considered?
+what accepted product capability does it serve?
 what backend/system truth supplies it?
 what operation/action does it invoke?
-what identity is used and where did that identity come from?
+where does every required identity come from?
 what state is authoritative?
 what happens on success?
 what happens on material failure?
 what screen/state follows?
+which reusable interaction pattern does it use, if any?
 what may the frontend NOT infer or own?
 ```
 
-If a material question is unanswered, the frontend is **not implementation-ready**.
+If a material answer is missing, the frontend is **not implementation-ready**.
 
 ---
 
-## 3. Method principles
+# 4. Method laws
 
-### 3.1 Coverage before drawing
+## 4.1 Human needs before screens
 
-Do not start by inventing pages.
+Never start with a screen inventory merely because backend capabilities are known.
 
-Start by proving that every accepted user-facing capability and human goal has a coherent frontend home.
-
-```text
-accepted capability / journey
-→ semantic/business owner
-→ admitted read/write contract
-→ frontend home
-```
-
-Only after coverage is coherent should screen contracts and wireframes be produced.
-
-### 3.2 Bidirectional derivation
-
-Every trace must work in both directions.
+Start from:
 
 ```text
-backend/product → frontend
-accepted capability → owner → operation/read model → screen/control
+actor
+→ context
+→ user need / job
+→ desired outcome
+→ end-to-end flow
 ```
 
-and:
+A user need describes the outcome/problem, not a predetermined interface.
+
+Bad:
 
 ```text
-frontend → backend/product
-screen/control → operation/read truth → owner → accepted capability
+"I need a dashboard with cards"
 ```
 
-A one-way mapping is insufficient because it can hide orphan backend operations or invented frontend behavior.
-
-### 3.3 Hard no screen-shaped API
-
-A screen being inconvenient to implement is not authority to create a new endpoint, DTO, state, permission or backend capability.
-
-When a screen requires information that is not available:
+Better:
 
 ```text
-prove the human/product need
-→ trace the missing truth to its owner
-→ classify whether accepted authority already contains that truth
-→ if necessary, reopen the smallest owning contract explicitly
+"I need to quickly identify which resources require my attention so I can act without opening every item"
 ```
 
-Never silently repair the frontend with a convenience API.
+Interface form is derived later.
 
-### 3.4 Server/business authority stays authoritative
+## 4.2 Coverage before layout
 
-The prototype may simulate states, but it must not create a second semantic authority.
+Before choosing tables, cards, drawers or page structures, prove every accepted human capability has a coherent frontend home.
 
-Examples of forbidden frontend authority unless explicitly accepted by the product architecture:
+```text
+accepted capability / human goal
+→ semantic owner
+→ admitted read/write contracts
+→ candidate frontend context
+```
+
+Coverage tells us **what must be representable**.
+
+It does not yet tell us **how the screen should look**.
+
+## 4.3 Information architecture before screen composition
+
+Navigation and grouping are product decisions.
+
+Before drawing screens, decide how users should understand and find the product's objects/tasks.
+
+Information architecture must consider:
+
+```text
+user mental models
+core objects
+frequent tasks
+relationships
+browse hierarchies
+search
+filters
+saved/persistent views when justified
+cross-links
+global vs contextual navigation
+primary vs secondary destinations
+future extension seams already accepted by product direction
+```
+
+Do not expose backend package/domain topology as navigation merely because it exists.
+
+## 4.4 Reference study before layout commitment
+
+Do not invent every interaction from scratch.
+
+For each material functional block, study relevant mature products and design systems.
+
+References are **evidence**, not authority.
+
+Use them to understand:
+
+```text
+information hierarchy
+navigation models
+density
+selection patterns
+list vs grid vs master-detail
+search/filter behavior
+action placement
+progressive disclosure
+empty/error states
+responsive behavior
+interaction conventions
+```
+
+Never copy visual appearance or foreign product semantics blindly.
+
+## 4.5 Competing hypotheses before commitment
+
+For consequential screens/blocks, produce **2–3 plausible structural alternatives** before choosing one.
+
+Examples:
+
+```text
+dense table
+visual cards/grid
+master-detail
+category-first browse
+search-first
+mixed browse + list
+```
+
+Evaluate alternatives against explicit criteria instead of taste.
+
+## 4.6 Screen-by-screen / block-by-block adjudication
+
+Never generate the whole product interface and ask for review afterwards.
+
+Large products are reviewed in bounded blocks.
+
+For each block:
+
+```text
+recover local authority
+→ review user need/flow
+→ study references
+→ produce alternatives
+→ discuss with operator/product owner
+→ select or revise structure
+→ record decision
+→ only then progress
+```
+
+The human operator must be able to **see and discuss each important screen/block before it becomes the baseline**.
+
+## 4.7 No all-at-once wireframing
+
+The following workflow is prohibited for non-trivial products:
+
+```text
+screen inventory
+→ generate every screen in one pass
+→ review finished prototype afterwards
+```
+
+Why:
+
+```text
+weak early assumptions propagate to every later screen
+component vocabulary freezes prematurely
+poor navigation becomes expensive to unwind
+screens become internally consistent with the wrong structure
+reviewer cognitive load becomes too high
+```
+
+## 4.8 Hard no screen-shaped API
+
+A screen being inconvenient to implement is not authority to create a backend operation.
+
+If a needed fact/action is absent:
+
+```text
+prove the user need
+→ identify the missing semantic truth
+→ find its accepted owner
+→ classify whether authority already exists
+→ reopen only the smallest owning decision when evidence demands it
+```
+
+Never repair layout convenience with an arbitrary endpoint.
+
+## 4.9 Frontend never becomes parallel business authority
+
+Unless explicitly accepted by product architecture, frontend planning must not create:
 
 ```text
 client lifecycle state machine
 client authorization evaluator
 parallel DTO/schema registry
 parallel normalized business-entity truth store
-provider/external mechanism state treated as product truth
-history/audit projection used as current-resource truth
-optimistic business-state fabrication
+provider mechanism state as product truth
+history/audit projection as current-resource truth
+optimistic fabrication of consequential business state
 ```
 
-### 3.5 Prepare the seam, not hypothetical capability
+## 4.10 Patterns are derived, not invented upfront
 
-Do not add generic directories, workflow engines, component frameworks, state stores, routes or endpoints because they may be useful later.
+Do not start by declaring a universal component library for a product that has not been wireframed.
 
-Every material pattern must have a current consumer.
+First observe repeated interaction semantics across reviewed screens.
 
-### 3.6 Implementation nodes close user journeys, not technical layers
+Then consolidate them.
 
-A backend slice must not declare itself complete when the user-facing journey it owns still points to a dead or unimplemented frontend target.
+```text
+repeated protected behavior
+→ shared pattern
 
-When an accepted journey is:
+cosmetic similarity only
+→ not enough evidence for semantic abstraction
+```
+
+This avoids both duplication and premature abstraction.
+
+## 4.11 Visual design cannot silently redesign UX
+
+After structural wireframes are accepted, visual design may refine:
+
+```text
+brand palette
+typography
+spacing rhythm
+radii
+shadows
+icons
+visual hierarchy emphasis
+responsive polish
+microinteraction polish
+```
+
+A visual-design proposal that changes any of these is a UX/contract finding and must return to the appropriate stage:
+
+```text
+information architecture
+navigation
+screen composition
+material region priority
+action semantics
+required data
+workflow
+state model
+```
+
+---
+
+# 5. Evidence posture
+
+The method distinguishes four kinds of input.
+
+## 5.1 Accepted authority
+
+Binding product/system decisions such as:
+
+```text
+product boundary
+user capabilities
+semantic/domain ownership
+identity rules
+lifecycle/state
+permissions/disclosure
+API/wire contract
+persistence/concurrency meaning
+runtime/external boundaries
+```
+
+Frontend planning may derive from these but cannot casually supersede them.
+
+## 5.2 User evidence
+
+Evidence about real user goals and behavior:
+
+```text
+interviews
+observation
+existing workflows
+analytics/search logs
+support tickets
+operational reports
+known user feedback
+validated domain/operator experience
+```
+
+Where direct user research is not yet available, assumptions must be explicitly labeled as assumptions and tested during prototype review.
+
+## 5.3 Reference evidence
+
+External products, SaaS systems, enterprise systems and design systems used to study established patterns.
+
+They inform alternatives but never become product authority.
+
+## 5.4 Operator adjudication
+
+A human product/operator decision after reviewing evidence and candidate layouts.
+
+The operator does not replace user evidence, but owns the explicit product decision when the planning process requires a choice.
+
+---
+
+# 6. Decision status vocabulary
+
+Use a small explicit vocabulary through the planning process.
+
+```text
+LOCKED
+  accepted for the current planning baseline
+
+CANDIDATE
+  plausible leading design; not yet approved
+
+FINDING
+  material unresolved question or contradiction
+
+REJECTED
+  alternative considered and deliberately not selected
+
+DEFERRED
+  known future seam with no current consumer; not implemented now
+```
+
+Never write a `CANDIDATE` as though it were accepted authority.
+
+---
+
+# 7. Phase P0 — Recover accepted authority
+
+## Goal
+
+Recover only the smallest authority pack required to plan the current frontend problem.
+
+Collect, where applicable:
+
+```text
+product mission / scope
+actors
+human capabilities
+semantic/business owners
+identity/data semantics
+state/lifecycle rules
+permissions/disclosure
+backend/module boundaries
+API operations/read models
+concurrency/idempotency
+external dependency semantics
+accepted frontend route/lens constraints
+proof/validation obligations
+```
+
+Do not recursively ingest historical documentation.
+
+## Exit
+
+Every known frontend requirement can be traced to current authority or is explicitly classified as an unknown/assumption.
+
+---
+
+# 8. Phase P1 — Actors, jobs and user needs
+
+## Goal
+
+Understand what people need to accomplish before deciding screens.
+
+For each human actor capture:
+
+```text
+actor / role context
+trigger
+current situation
+need / job-to-be-done
+desired outcome
+frequency
+urgency
+information needed to decide
+common failure/friction
+handoffs to other actors/systems
+```
+
+Recommended need format:
+
+```text
+When <context/trigger>,
+I need to <goal>,
+so that <outcome>.
+```
+
+Do not confuse access roles with personas unless evidence shows they map cleanly.
+
+Do not create screens for machine actors unless a real human operational need exists.
+
+## Exit
+
+Human goals are written independently from proposed pages/components.
+
+---
+
+# 9. Phase P2 — End-to-end user-flow inventory
+
+## Goal
+
+Describe how users accomplish goals across the whole product.
+
+For each goal:
+
+```text
+entry context
+→ understand state
+→ decision
+→ action
+→ system response
+→ handoff if any
+→ outcome
+→ next likely task
+```
+
+Capture alternate/failure branches where they materially change safe behavior.
+
+A user flow is not a route graph and not a component diagram.
+
+## Flow completeness rule
+
+Do not split implementation planning at a point that leaves an accepted human goal unfinished.
+
+If the user goal is:
 
 ```text
 A → B → C → D
 ```
 
-implementation planning must not create a completion boundary between B and C if that boundary leaves B claiming success while C is required to complete the real user goal.
+an implementation slice must not call itself complete at B if C/D are required for the real outcome and B exposes a dead target.
+
+## Exit
+
+Every accepted human goal has at least one complete end-to-end flow.
 
 ---
 
-## 4. Required inputs
-
-The method does not require a specific stack, framework or API technology, but it does require an accepted planning baseline.
-
-Before starting, recover the smallest authority pack that defines, where applicable:
-
-```text
-product capabilities and human goals
-semantic/business ownership
-user journeys and lifecycle rules
-permissions/authorization/disclosure rules
-backend/module boundaries
-persistence/concurrency rules
-API or application-operation contract
-read models / DTO wire shapes
-generated-client boundaries if any
-frontend route/lens decisions already accepted
-runtime/external dependency constraints
-validation/proof obligations
-```
-
-If these are not yet decided, the wireframe method must not pretend they are.
-
-Unknowns are recorded and routed to the owning planning stage.
-
----
-
-## 5. Outputs
-
-The complete method produces these logical artifacts. They may be separate files or consolidated according to repository standards.
-
-```text
-1. Frontend Coverage Matrix
-2. Material Surface Inventory
-3. Screen Contracts
-4. Navigation / Data Graph
-5. Component-Pattern Vocabulary
-6. Functional HTML Wireframe Prototype
-7. Material Interaction Ledger
-8. Bidirectional Frontend ↔ Backend Trace
-9. Finding / Reopen Record
-10. Frontend Implementation-Readiness Closure
-```
-
-The artifacts are not independent authorities. They derive implementation detail from accepted product/system authority.
-
----
-
-# 6. Phase F0 — Authority recovery
+# 10. Phase P3 — Frontend Coverage Matrix
 
 ## Goal
 
-Create the bounded evidence set needed to reason about the frontend without rediscovering the whole repository.
+Prove that accepted product/system semantics reach the frontend before layout work begins.
 
-For every user-facing capability collect, where applicable:
+Minimum matrix:
 
-```text
-accepted human goal / journey
-semantic/business owner
-stable route/lens or navigation meaning
-read operations + read models
-write operations
-identity sources
-permission / relationship / disclosure predicates
-concurrency / idempotency requirements
-exact-content/file behavior
-material dependency/failure behavior
-proof obligations
-```
+| Capability / user need | Owner | User flow | Candidate frontend context | Reads | Writes | Access/security | UX obligations | Status |
+|---|---|---|---|---|---|---|---|---|
 
-## Exit condition
-
-The team can trace every known frontend requirement back to accepted source authority, and unknowns are explicitly labeled rather than guessed.
-
----
-
-# 7. Phase F1 — Frontend Coverage Matrix
-
-## Goal
-
-Prove that the planned frontend represents the product already accepted rather than inventing a new one.
-
-Build a matrix similar to:
-
-| Accepted capability / human goal | Frontend home | Backend/system obligations inherited | Status |
-|---|---|---|---|
-| capability A | route/surface | owner, reads, writes, state, security | Covered / Wireframe / Finding |
-
-Recommended status vocabulary:
-
-```text
-COVERED
-  accepted authority provides a coherent frontend home
-
-WIREFRAME OBLIGATION
-  backend/product contract is coherent but a material interaction/state must still be drawn
-
-FINDING
-  a material product/API/architecture/frontend question is unresolved
-```
-
-## Cross-cutting coverage
-
-Also map architecture/system invariants into UX obligations.
+Cross-cutting system invariants must also become UX obligations.
 
 Examples:
 
 ```text
-server authorization is final
-→ hidden UI may improve usability but never become security authority
-
-optimistic concurrency exists
-→ stale edits must have an explicit reconciliation UX
-
-idempotent command intake exists
-→ same logical retry preserves the same key; changed command receives a new key
-
-external effect can be ambiguous
-→ UI must not expose blind retry as though failure were known
-
-projection/read model is not source truth
-→ list row cannot be carried forward as mutation authority
-
-content integrity is protected
-→ partial/corrupt content cannot be rendered as successful authoritative content
+unknown != known-empty
+accepted != applied != converged
+projection != mutation authority
+hidden control != authorization
+ambiguous outcome != known failure
+stale write != silent overwrite
+external provider success != product success
 ```
 
-## Exit condition
+## Exit
 
 ```text
-all accepted human goals mapped
-all material backend capabilities with human consumers have a frontend home
-no invented product capability
-all findings explicitly classified
+all human-facing accepted capabilities mapped
+all backend/application operations with human consumers have a frontend home
+no invented capability
+material findings explicitly named
 ```
 
-Do not proceed to drawing while a material coverage finding is unresolved.
+Do not proceed to structural layout for a materially blocked capability.
 
 ---
 
-# 8. Phase F2 — Material Surface Inventory
+# 11. Phase P4 — Information Architecture
 
 ## Goal
 
-Identify every material user decision context that requires a Screen Contract.
+Design how users find, understand and move among the product's information and tasks.
 
-A **surface** is not necessarily a page or URL.
+This phase happens **before final screen inventory and layout**.
 
-Create a distinct surface when at least one materially changes:
+## 11.1 Object/task inventory
+
+List the concepts users must recognize.
+
+For each:
 
 ```text
-primary semantic truth shown
+name in user language
+why users care
+primary actions
+relationships to other objects
+frequency of use
+whether it is browse/search/filter target
+whether it deserves independent navigation
+```
+
+Do not automatically mirror domain aggregates, database entities or API resource families.
+
+## 11.2 Navigation model
+
+Evaluate:
+
+```text
+global navigation
+local/context navigation
+home/default landing
+recents/favorites when evidence justifies them
+primary work queue
+browse hierarchy
+search entry
+cross-context links
+breadcrumbs where hierarchy genuinely exists
+```
+
+Navigation links are appropriate when users repeatedly perform multiple unordered tasks. Sequential journeys should favor task/journey guidance rather than pretending everything is peer navigation.
+
+## 11.3 Findability strategy
+
+For every important collection decide how users should find an item:
+
+```text
+browse
+search
+filter
+group
+sort
+alternate view
+saved view
+recent context
+```
+
+Do not add all mechanisms by default.
+
+Choose only those supported by user need/scale.
+
+## 11.4 Mental-model validation
+
+When IA is uncertain or high-impact, use lightweight validation such as:
+
+```text
+card sorting
+category naming review
+tree testing
+first-click testing
+operator/domain walkthrough
+```
+
+The exact research technique depends on project maturity and access to users.
+
+## 11.5 Future seams
+
+Future known product concepts may influence extensibility of the IA, but they must not become live screens/routes without current Product authority.
+
+Correct:
+
+```text
+leave a navigation grouping extensible
+```
+
+Incorrect:
+
+```text
+add empty future modules because they may exist later
+```
+
+## Exit
+
+The team has a reviewed model for how users understand/find product contexts, independent of final visual design.
+
+---
+
+# 12. Phase P5 — Screen and material-surface inventory
+
+## Goal
+
+Derive screens from user flows + IA, not from backend endpoints.
+
+Distinguish:
+
+```text
+route/page
+material surface within a route
+drawer/modal
+inline composition region
+alternate view of the same collection
+material state variant
+```
+
+Create a separate material surface when one of these changes:
+
+```text
+primary semantic truth
 safe user action
-write owner / operation
-target identity required
-concurrency behavior
-idempotency behavior
-exact-file/content behavior
-lifecycle context
-security/disclosure outcome
+write owner
+identity required
+concurrency/idempotency behavior
+exact-content behavior
+security/disclosure context
 recovery path
 editor/viewer mode
 ```
 
-Do **not** split merely because:
+Do not create a separate screen merely because:
 
 ```text
-loading spinner differs
-spacing/layout differs
-responsive arrangement differs
+loading style differs
+spacing differs
 component file differs
-cosmetic empty state differs without semantic consequence
+responsive arrangement differs
+cosmetic empty state differs
 ```
 
-One route may contain many surfaces. Several surfaces may be represented in one composed HTML screen.
+## Exit
 
-## Exit condition
-
-Every material human decision state from F1 has exactly one coherent surface home and no surface requires invented backend truth.
+Every human-flow step and material decision context has a candidate screen/surface home.
 
 ---
 
-# 9. Phase F3 — Screen Contracts
+# 13. Phase P6 — Reference Study
 
 ## Goal
 
-Freeze the meaning of every material surface before visual implementation begins.
+Study how mature products solve the **same UX problem** before committing to a layout.
 
-Every Screen Contract must answer the following when relevant:
+Reference study is performed per functional block, not once for the whole product.
 
-1. What accepted human goal/journey does this surface serve?
-2. Which route/lens contains it?
-3. Which semantic/business owner supplies each material block?
-4. Which exact read operation/query supplies each block?
-5. Which exact write operation/action receives each material control?
-6. Which schema/read model supplies displayed fields?
-7. Where does every identifier needed for a child action/navigation come from?
-8. Which state is server state, URL/navigation state, form draft or ephemeral UI state?
-9. Which interactions require concurrency tokens, idempotency keys, CSRF/trust material, cursor rules, file-integrity rules or other wire mechanics?
-10. Which business/lifecycle states materially alter safe action or presentation?
-11. Which failures change the user’s next safe action?
-12. What authoritative query/refetch/navigation follows success?
-13. Which permission/relationship/disclosure constraints affect the interaction while remaining server authority?
-14. What proof demonstrates the real implementation path?
-15. What must the frontend explicitly NOT own or infer?
-16. Does any required display/action depend on information absent from accepted backend authority?
+## 13.1 Choose references intentionally
 
-Recommended compact contract form:
+Select approximately 3–6 useful references when available, such as:
 
 ```text
-GOAL / ROUTE
+direct competitors
+adjacent enterprise/SaaS products
+high-quality products with analogous jobs
+design systems with relevant task patterns
+platform conventions already familiar to target users
+```
+
+Do not optimize for visual similarity.
+
+Optimize for similarity of **user task**.
+
+## 13.2 Analyze patterns, not screenshots
+
+For each reference record:
+
+```text
+what user problem it appears to solve
+navigation model
+information hierarchy
+primary vs secondary actions
+collection representation
+search/filter strategy
+list/grid/master-detail usage
+progressive disclosure
+selection/action behavior
+empty/loading/error patterns
+responsive behavior
+density
+what appears strong
+what would be wrong for our product
+```
+
+## 13.3 Evidence matrix
+
+Recommended form:
+
+| Reference | Relevant job | Pattern observed | Benefit | Risk / mismatch | Candidate lesson |
+|---|---|---|---|---|---|
+
+## 13.4 Reference discipline
+
+Do not say:
+
+```text
+"Product X uses cards, therefore we use cards."
+```
+
+Say:
+
+```text
+"Product X uses cards because recognition/preview dominates comparison. Our users have a similar/different need, therefore this pattern is/is not a useful hypothesis."
+```
+
+## Exit
+
+The team has evidence-informed structural possibilities for the current block.
+
+---
+
+# 14. Phase P7 — Competing Layout Hypotheses
+
+## Goal
+
+Create and compare plausible structures before choosing one.
+
+For a consequential block, propose 2–3 alternatives whenever real ambiguity exists.
+
+Examples:
+
+```text
+A — dense table
+B — visual cards/grid
+C — master-detail
+D — category-first browse + list
+```
+
+Do not manufacture alternatives when there is genuinely only one reasonable conventional pattern.
+
+## 14.1 Evaluation criteria
+
+Use criteria relevant to the block, commonly:
+
+```text
+task completion speed
+recognition
+comparison
+scanability
+information density
+cognitive load
+frequency of action
+scale / number of records
+preview needs
+bulk action needs
+context preservation
+error recovery
+accessibility
+responsive viability
+future accepted extensibility
+implementation complexity
+backend truth fit
+```
+
+Recommended comparison:
+
+| Criterion | Hypothesis A | Hypothesis B | Hypothesis C |
+|---|---|---|---|
+| Recognition | | | |
+| Comparison | | | |
+| Scale | | | |
+| Density | | | |
+| Task speed | | | |
+| Context | | | |
+| Accessibility | | | |
+| Backend fit | | | |
+
+## 14.2 Example decision rule: table vs cards
+
+Use a table as a leading hypothesis when users primarily need to:
+
+```text
+compare several attributes across many rows
+scan structured records quickly
+sort/filter by column-like data
+perform repeated row/batch actions
+find a specific record in a dense collection
+```
+
+Use cards/grid as a leading hypothesis when users primarily need:
+
+```text
+recognize items visually
+consume previews/thumbnails
+scan a small number of heterogeneous attributes
+choose among items where identity/summary matters more than cross-row comparison
+```
+
+Use alternate list/grid views only when both tasks are genuinely important, not because a switcher is fashionable.
+
+## Exit
+
+One candidate is selected for structural wireframing, or the block remains a named finding.
+
+---
+
+# 15. Phase P8 — Block-by-block Structural Wireframing
+
+## Goal
+
+Turn the selected layout hypothesis into a low-fidelity structural design.
+
+This phase freezes **structure**, not brand styling.
+
+Structural wireframes decide:
+
+```text
+screen hierarchy
+major regions
+relative width/height
+primary reading order
+navigation placement
+information grouping
+card/table/list/master-detail choice
+density
+primary/secondary action placement
+progressive disclosure
+dialog/drawer vs inline editing
+empty/error/conflict region placement
+responsive transformation rules
+```
+
+## 15.1 Review one block at a time
+
+Recommended block cycle:
+
+```text
+BLOCK INPUT
+  user goals + IA + coverage + local authority
+
+REFERENCE STUDY
+
+LAYOUT HYPOTHESES
+
+CANDIDATE STRUCTURAL WIREFRAME
+
+OPERATOR WALKTHROUGH
+  discuss layout, hierarchy, position, size, discoverability, task flow
+
+FINDINGS / REVISION
+
+LOCK or continue iterating
+```
+
+Do not start the next high-impact block until the current block is sufficiently coherent to serve as context.
+
+## 15.2 Operator review questions
+
+For each screen/block ask:
+
+```text
+Can I find what I came here to do?
+Is the most important information visible first?
+Does the screen expose too much at once?
+Do I understand where I am?
+Do I understand where I can go next?
+Are primary actions obvious without being dangerous?
+Would I rather compare, recognize or preview these items?
+Does the information density match the task?
+Would I expect this region to be a page, drawer or inline panel?
+Do I need context from the previous screen while acting?
+Would a real user repeatedly open records just to find the right one?
+Does anything feel like backend structure leaking into the UI?
+```
+
+## Exit
+
+The current block is explicitly `LOCKED`, or named findings remain open.
+
+---
+
+# 16. Phase P9 — Screen Contract and vertical backend trace
+
+## Goal
+
+After a screen structure is coherent, prove every material region/control is actually realizable by accepted system authority.
+
+Every material Screen Contract answers, where relevant:
+
+```text
+GOAL / USER FLOW
+ROUTE / SURFACE
+INFORMATION HIERARCHY ROLE
 OWNER + READ TRUTH
 WRITE CONTROLS
-IDENTITY / NAVIGATION
-CLIENT STATE
+IDENTITY SOURCE
+CLIENT STATE CLASS
 WIRE MECHANICS
 MATERIAL STATES / FAILURES
 SUCCESS CONSEQUENCE
 AUTHZ / DISCLOSURE
 PROOF
-FORBIDDEN
+FORBIDDEN FRONTEND AUTHORITY
 BACKEND SUFFICIENCY
 ```
 
-## Exit condition
+## Bidirectional law
 
-Every material surface is `READY` or explicitly blocked by a named finding. No blocked surface may proceed to final HTML realization.
+Trace both directions:
+
+```text
+Product/backend → frontend
+capability → owner → operation/read model → screen/region/control
+```
+
+and:
+
+```text
+Frontend → Product/backend
+screen/control → operation/read truth → owner → accepted capability
+```
+
+A one-way trace can hide orphan operations or invented UI behavior.
+
+## Exit
+
+Every material screen/control is `READY` or blocked by an explicit finding.
 
 ---
 
-# 10. Phase F4 — Navigation / Data Graph
+# 17. Phase P10 — Derive Component and Interaction Pattern Vocabulary
 
 ## Goal
 
-Prove every meaningful transition between surfaces without relying on magic IDs, client inference or history scans.
+Consolidate repeated semantics after enough screens have been reviewed to provide evidence.
 
-For each cross-surface navigation edge record:
-
-```text
-source surface
-→ source of target identity/reference
-→ target route/state
-→ target initial read
-→ 401/403/404/non-disclosure behavior
-→ stale-target behavior
-```
-
-Example abstract form:
-
-```text
-List row
-→ returned resource_id
-→ /resource/:resource_id
-→ getResource(resource_id)
-→ server decides current disclosure
-```
-
-## Rules
-
-Target identity must come from admitted current truth or from the authoritative result of an accepted operation.
-
-Do not use as current-resource resolvers unless explicitly accepted:
-
-```text
-Audit history
-semantic history timeline
-DOM state
-localStorage
-provider identity
-projection row cached indefinitely
-human-entered opaque IDs
-```
-
-## Exit condition
-
-Every link/button/navigation has a provable target identity source and real destination read. There are no dead navigation targets.
-
----
-
-# 11. Phase F5 — Component-Pattern Vocabulary
-
-## Goal
-
-Prevent duplicated semantics and visually different implementations of the same interaction pattern.
-
-Before building the HTML prototype, define the smallest reusable vocabulary of **behavioral UI patterns** actually required by the surfaces.
-
-Typical examples may include:
+Typical patterns may emerge such as:
 
 ```text
 AppShell
 PageHeader
-SectionNav
 FilterBar
 DataTable
+CardGrid
+MasterDetail
 StatusBadge
 FormField
-SelectField
 ActionMenu
 Drawer
 Modal
 ConfirmDialog
 EmptyState
 DeniedState
-NotFoundState
-UnavailableState
 ConflictReconciliation
 IdempotentRetry
 UploadProgress
 InlineViewer
-EditableDocumentRegion
-Pagination / LoadMore
+EditableRegion
 Timeline
-Toast / non-material notification
+Pagination / LoadMore
 ```
 
-Names are local conventions, not universal requirements.
+These names are examples, not mandatory taxonomy.
 
-## Pattern law
+## Pattern creation rule
 
-Two surfaces should reuse one pattern when they share the same protected interaction semantics.
-
-Create a distinct pattern only when a real difference exists in at least one of:
+Create a shared pattern when multiple accepted screens share:
 
 ```text
-data/authority semantics
-interaction behavior
-accessibility requirement
-failure behavior
-state ownership
-layout responsibility
+same purpose
+same state ownership
+same protected interaction semantics
+same accessibility behavior class
+same failure/recovery behavior
 ```
 
-Cosmetic difference alone should normally be a variant, not a new component concept.
+Do not create a shared pattern only because two boxes look alike.
 
-## Pattern catalog entry
+## Pattern entry
 
-For each reusable pattern record:
+For each pattern record:
 
 ```text
 purpose
-where used
+screens using it
 required inputs
 states/variants
 material interactions
 accessibility expectation
+responsive behavior
 what it does NOT own
 ```
 
-## Exit condition
+## Refactoring rule
 
-Every repeated material interaction points to a shared pattern or has a documented reason why reuse would be semantically wrong.
+When a later screen reveals that an earlier pattern was too specific or too generic, refine the vocabulary deliberately.
+
+Do not preserve a bad abstraction for consistency.
+
+## Exit
+
+Repeated semantics are represented by a bounded reusable vocabulary with no unexplained duplicate pattern.
 
 ---
 
-# 12. Phase F6 — Functional HTML Wireframe Prototype
+# 18. Phase P11 — Interactive Low-Fidelity HTML Prototype
 
 ## Goal
 
-Create a navigable, executable representation of the accepted frontend behavior **without production framework code**.
+Create a navigable representation of the **already-reviewed** structures.
 
-The prototype is the visual implementation contract.
+HTML is not where layout exploration starts.
 
-It should allow reviewers to use the product flow before the product frontend exists.
+It is where selected structural decisions become realistically reviewable together.
 
-## 12.1 Technical baseline
+## 18.1 Technical baseline
 
-Default to the smallest static implementation that supports the required behavior:
+Default to the smallest static technology sufficient for realistic interaction:
 
 ```text
 HTML
@@ -539,542 +1121,747 @@ vanilla JavaScript
 local deterministic fixtures/state simulation
 ```
 
-React/Vue/Svelte or the eventual production framework is intentionally avoided unless the prototype itself has a proven requirement that plain browser technology cannot satisfy.
+Avoid the eventual production framework unless plain browser technology is genuinely insufficient.
 
-Reason:
+Prototype code is evidence, not production code.
 
-```text
-prototype behavior must not accidentally become production implementation
-```
-
-The HTML prototype may be one file for a small product or a small static bundle such as:
+## 18.2 What the prototype must preserve
 
 ```text
-index.html
-wireframe.css
-wireframe.js
-fixtures.js
+accepted navigation
+reviewed screen hierarchy
+reviewed relative layout
+material fields/regions
+action placement
+component-pattern identity
+material dialogs/drawers
+negative/recovery states
+read-only vs editable regions
+responsive structural rules
 ```
 
-Choose the smallest structure that remains understandable.
+## 18.3 Material interaction
 
-## 12.2 Navigation
+Buttons, links, tabs, forms, drawers and dialogs must work when they represent a material state/navigation change.
 
-The prototype MUST represent every accepted user-facing route/lens and every material navigation edge from F4.
+No decorative dead controls.
 
-It may use hash/history simulation or another static routing technique.
+## 18.4 Fixture simulation
 
-Prototype navigation must not invent production routes.
-
-## 12.3 State simulation
-
-Use deterministic fixture scenarios to demonstrate material states without a live backend.
-
-Examples:
+Use deterministic scenarios to inspect states such as:
 
 ```text
 normal success
-known empty
+empty
 permission denied
 not found / non-disclosable
-stale concurrency token
+stale concurrency
 ambiguous command outcome
-external dependency unavailable
-upload/file admission failure
-content integrity failure
+dependency unavailable
+upload/admission failure
+integrity failure
 lifecycle transition
 ```
 
-Simulation is presentation evidence only. Fixture state is never treated as product authority.
+Fixture state never becomes product authority.
 
-## 12.4 Material interaction
+## 18.5 Machine-readable trace
 
-Buttons, links, tabs, dialogs, drawers and forms should be interactive whenever the interaction changes the user's material state or navigation.
-
-Do not leave implementation-ready controls as dead decorative elements.
-
-## 12.5 Machine-readable trace metadata
-
-Material elements SHOULD carry trace metadata so humans and LLMs can map the prototype directly to accepted contracts.
-
-Example:
+Material controls should carry prototype metadata where useful:
 
 ```html
 <button
-  data-surface="SURFACE-ID"
-  data-owner="semantic-owner"
-  data-operation="operationId"
-  data-concurrency="resource-etag"
-  data-idempotency="required"
+  data-surface="..."
+  data-owner="..."
+  data-operation="..."
+  data-pattern="..."
+  data-id-source="..."
+  data-concurrency="..."
+  data-idempotency="..."
 >
-  Submit
+  Action
 </button>
 ```
 
-Navigation example:
+This helps human reviewers and LLM implementers connect visual structure to accepted contracts.
 
-```html
-<a
-  data-from="LIST-SURFACE"
-  data-to="DETAIL-SURFACE"
-  data-id-source="ReadModel.resource_id"
-  href="#/resources/example-id"
->
-  Open
-</a>
-```
+## 18.6 Prototype design boundary
 
-Useful metadata categories:
+The HTML SHOULD freeze:
 
 ```text
-data-surface
-data-owner
-data-operation
-data-read
-data-id-source
-data-target
-data-concurrency
-data-idempotency
-data-content-mode
-data-proof
-data-pattern
-```
-
-These attributes are prototype trace aids; production code is not required to preserve them.
-
-## 12.6 Semantic HTML and accessibility
-
-Even low-fidelity prototypes should use meaningful browser semantics:
-
-```text
-button for actions
-a for navigation
-label/input association
-native form controls where practical
-table semantics for real tabular data
-heading hierarchy
-keyboard-reachable dialogs/drawers where simulated
-```
-
-Do not use visual convenience that would hide whether the intended production interaction is actually coherent.
-
-## 12.7 Design boundary
-
-The functional prototype freezes interaction meaning, not final visual design.
-
-It SHOULD freeze:
-
-```text
-screen hierarchy
-material regions
-fields/data blocks
-actions
+layout structure
+relative region size
+information hierarchy
+interaction placement
+patterns
+states
 navigation
-forms/dialogs/drawers
-component-pattern identity
-material status/failure/conflict states
-read-only vs editable regions
 ```
 
-It SHOULD NOT freeze unless materially required:
+It SHOULD NOT freeze unless materially necessary:
 
 ```text
-final brand palette
-exact typography
+brand palette
+final font
 pixel-perfect spacing
-radii/shadows
-final iconography
+ornamental shadows
+final icon set
 micro-animation
-ornamental illustration
 ```
 
-## Exit condition
+## Exit
 
-A reviewer can navigate every accepted human flow and exercise every material state/control without encountering a dead element or behavior that requires an invented backend contract.
+A reviewer can navigate the approved flows and exercise material interactions without the prototype inventing Product authority.
 
 ---
 
-# 13. Phase F7 — Material Interaction Ledger
+# 19. Phase P12 — Adversarial UX + Architecture Walkthrough
 
 ## Goal
 
-Bind every material prototype control to the system contract that makes it real.
+Attack the prototype as both a user experience and a system realization.
 
-Recommended ledger columns:
+Review from these roles:
 
-| Field | Required meaning |
-|---|---|
-| Surface/control | exact prototype context and control |
-| Pattern | reusable UI pattern used |
-| Owner | semantic/business owner of the action/truth |
-| Operation/action | exact operation or admitted external/browser mechanism |
-| Input source | form/current read/route identity/local exact bytes/etc. |
-| Wire mechanics | concurrency/idempotency/trust/file/cursor requirements |
-| Success truth | authoritative result/read that controls presentation |
-| Material failures | failures that change the next safe UX |
-| Client consequence | cache/refetch/local-input/navigation behavior |
-| Retry law | same logical command vs new command |
-| Forbidden inference | what the client must not manufacture |
+```text
+target user
+product owner
+principal product designer
+information architect
+senior frontend architect
+backend/domain owner
+accessibility reviewer
+adversarial reviewer
+```
 
-## Rule
+## UX attack questions
 
-There must be no material prototype button whose implementation contract is “figure it out later.”
+```text
+Can users find the right place without knowing backend terminology?
+Are frequent tasks unnecessarily deep?
+Are important decisions hidden by progressive disclosure?
+Are lists too dense or too sparse?
+Does a card/table choice match the actual task?
+Does the interface force memory instead of recognition?
+Do actions preserve necessary context?
+Are similar interactions inconsistent without reason?
+Are screens optimized for a demo rather than repeated real use?
+```
 
-## Exit condition
+## Architecture attack questions
 
-Every material control is bound to an accepted action/read or explicitly identified as a presentation-only local interaction.
+```text
+Does every material field have a source?
+Does every write have an accepted owner/operation?
+Does any fixture state accidentally become Product truth?
+Does any screen imply a capability the backend does not own?
+Did a convenience endpoint sneak in?
+Does UI visibility pretend to authorize?
+Are concurrency/idempotency/recovery semantics preserved?
+Does navigation depend on unavailable IDs?
+```
+
+## Finding classes
+
+```text
+UX-LAYOUT
+  hierarchy/position/density/presentation problem; authority unchanged
+
+IA
+  grouping/findability/navigation problem
+
+PATTERN
+  duplicate/inconsistent/premature component pattern
+
+SCREEN-CONTRACT
+  screen behavior/trace incomplete but upstream product remains sufficient
+
+UPSTREAM
+  accepted product/API/architecture lacks truth required by a proven user need
+
+VISUAL-DESIGN
+  purely aesthetic refinement; does not block structural readiness
+```
+
+## Exit
+
+No unresolved material UX/IA/contract contradiction remains in the reviewed blocks.
 
 ---
 
-# 14. Phase F8 — Bidirectional Frontend ↔ Backend Trace
+# 20. Phase P13 — Visual Design Handoff Contract
 
-## Backend/product → frontend
+## Goal
 
-Prove:
+Allow visual design to improve the product without silently changing accepted structure.
+
+Handoff includes:
 
 ```text
-every accepted human goal has a frontend home
-every user-facing application operation has a consumer context
-every material read model has a surface
-every material concurrency/idempotency/file behavior has a visible interaction home
-every material backend failure has an appropriate safe UX where user-visible
+locked IA
+locked user flows
+locked structural wireframes
+interaction pattern vocabulary
+functional HTML prototype
+Screen Contracts
+material state inventory
+responsive structure
 ```
 
-## Frontend → backend/product
+Visual design is free to explore appearance but must raise a finding when it discovers that good design requires a structural UX change.
 
-Prove:
-
-```text
-every surface traces to an accepted human goal
-every material data block traces to accepted read truth
-every material write control traces to one accepted owner/action
-every target identity traces to server-returned/current truth
-every client state belongs to an accepted state class
-no frontend-created product lifecycle/authorization truth
-```
-
-## Exit condition
+## Visual design may change
 
 ```text
-orphan accepted human operations = 0
-invented frontend product operations = 0
-unbound material controls = 0
-unresolved navigation identities = 0
-unexplained duplicated semantic patterns = 0
-```
-
-Exact operation counts are product-specific and must be reconciled against that product's accepted census rather than copied from another repository.
-
----
-
-# 15. Phase F9 — Finding classification and reopen law
-
-The method is intended to discover contradictions **before implementation**.
-
-Do not treat findings as failure of the method. Finding them early is the purpose.
-
-Classify each finding before changing authority.
-
-```text
-presentation/layout issue only
-→ correct prototype/screen contract
-
-missing trace precision but backend truth already exists
-→ correct Screen Contract / navigation trace
-
-prototype duplicated a semantic pattern
-→ consolidate component vocabulary
-
-accepted frontend mapping is contradictory
-→ reopen the smallest frontend planning authority
-
-accepted human goal cannot be represented from current backend/API truth
-→ reopen the smallest Product/API/backend owner required to supply that truth
-
-new desired capability discovered during design
-→ Product decision/reopen; never smuggle through UI
-
-convenience endpoint with no accepted product need
-→ reject and redesign against current truth
-
-scale/performance evidence invalidates a previously bounded projection
-→ reopen only that projection/contract with evidence
-```
-
-### Hard stops
-
-```text
-never invent a new backend operation silently
-never add a generic endpoint because HTML wants a selector
-never infer permission from navigation visibility
-never create a second lifecycle state machine in JavaScript
-never use history/audit as current truth merely because it contains an id
-never keep a dead button as placeholder in an implementation-ready prototype
-```
-
----
-
-# 16. Phase F10 — Adversarial visual walkthrough
-
-Before declaring readiness, review the prototype as a hostile user/implementer rather than as its author.
-
-Walk at least these classes where relevant:
-
-```text
-fresh direct navigation to every route
-no-data / empty result
-unauthenticated session
-permission denied
-resource absent/non-disclosable
-stale edit/concurrency conflict
-ambiguous retry
-external dependency unavailable
-file/upload failure
-state changes between list and detail navigation
-state changes between form load and submit
-browser refresh on nested/material state
-back/forward navigation
-long text / large table / pagination
-admin vs ordinary-user visibility
-read-only vs editable content
-```
-
-Ask repeatedly:
-
-```text
-Does this screen know something the backend never said?
-Can this button execute without an accepted operation?
-Can this route obtain every id it needs?
-Would two developers reasonably create two different components for the same pattern?
-Is any current truth being reconstructed from stale projection/history?
-Is any error collapsed into a generic state that changes the user's safe next action?
-```
-
-All material findings must be resolved or routed before closure.
-
----
-
-# 17. Frontend Implementation-Readiness closure
-
-The frontend is implementation-ready only when all product-relevant checks are true.
-
-Generic closure contract:
-
-```text
-accepted human goals                     complete
-capability coverage                       complete
-material surface inventory                complete
-Screen Contracts                          complete
-Navigation/Data Graph                     complete
-component-pattern vocabulary              complete
-functional HTML prototype                 complete and navigable
-material prototype states                 represented
-Material Interaction Ledger               complete
-backend→frontend trace                     complete
-frontend→backend trace                     complete
-unbound material controls                 0
-unresolved navigation identities          0
-invented Product routes                   0
-invented Product operations               0
-unexplained duplicate semantic patterns   0
-frontend semantic authority added         0 unless explicitly accepted
-unresolved MATERIAL findings              0
-```
-
-Product-specific censuses should be added to this closure, for example:
-
-```text
-accepted operations x/x
-concurrency domains x/x
-idempotent commands x/x
-exact-content/file resources x/x
-required proof flows x/x
-```
-
-Do not copy numbers from another product.
-
----
-
-# 18. Design handoff after prototype closure
-
-Once the functional HTML wireframe is accepted, visual design may refine:
-
-```text
-brand
-palette
+color
 typography
-spacing
-density
-icons
-radius/shadow
-visual hierarchy
-responsive presentation
-micro-interactions
+spacing scale
+radius
+shadow
+iconography
+visual tone
+motion polish
+illustration
+fine responsive styling
 ```
 
-Visual design must not silently change:
+## Visual design must not silently change
 
 ```text
-screen meaning
-accepted fields/data blocks
+navigation model
+information architecture
+material fields
 business actions
-operation ownership
-navigation semantics
-required states
-concurrency/idempotency behavior
-security/disclosure meaning
-backend data requirements
-```
-
-If design discovers that a material semantic change is needed, route it back through the smallest Screen Contract/authority finding instead of treating it as styling.
-
-This keeps:
-
-```text
-design = visual realization
-not
-product/backend redesign hidden inside Figma/HTML
+action consequences
+backend operation mapping
+state semantics
+screen hierarchy that affects task meaning
 ```
 
 ---
 
-# 19. Production implementation handoff
+# 21. Phase P14 — Frontend Implementation-Readiness Closure
 
-The HTML prototype is **not production code**.
+## Goal
 
-Production implementation consumes it as an interaction/component contract.
+Prove that implementation can be realization rather than rediscovery.
 
-The implementation plan should map:
+Close only when the project-specific counts reconcile exactly.
 
-```text
-HTML pattern → production component
-HTML surface → production feature/lens
-trace metadata → generated/API client call
-fixture scenario → test scenario
-wireframe state → server/query/form/ephemeral state classification
-```
-
-Production components may be internally refactored, but semantic reuse must be preserved.
-
-When several prototype surfaces use the same behavioral pattern, production code should normally realize one reusable component/pattern rather than independent copies.
-
-A production deviation is valid only when it has a material reason such as:
+Generic closure requirements:
 
 ```text
-different accessibility contract
-different authority/state ownership
-different failure behavior
-different performance/rendering boundary
+accepted human goals                    complete
+end-to-end flows                        complete
+information architecture               adjudicated
+material screens/surfaces               complete
+reference study                         complete for material ambiguous blocks
+layout hypotheses                       adjudicated
+structural wireframes                   locked
+Screen Contracts                        complete
+material controls                       100% bound
+navigation identities                   100% sourced
+component/interaction patterns          derived and reviewed
+interactive HTML                        complete for accepted scope
+negative/material states                represented
+frontend ↔ backend trace                complete
+orphan backend human operations         0
+invented frontend Product operations    0
+screen-shaped APIs                      0
+unresolved material UX findings         0
+unresolved architecture findings        0
 ```
 
-“Different developer,” “different page,” or “easier to copy” are not sufficient reasons.
+Product-specific invariants such as operation counts, concurrency domains or exact-file surfaces are added by the consuming repository.
 
 ---
 
-# 20. Anti-pattern catalog
+# 22. Block operating protocol
 
-## Screen-first design
+For a non-trivial product, maintain a block ledger.
+
+Example generic sequence:
 
 ```text
-open design tool
+B01 — App shell + global IA
+B02 — primary discovery/browse
+B03 — primary resource detail
+B04 — authoring/editing
+B05 — personal work/queue
+B06 — decision/governance
+B07 — history/evidence
+B08 — administration
+```
+
+Actual blocks are product-derived; these names are examples.
+
+For each block:
+
+| Field | Required |
+|---|---|
+| Block | stable planning ID |
+| User goals | explicit |
+| Authority pack | bounded |
+| Reference study | complete when material |
+| Hypotheses | 1–3 depending on ambiguity |
+| Leading candidate | named |
+| Operator review | date/result |
+| Findings | explicit |
+| Decision | LOCKED / CANDIDATE / FINDING |
+| Screen Contracts | ready after structure |
+| HTML realization | only after lock |
+
+The next high-impact block should not proceed while the previous block has unresolved structural findings that materially affect global IA/patterns.
+
+---
+
+# 23. Research and reference discipline
+
+This method is intentionally compatible with iterative product discovery.
+
+Use external research to challenge layout assumptions, not to outsource product decisions.
+
+Useful research questions include:
+
+```text
+How do mature products present this kind of collection?
+When do enterprise systems prefer table vs grid?
+How do users navigate similar object hierarchies?
+How is context preserved during editing?
+How are high-risk actions disclosed?
+How do established design systems distinguish tabs, content switchers, accordions and navigation?
+How do comparable products surface search/filter/saved views?
+```
+
+For each external conclusion separate:
+
+```text
+SOURCE OBSERVATION
+what the reference actually does/recommends
+
+INFERENCE
+why it may apply here
+
+PRODUCT DECISION
+what we choose after considering our users/authority
+```
+
+Never collapse these three into one statement.
+
+---
+
+# 24. Accessibility is structural, not polish
+
+Accessibility enters during layout and interaction planning, not after visual design.
+
+Wireframes/prototypes must consider:
+
+```text
+keyboard navigation
+semantic control choice
+focus order
+heading hierarchy
+labels/instructions
+error association
+contrast-dependent meaning avoided at wireframe level
+minimum interactive target viability
+responsive reflow
+screen-reader comprehensibility of tables/forms/dialogs
+non-drag alternatives for essential interactions
+```
+
+A layout that cannot reasonably become accessible is not a valid candidate simply because it looks efficient.
+
+---
+
+# 25. Responsive planning
+
+Do not defer responsive behavior to production CSS.
+
+Structural wireframes should define what happens when width changes:
+
+```text
+what remains primary
+what stacks
+what collapses
+what becomes a drawer/menu
+what becomes locally scrollable
+what must stay visible
+whether table transforms or remains scrollable
+whether cards change columns
+```
+
+Responsive transformation must not change Product semantics or hide the only path to a material action.
+
+---
+
+# 26. Density and progressive disclosure
+
+Information density is a user-task decision.
+
+Use higher density when users need rapid scanning/comparison across many records.
+
+Use more whitespace/preview when recognition and comprehension dominate.
+
+Progressive disclosure is appropriate when secondary information would otherwise overwhelm the primary task.
+
+Do not hide information that users need to make the current decision merely to make the screen look clean.
+
+---
+
+# 27. Search, browse and filters
+
+Do not assume search replaces IA, or IA replaces search.
+
+Choose based on user behavior.
+
+```text
+known-item lookup
+  search may dominate
+
+exploratory discovery
+  browse/grouping may dominate
+
+large structured collection
+  filter/sort may dominate
+
+mixed use
+  combine carefully
+```
+
+Filter controls require human-understandable value sources. A backend parameter accepting an opaque ID is not proof that a good selector exists.
+
+If selector discovery is missing, classify whether the user need is real before requesting new backend support.
+
+---
+
+# 28. Tables, cards, lists and master-detail
+
+These are task patterns, not aesthetics.
+
+## Data table
+
+Strong when:
+
+```text
+records share comparable attributes
+users scan many rows
+users sort/filter repeatedly
+precise comparison matters
+row/batch actions matter
+```
+
+## Card/grid
+
+Strong when:
+
+```text
+visual/summary recognition matters
+preview/thumbnail is useful
+items have less uniform metadata
+cross-row comparison is secondary
+```
+
+## Structured/contained list
+
+Strong when:
+
+```text
+space is limited
+items share a simple structure
+one main label plus small metadata/action is enough
+```
+
+## Master-detail
+
+Strong when:
+
+```text
+users inspect many records sequentially
+context/list position should remain visible
+opening a separate page repeatedly would be expensive
+```
+
+## Multiple views
+
+Offer grid/list or equivalent switch only when distinct important user tasks justify both.
+
+Do not add view switchers as generic polish.
+
+---
+
+# 29. Findings and smallest-reopen law
+
+A visual inconvenience is not automatically an upstream defect.
+
+When a screen fails, classify in order:
+
+```text
+1. UX/layout issue?
+2. IA issue?
+3. wrong candidate pattern?
+4. incomplete Screen Contract?
+5. missing read composition already allowed by authority?
+6. genuinely missing Product/API capability?
+```
+
+Only item 6 justifies an upstream Product/API reopen.
+
+If a reopen is required:
+
+```text
+reopen smallest owner
+→ correct authority
+→ update coverage/IA/screen contract
+→ redraw affected blocks only
+→ rerun trace
+```
+
+Do not redesign unrelated screens.
+
+---
+
+# 30. Adversarial independent review protocol
+
+Before declaring the methodology or a major frontend plan ready, use an independent reviewer when project governance supports it.
+
+Recommended reviewer stance:
+
+```text
+Principal Product Designer
++ Information Architect
++ Senior Frontend Architect
++ adversarial architecture reviewer
+```
+
+Review question:
+
+> Does this method/plan leave any material UX, IA, interaction, component-boundary or backend/frontend decision to be improvised during implementation?
+
+Reviewer must specifically attack:
+
+```text
+missing user-centered discovery
+weak information architecture
+premature screen inventory
+premature component vocabulary
+single-solution wireframing
+lack of reference study
+poor operator/user feedback loop
+all-at-once prototype generation
+screen-shaped API risk
+frontend authority duplication
+component duplication
+YAGNI violations
+overengineering
+unprovable backend-to-screen mappings
+missing failure/recovery UX
+accessibility deferred as visual polish
+responsive behavior deferred to implementation
+```
+
+Finding severity:
+
+```text
+MATERIAL
+  method/plan can plausibly produce a materially wrong product or implementation
+
+IMPORTANT
+  meaningful weakness that should be corrected before closure but does not invalidate the whole model
+
+OPTIONAL
+  useful refinement; not required for correctness/readiness
+
+UNSUPPORTED PREFERENCE
+  reviewer taste without evidence of a protected user/system property
+```
+
+Correct only evidence-backed findings.
+
+---
+
+# 31. Reusable review checklist
+
+## User / product
+
+- [ ] Human actors and needs are explicit before screens.
+- [ ] User needs describe outcomes, not predetermined UI solutions.
+- [ ] End-to-end flows cover the whole accepted human goal.
+- [ ] Every accepted human capability has a frontend home.
+
+## Information architecture
+
+- [ ] Navigation reflects user tasks/mental models, not backend topology.
+- [ ] Browse/search/filter strategy is deliberate.
+- [ ] Important collections have a justified findability model.
+- [ ] Future seams do not create present speculative features.
+
+## Reference study
+
+- [ ] Material ambiguous blocks use relevant references.
+- [ ] References are analyzed by task/pattern, not copied visually.
+- [ ] Source observation, inference and product decision remain distinct.
+
+## Layout
+
+- [ ] Consequential screens considered real alternatives when ambiguous.
+- [ ] Table/card/list/master-detail choice is justified by user task.
+- [ ] Information hierarchy and density are deliberate.
+- [ ] Primary and secondary actions are deliberately placed.
+- [ ] Progressive disclosure does not hide decision-critical information.
+- [ ] Responsive transformation is defined.
+
+## Human review loop
+
+- [ ] Major screens/blocks are reviewed individually with the operator/product owner.
+- [ ] Candidate vs locked decisions are explicit.
+- [ ] The whole product was not generated in one unreviewed pass.
+
+## Architecture
+
+- [ ] Every material read has an accepted source.
+- [ ] Every material write maps to an accepted owner/operation.
+- [ ] Every navigation identity has a source.
+- [ ] No client state becomes Product authority.
+- [ ] No screen-shaped API was introduced for convenience.
+- [ ] Material concurrency/idempotency/recovery semantics are represented.
+
+## Patterns
+
+- [ ] Reusable UI patterns were derived from reviewed repetition.
+- [ ] Duplicate semantic patterns have been reconciled.
+- [ ] Cosmetic similarity did not force false abstraction.
+- [ ] Pattern vocabulary does not become a speculative design-system project.
+
+## Prototype
+
+- [ ] Interactive HTML realizes reviewed structure rather than inventing it.
+- [ ] Material controls work.
+- [ ] Material negative states are inspectable.
+- [ ] Trace metadata exists where it materially improves implementation handoff.
+- [ ] Prototype code is not treated as production code.
+
+## Visual design handoff
+
+- [ ] Structural UX baseline is explicit before visual styling.
+- [ ] Visual design is free to improve aesthetics.
+- [ ] Structural changes discovered by design return to the correct UX stage.
+
+## Closure
+
+- [ ] Frontend ↔ backend trace is complete.
+- [ ] No orphan human-facing operations.
+- [ ] No invented operations.
+- [ ] No unresolved material UX/IA findings.
+- [ ] No unresolved material architecture findings.
+- [ ] Implementation can proceed without material UX invention in code.
+
+---
+
+# 32. Compact process
+
+```text
+P0  Recover accepted authority
+ ↓
+P1  Actors / jobs / user needs
+ ↓
+P2  End-to-end user flows
+ ↓
+P3  Frontend Coverage Matrix
+ ↓
+P4  Information Architecture
+ ↓
+P5  Screen / material-surface inventory
+ ↓
+P6  Reference Study — per functional block
+ ↓
+P7  Competing Layout Hypotheses
+ ↓
+P8  Structural Wireframe — block-by-block + human adjudication
+ ↓
+P9  Screen Contract + bidirectional backend trace
+ ↓
+P10 Derive reusable component/interaction patterns
+ ↓
+P11 Interactive Low-Fidelity HTML
+ ↓
+P12 Adversarial UX + Architecture Walkthrough
+ ↓
+P13 Visual Design Handoff
+ ↓
+P14 Frontend Implementation-Readiness Closure
+```
+
+The loop is deliberately iterative:
+
+```text
+finding
+→ smallest affected phase
+→ correction
+→ re-review affected block
+```
+
+Do not restart the entire method unless the finding actually invalidates global assumptions.
+
+---
+
+# 33. Research basis for the method
+
+The methodology deliberately synthesizes several established principles without making any external product its authority.
+
+Useful reference families include:
+
+```text
+GOV.UK Service Manual
+  understand users and their whole problem
+  prototype before committing to build
+  test multiple approaches
+  use realistic code prototypes for interaction research
+
+GOV.UK Design System
+  choose navigation/patterns according to the user task
+  patterns are task solutions, not decorative components
+
+Nielsen Norman Group / established IA practice
+  user mental models
+  card sorting / tree testing where useful
+  recognition over recall
+  findability and scanability
+
+Enterprise design systems such as Carbon
+  data tables for dense structured comparison
+  content switchers for alternate views of the same content
+  tabs for distinct related sections
+  progressive disclosure for secondary information
+```
+
+External reference material informs hypotheses. The consuming product's accepted authority + user evidence + operator adjudication determine the actual frontend.
+
+---
+
+# 34. Final principle
+
+A strong frontend plan should make production coding feel almost boring.
+
+Implementation should mostly be:
+
+```text
+realize accepted structure
+→ bind generated/accepted contracts
+→ implement reviewed interaction patterns
+→ prove states and failures
+```
+
+not:
+
+```text
+invent navigation
 → invent screens
-→ later search for APIs
+→ invent components
+→ discover missing APIs
+→ redesign workflows
+→ reconcile backend/frontend after the fact
 ```
 
-**Reject.** Coverage and authority tracing come first.
-
-## Endpoint-shaped UI
-
-```text
-one backend endpoint = one page/component
-```
-
-**Reject.** UI surfaces follow human decision contexts, not transport structure.
-
-## Page-shaped API
-
-```text
-wireframe needs one convenient payload
-→ create /dashboard-page-data
-```
-
-**Reject unless a real accepted product/read-model need justifies it.**
-
-## Admin-directory shortcut
-
-Using a privileged administrative directory merely to populate an ordinary user selector can create an invalid permission dependency.
-
-Use a purpose-built least-privilege projection only when the accepted journey actually requires one.
-
-## Generic global client store
-
-Do not introduce a second global server-truth store merely because several screens need the same data.
-
-Preserve the accepted frontend state model.
-
-## Duplicate semantic components
-
-Do not independently implement multiple tables, status systems, conflict dialogs, upload flows or command retry patterns that protect the same semantics.
-
-Use the component vocabulary.
-
-## Pretty but inert prototype
-
-A static screenshot with decorative buttons does not prove implementation readiness.
-
-Material controls must navigate or simulate their accepted state consequences.
-
-## Prototype-as-production
-
-Do not choose the production framework merely to make the wireframe look closer to final code.
-
-The prototype should be cheap to change and safe to discard.
-
-## Missing negative states
-
-A prototype that only demonstrates happy paths is incomplete when safe behavior depends on conflicts, permission, external failure or stale state.
-
----
-
-# 21. Minimal reusable checklist
-
-Use this when applying the method to another repository.
-
-```text
-[ ] recover accepted product/backend/frontend authority
-[ ] enumerate accepted human goals/capabilities
-[ ] build capability coverage matrix
-[ ] translate cross-cutting architecture into UX obligations
-[ ] resolve material coverage findings
-[ ] enumerate material decision surfaces
-[ ] create Screen Contract for every surface
-[ ] prove every navigation/data identity edge
-[ ] define smallest component-pattern vocabulary
-[ ] build functional HTML/CSS/JS prototype
-[ ] make every material control interactive or explicitly presentation-only
-[ ] add trace metadata to material HTML controls
-[ ] simulate material positive + negative states
-[ ] bind every material control in Interaction Ledger
-[ ] execute backend→frontend trace
-[ ] execute frontend→backend trace
-[ ] reconcile product-specific operation/concurrency/idempotency/file censuses
-[ ] perform adversarial walkthrough
-[ ] resolve or route every MATERIAL finding
-[ ] freeze functional prototype before visual design
-[ ] hand design only ornamental/visual freedom unless a semantic finding is reopened
-[ ] map prototype patterns to reusable production components before coding
-```
-
----
-
-# 22. Definition of success
-
-The method succeeds when frontend implementation no longer begins with:
-
-> “What screens should we build and how should they call the backend?”
-
-Instead, implementation begins with:
-
-> “Here is the reviewed functional prototype, here are the accepted component patterns, here is every screen/control/backend trace, and here are the exact states and proof obligations we must realize.”
-
-At that point, production frontend development is primarily **realization**, not architecture discovery.
+> **Frontend implementation readiness means the important product, IA, layout, interaction and system-contract decisions have already been made visibly, reviewed deliberately and traced to evidence.**
