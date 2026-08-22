@@ -492,7 +492,7 @@ S2 closed and P3 content mechanisms needed by this flow are real enough for thei
 ### APPLICATION ASSIGNMENT
 
 ```text
-operations 44–54 except 55
+operations 44–54
 + operations 56–66
 = 22 operations
 ```
