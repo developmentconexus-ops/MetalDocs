@@ -49,8 +49,10 @@ post-review status carrier             c5fba2b179e1e0a9a806df83654ea6daf6e67513
 status-carrier required CI             #1133 SUCCESS
 operator ratification                  EXPLICIT / 2026-08-21
 merge authorization                    EXPLICIT / 2026-08-21
-closure candidate                      8014cabd467448f726ba5ad16257074e6d1bea82
-closure required CI                    #1139 SUCCESS
+first closure tree                     8014cabd467448f726ba5ad16257074e6d1bea82
+first closure required CI              #1139 SUCCESS
+final closure candidate                3f3493652eec8f6880fe29ccea6b0d2bd0f51c7e
+final closure required CI              #1140 SUCCESS
 ```
 
 Round-1 adjudication closed two material proof gaps without reopening T1→T8:
@@ -125,7 +127,7 @@ The bounded T8-E-FR read-symmetry meaning remains executable only through the T8
 ## Exact next action
 
 ```text
-mark PR #154 Ready on exact closure candidate 8014cabd467448f726ba5ad16257074e6d1bea82
+mark PR #154 Ready on exact final closure candidate 3f3493652eec8f6880fe29ccea6b0d2bd0f51c7e
 → obtain merge-candidate required CI on that same exact HEAD
 → squash merge PR #154 using expected HEAD protection
 → verify integrated tree / main
