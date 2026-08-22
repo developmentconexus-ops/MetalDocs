@@ -25,9 +25,9 @@ LEGACY IMPLEMENTATION                 ABSENT FROM LIVE TREE
 
 T9 — Golden Flows & Validation Baseline is **CLOSED / OPERATOR-RATIFIED** as of 2026-08-21. The operator separately authorized squash integration of PR #154 after bounded independent Fable convergence.
 
-The durable T9 authority is `architecture/validation-baseline.md`; immutable ratification evidence is `decisions/t9-ratification.md`. Temporary review/work Evidence is not authority and must not land in `main`.
+The durable T9 authority is `architecture/validation-baseline.md`; immutable ratification evidence is `decisions/t9-ratification.md`. Temporary review/work Evidence does not land in the closure tree.
 
-Ratification proof:
+Ratification and closure proof:
 
 ```text
 opening main                           82832cce62d11ea90575fb484b97e3c934c03e37
@@ -49,6 +49,8 @@ post-review status carrier             c5fba2b179e1e0a9a806df83654ea6daf6e67513
 status-carrier required CI             #1133 SUCCESS
 operator ratification                  EXPLICIT / 2026-08-21
 merge authorization                    EXPLICIT / 2026-08-21
+closure candidate                      8014cabd467448f726ba5ad16257074e6d1bea82
+closure required CI                    #1139 SUCCESS
 ```
 
 Round-1 adjudication closed two material proof gaps without reopening T1→T8:
@@ -123,10 +125,8 @@ The bounded T8-E-FR read-symmetry meaning remains executable only through the T8
 ## Exact next action
 
 ```text
-finish T9 closure candidate on PR #154
-→ remove temporary docs/work/current/t9-golden-flows.md
-→ required CI must pass on the exact closure HEAD
-→ mark PR #154 Ready and obtain merge-candidate required CI on the same exact HEAD
+mark PR #154 Ready on exact closure candidate 8014cabd467448f726ba5ad16257074e6d1bea82
+→ obtain merge-candidate required CI on that same exact HEAD
 → squash merge PR #154 using expected HEAD protection
 → verify integrated tree / main
 → record T9 integration status without opening T10
