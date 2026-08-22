@@ -39,10 +39,11 @@ The current frontend gate is:
 
 ```text
 B01 — App Shell + Global Information Architecture   LOCKED / OPERATOR-RATIFIED
-B02 — Library / discovery                           NEXT / NOT OPEN
+B02 — Library / discovery                           OPEN / CANDIDATE / NOT LOCKED
+B03 — Document Official                             NOT OPEN
 ```
 
-B01 was operator-locked on 2026-08-22 after the revised **Home A — Central operacional** visual walkthrough. Its bounded durable record and rendered structural artifact are:
+B01 was operator-locked on 2026-08-22 after the revised **Home A — Central operacional** visual walkthrough. Its bounded durable record and canonical rendered structural artifact are:
 
 ```text
 docs/work/current/t11-b01-app-shell.md
@@ -51,7 +52,15 @@ docs/work/current/t11-b01-app-shell-wireframe.html
 
 B01 P9 Screen Contract / bidirectional trace and bounded P10 consolidation are complete in the B01 record. The lock freezes the current structural baseline but remains subject to the normal smallest-scope evidence-backed reopen law.
 
-Only the operator may set `LOCKED`. B02 may now be opened as a future CANDIDATE because B01 is locked, but B02 is not opened by this roadmap update itself.
+B02 was opened as CANDIDATE after explicit operator continuation. Its bounded current record is:
+
+```text
+docs/work/current/t11-b02-library.md
+```
+
+B02 P6 reference study and P7 structural-hypothesis comparison are complete enough for operator visual review. Leading direction is a wide metadata table with top search/filter controls. `B02-F1` remains OPEN: the complete disclosure-safe human-readable option source for Document Type / Area / responsible-owner Library filters is not yet proven. B02 may be visually iterated but MUST NOT be set `LOCKED` until that feasibility finding is resolved.
+
+Only the operator may set `LOCKED`. B03 remains NOT OPEN.
 
 ## T11 fixed system invariants
 
@@ -162,7 +171,7 @@ Current block sequence:
 
 ```text
 B01  App Shell + Global Information Architecture   LOCKED / OPERATOR-RATIFIED
-B02  Library / discovery                            NEXT / NOT OPEN
+B02  Library / discovery                            CURRENT / CANDIDATE / NOT LOCKED
 B03  Document Official                              NOT OPEN
 B04  Document Work / authoring                      NOT OPEN
 B05  My Work                                        NOT OPEN
@@ -266,15 +275,14 @@ No historical business migration, dual Product authority, legacy fallback, compa
 
 ```text
 B01 remains LOCKED / operator-ratified
-→ do not reopen B01 by preference; use smallest-scope evidence-backed reopen only if later evidence falsifies it
-→ NEXT: open B02 — Library / discovery as CANDIDATE only
-→ recover the smallest B02 authority + user-goal evidence
-→ study official-document discovery/findability references only where triggered
-→ compare genuine Library structural hypotheses when ambiguity is real
-→ perform lightweight data/filter/navigation feasibility
-→ render only the B02 grayscale structural candidate
-→ operator + assistant visually adjudicate B02
+→ B02 is OPEN / CANDIDATE / NOT LOCKED
+→ operator visually compare the rendered B02 Library hypotheses
+→ leading direction: wide metadata table + top search/filter controls
+→ iterate B02 hierarchy / density / filter placement from operator feedback
+→ resolve B02-F1 before any B02 LOCK: prove a complete disclosure-safe human-readable source for Type / Area / responsible-owner filter options, using the smallest accepted read-model owner and without silently adding operation 79
 → only operator may LOCK B02
+→ only after B02 LOCK complete P9 Screen Contract / bidirectional trace and P10 bounded pattern consolidation
+→ do not open B03 as baseline before B02 LOCK
 → do not generate B03+ in advance
 → do not begin T12
 → do not implement Product code
@@ -290,7 +298,7 @@ B01 remains LOCKED / operator-ratified
 | T8-H | Whole-T8 coherence | CLOSED / INTEGRATED |
 | T9 | Golden Flows / validation baseline | CLOSED / INTEGRATED |
 | T10 | Transition / cutover | CLOSED / INTEGRATED |
-| T11 | Implementation graph + implementation-readiness | OPEN / B01 LOCKED; B02 NEXT / NOT OPEN |
+| T11 | Implementation graph + implementation-readiness | OPEN / B01 LOCKED; B02 OPEN / CANDIDATE |
 | T12 | Adversarial implementation-readiness | NOT OPEN |
 
 ## Final implementation gate
