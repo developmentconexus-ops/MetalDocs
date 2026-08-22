@@ -4,7 +4,7 @@
 
 ## 1. Purpose and boundary
 
-T11 derives the smallest bounded implementation work graph and proof obligations from accepted T1→T10 authority so that later Product implementation can proceed without architectural improvisation, duplicate authority, late integration or proof-by-ceremony.
+T11 derives the smallest bounded implementation work graph and proof obligations from accepted T1→T10 authority so that later Product implementation can proceed without architectural improvisation, duplicate authority, late integration, frontend/backend drift or proof-by-ceremony.
 
 T11 does **not** implement Product code, create schema/OpenAPI/frontend/runtime/deploy implementation, begin T12, choose a new Product capability, add an application operation, or reopen accepted authority by preference.
 
@@ -26,7 +26,26 @@ exact-byte resources                  exact 4
 
 The future execution graph defined here is inert while the roadmap implementation gate is BLOCKED. It becomes executable only after every final implementation-gate condition in `docs/roadmap.md` is satisfied, including T12 closure, Whole-R10 coherence, fresh independent challenge and explicit operator implementation authorization.
 
-## 2. Decision frame
+## 2. Candidate composition
+
+The current T11 candidate is deliberately split into three **temporary review artifacts**, not three durable authorities:
+
+```text
+docs/work/current/t11-implementation-program.md
+  → owns execution DAG, operation assignment, proof/cutover integration and T11 closure
+
+docs/work/current/t11-node-completion-contracts.md
+  → defines the observable MUST-BE-IMPLEMENTED exit state for every P/S node
+
+docs/work/current/t11-frontend-readiness.md
+  → defines Coverage → Screen Contract → Navigation/Data Graph → Wireframe → Interaction Ledger → bidirectional trace closure
+```
+
+The companions refine this Lead and are mandatory parts of the same T11 candidate. They may not be ignored to satisfy the shorter summary tables in this file.
+
+At durable promotion, their binding result is consolidated into the minimum T11 authority/implementation-readiness artifact set and these temporary work files are removed so no parallel authority remains.
+
+## 3. Decision frame
 
 ### Evidence
 
@@ -34,9 +53,10 @@ Accepted authority already fixes the important semantic and realization decision
 
 ```text
 Product / ownership / lifecycle / authorization / audit / content / async semantics
-backend + interface + persistence topology
+backend + internal-interface + persistence topology
+closed-world/default-deny first-party import graph
 executable application wire
-frontend realization
+frontend route/lens/state/transport realization
 runtime / process / deployment realization
 Whole-T8 global coherence
 T9 Golden Flows + evidence classes + cross-cutting falsifiers
@@ -47,7 +67,18 @@ The live tree contains no Product implementation to preserve. Therefore implemen
 
 ### Root cause to prevent
 
-The implementation risk is no longer missing architecture. It is **execution-order ambiguity**: layer-first work can defer real integration until late; flow-only work can duplicate foundations or leave census coverage implicit; large cross-cutting PRs can make authority and proof ownership unclear.
+The remaining risk is no longer only missing architecture. It is **implementation ambiguity across boundaries**:
+
+```text
+execution-order ambiguity
++ node-exit ambiguity
++ late integration
++ frontend designed after backend without bidirectional trace
++ screen-shaped API invention
++ proof deferred until the system is too large to localize defects
+```
+
+Layer-first work can leave a locally-green backend that has never been consumed coherently by the browser. Flow-only work can duplicate foundations or omit non-representative operations. A graph that says what to start but not what MUST exist at exit still forces the implementer to design while coding.
 
 ### Target invariant
 
@@ -56,6 +87,9 @@ every future implementation increment
 → has one bounded graph position
 → consumes only accepted authority
 → has explicit prerequisites
+→ has an exact observable completion contract
+→ implements its backend + persistence + wire + frontend obligations as one coherent tranche where applicable
+→ satisfies the accepted closed-world dependency graph
 → has a falsifiable exit proof on the real protected subject
 → preserves all previously closed invariants
 → never creates a second semantic authority
@@ -67,6 +101,7 @@ For application operations specifically:
 78 accepted operations
 → each assigned to exactly one semantic implementation tranche
 → all implemented through the canonical wire SSOT
+→ all accepted frontend consumers traced before implementation
 → zero unassigned
 → zero multiply-owned
 → zero invented
@@ -75,9 +110,11 @@ For application operations specifically:
 
 ### Intentionally implementation-local, not T11 authority
 
-T11 does not freeze exact future file splits, dependency patch versions, secret values, environment identifiers or mechanical commit counts. Those are selected at execution time inside already-accepted T8 boundaries and current repository rules. Freezing them now would manufacture stale or duplicate authority rather than remove semantic ambiguity.
+T11 does not freeze exact future private file splits, dependency patch versions, secret values, environment identifiers, mechanical commit counts or ornamental UI pixels. Those are selected at execution time inside already-accepted T8 boundaries and current repository rules.
 
-## 3. Credible execution shapes
+What T11 **does** freeze before implementation is every material outcome needed to prevent semantic guessing: graph position, node exit state, dependency class/edge law, accepted operation ownership, frontend screen/action/data trace, material interaction behavior and proof obligation.
+
+## 4. Credible execution shapes
 
 ```text
 A  technical-layer waterfall
@@ -91,13 +128,13 @@ C  minimal shared spines + semantic vertical tranches + global proof closure
 
 **C is selected.**
 
-A is rejected because it can make each layer locally green while composed-system failure remains undiscovered until the end.
+A is rejected because it can make each layer locally green while composed-system and browser/backend failure remain undiscovered until the end.
 
 B is rejected because the six Golden Flows are a validation composition basis, not the complete 78-operation implementation census; using them as the only work decomposition would either duplicate shared correctness machinery or leave non-representative operations implicit.
 
 C is the smallest sustainable shape: establish only shared mechanisms with multiple concrete consumers, then implement semantic slices end-to-end, then close the full wire/runtime/recovery contract globally.
 
-## 4. Global execution law
+## 5. Global execution law
 
 After the future implementation admission gate opens:
 
@@ -141,29 +178,31 @@ T10 B0 remains a prerequisite to treating any target preparation as cutover and 
 
 `26 + 7 + 10 + 12 + 11 + 8 + 4 = 78`.
 
-Frontend is deliberately **not** a late standalone semantic phase. P1 establishes the accepted SPA/generated-TypeScript shell; each S tranche adds only the T8-F lens/query/editor/viewer behavior whose real backend contract is available in that tranche. This preserves one semantic owner and prevents a second frontend authorization/state model.
+Frontend is deliberately **not** a late standalone semantic phase. P1 establishes the accepted SPA/generated-TypeScript shell; each S tranche closes its assigned backend/persistence/wire **and** the reviewed T11 frontend Screen Contracts/wireframes whose real backend contract becomes available in that tranche.
 
-## 5. Program nodes
+A semantic S node cannot close with `backend done / frontend later`.
 
-| Node | Deliverable boundary | Depends on | App ops | Minimum closure basis |
+## 6. Program nodes
+
+| Node | Work boundary | Depends on | App ops | Required exit basis |
 |---|---|---:|---:|---|
-| P0 | exact implementation-admission and authority snapshot | final roadmap gate | 0 | roadmap/T11/T12/Whole-R10/operator authorization all current; census still 78 |
-| P1 | build/package spine, canonical OpenAPI realization, generated Go/TS projections, structural architecture verifier, SPA shell | P0 | 0 new semantics | T9 E1; V1 + V2 structural lane; generated projections compile; operation 79 absent |
-| P2 | PostgreSQL persistence, migration/transaction correctness primitives, required Audit/idempotency/OCC mechanisms used by later semantic owners | P1 | 0 | T9 E2; causal DB/transaction negatives for V4/V5/V6 primitives |
-| P3 | one runtime shell plus accepted dependency boundaries/config/readiness/shutdown/observability and only actually-consumed external mechanisms | P1 | 0 | E1/E5/E6 as claim-relevant; fail-closed config/dependency probes; no extra runtime component |
-| S1 | Organization owner and Admin organization lenses | P2 + P3 | 26 | real E2/E3; E4 where browser behavior is claimed; current-state/OCC/atomicity negatives |
-| S2 | browser OIDC/session trust path plus Authorization owner/access lenses | S1 | 7 | GF1; E2+E3+E4 and E5 for selected OIDC profile; V3 |
-| S3 | Document Governance configuration | S1 + S2 | 10 | E2+E3; E4 where claimed; stale-ETag/current-eligibility negatives; GF2 prerequisite |
-| S4 | Document creation/core, responsibility/template role, Work and History composition | S3 | 12 | closes GF2 with prior nodes; E2+E3; V4/V5/V6 representative causal negatives |
-| S5 | Revision DRAFT, upload/admission, exact source and Submission paths | S4 + P3 content mechanisms | 11 | GF3; E2+E3+E4+E5 as claim-relevant; V5/V6/V7 |
-| S6 | GovernanceAttempt/Step/feedback/decision, Release and OfficialRendition | S5 + P3 River/renderer/scanner mechanisms | 8 | GF4; E2+E3+E5+E6; V4/V5/V6/V7/V8; browser lens when claimed |
-| S7 | obsolescence commands/reads plus Audit event read | S6 | 4 | GF5 with discovery/history from prior slices; E2+E3+E4 as claim-relevant; disclosure/history/Audit falsifiers |
-| P4 | final runtime failure isolation, durable-work, shutdown and recovery behavior | S1→S7 + P3 | 0 | GF6; E2+E5+E6; V8/V9/V10 |
-| P5 | exact whole-implementation candidate and proof dossier | all prior nodes + B1 private target | 78 closed | 6/6 GF; 10/10 V; T8-E runtime conformance classes; 78/78 operations; idempotent creations 10; ETag domains 13/13; exact-byte resources 4; real-dependency proof where claimed |
+| P0 | exact implementation-admission and authority snapshot | final roadmap gate | 0 | current authority/census pinned; no Product code; B0 classification current |
+| P1 | structural/package + executable-contract + SPA transport spine | P0 | 0 semantic implementations | T9 E1/V1/V2 structural; generated Go/TS compile; closed-world import verifier fires |
+| P2 | PostgreSQL/transaction/idempotency correctness spine | P1 | 0 | real E2 shared persistence mechanics; no database-first semantic prebuild |
+| P3 | runtime/composition/config/dependency shell | P1 | 0 | accepted one-runtime shell + fail-closed technical mechanisms; E5/E6 only when claimed |
+| S1 | Organization owner + Admin Organization frontend | P2 + P3 | 26 | all S1 completion-contract dimensions + real E2/E3/E4 as claim-relevant |
+| S2 | browser AuthN/session + Authorization/access frontend | S1 | 7 | GF1 + V3 + exact S2 browser/server completion contract |
+| S3 | Document Governance configuration + frontend | S1 + S2 | 10 | accepted config/OCC/disclosure behavior + frontend contract |
+| S4 | Document creation/core + Library/Official/My Work/History | S3 | 12 | GF2 closure + numbering/idempotency/OCC + reviewed frontend surfaces |
+| S5 | Revision DRAFT/content/Submission + Document Work | S4 + P3 content mechanisms | 11 | GF3 + exact-content/OCC/idempotency + editor/upload/recovery UI contract |
+| S6 | Governance/Release/OfficialRendition + browser presentation | S5 + P3 River/renderer/scanner | 8 | GF4 + durable-effect/rendition/fidelity integrity + browser contract |
+| S7 | obsolescence + Audit read + frontend | S6 | 4 | GF5 + disclosure/history/Audit separation + reviewed frontend surfaces |
+| P4 | runtime failure isolation/shutdown/recovery | S1→S7 + P3 | 0 | GF6 + V8/V9/V10 real failure/recovery evidence |
+| P5 | exact private whole-implementation proof candidate | all prior nodes + B1 | 78 closed | 6/6 GF; 10/10 V; wire runtime closure; all cross-cutting censuses; frontend drift check |
 
-A node may use more evidence classes than its minimum when the protected claim requires them. The table is not permission to replace a stronger accepted proof with a weaker one.
+The mandatory exact exit meaning for every row is `t11-node-completion-contracts.md`. A row in this table is only a summary and cannot weaken its companion completion contract.
 
-## 6. Exact 78-operation tranche assignment
+## 7. Exact 78-operation tranche assignment
 
 This section owns **implementation assignment only**. Endpoint meaning, schemas and wire behavior remain owned by T6/T8-E and the canonical OpenAPI. Repeating a method/path here never creates a second contract authority.
 
@@ -298,38 +337,113 @@ S7  4
 
 Any path/method outside this assignment that is proposed as a new application operation is a STOP and requires the smallest Product/T6/T8-E reopen. It cannot be repaired locally inside T11 or implementation.
 
-## 7. Frontend realization rule
+## 8. Node completion contract — mandatory, not advisory
 
-Frontend work follows semantic-slice availability rather than forming a second implementation graph:
+`t11-node-completion-contracts.md` defines for every P/S node:
+
+```text
+ENTRY
+PRODUCTION STATE
+PERSISTENCE STATE
+WIRE STATE
+DEPENDENCY GRAPH STATE
+FRONTEND STATE
+PROOF STATE
+EXPLICIT ABSENCES
+EXIT
+```
+
+A future node closes only when all applicable dimensions are true on the integrated real subject.
+
+This prevents ambiguous milestones such as:
+
+```text
+backend complete / frontend later
+schema exists / behavior later
+endpoint exists / owner path not integrated
+UI works against mocks / real API later
+imports compile / forbidden architecture edge unverified
+test exists / causal falsifier absent
+```
+
+The accepted T8-B closed-world/default-deny import graph is inherited by every node. P1 must make the classifier/verifier executable; every later node must keep the live tree classified and legal. Package existence never grants a new dependency edge.
+
+## 9. Frontend implementation-readiness program — mandatory T11 work
+
+T8-F remains closed. It already owns the semantic frontend realization contract. T11 now derives the implementation-ready **screen/action/data realization** from that authority before Product implementation begins.
+
+The mandatory sequence is defined in `t11-frontend-readiness.md`:
+
+```text
+F0 authority recovery
+→ F1 Frontend Coverage Matrix
+→ F2 material interaction-surface inventory
+→ F3 Screen Contracts
+→ F4 Navigation/Data Graph
+→ F5 functional low/mid-fidelity wireframes
+→ F6 Material Interaction Ledger
+→ F7 bidirectional frontend↔backend trace
+→ F8 material finding classification / smallest justified reopen
+→ F9 frontend readiness closure
+```
+
+No wireframe is accepted merely because the layout is sensible. A material surface must identify its Product goal, semantic owner, exact reads/writes, generated schemas, target-identity source, state class, ETag/idempotency/exact-byte mechanics, material Problems/recovery and what the frontend must not own.
+
+Every material control must trace to one accepted owner operation. Every material data block must trace to accepted read truth. Every navigation edge must identify where the target identity comes from and which initial operation loads the target lens.
+
+### Hard no screen-shaped API
+
+If a wireframe needs information or an action absent from the accepted backend contract:
+
+```text
+STOP affected screen
+→ prove whether the need follows from an accepted Product/human goal
+→ classify the gap
+→ if material, reopen only the smallest owning Product/T6/T8-E/T8-F authority
+→ never add operation 79 or a convenience endpoint silently
+```
+
+Conversely, the frontend may not be forced to guess material backend truth merely to avoid a justified bounded reopen.
+
+### Wireframe fidelity law
+
+Before implementation, wireframes freeze interaction meaning, not ornamental pixels. They must show structure, material data, actions, navigation, state/recovery distinctions and editor/viewer behavior. Final color, micro-animation, exact spacing/shadow/radius and other non-functional styling are not architecture unless a material requirement depends on them.
+
+## 10. Frontend realization during future implementation
+
+The completed T11 frontend pack binds to semantic tranches rather than becoming a late frontend phase:
 
 ```text
 P1
-→ React SPA shell + canonical generated TypeScript projection consumption
+→ React SPA shell + router foundation + canonical generated TypeScript transport consumption
 
-S1/S3
-→ bounded Admin Center lenses
+S1
+→ reviewed Admin / Organization screen contracts/wireframes
 
 S2
-→ auth/session shell + access behavior
+→ reviewed auth/session shell + Admin / Access screen contracts/wireframes
+
+S3
+→ reviewed Admin / Document Governance screen contracts/wireframes
 
 S4
-→ Library / creation / Document Work / My Work / History lenses as their real reads become available
+→ reviewed Library / creation / Document Official / My Work / History screen contracts/wireframes
 
 S5
-→ DRAFT/editor/upload/Submission paths
+→ reviewed Document Work DRAFT/editor/upload/Submission screen contracts/wireframes
 
 S6
-→ Governance Case + Release/Official presentation
+→ reviewed Governance Case + Release/Official presentation screen contracts/wireframes
 
 S7
-→ obsolescence completion + Audit lens
+→ reviewed obsolescence + Audit screen contracts/wireframes
 ```
 
-Every browser mutation still relies on server authority. `allowed_actions` remain hints. No frontend authorization engine, parallel global server store, handwritten application DTO contract or duplicate lifecycle state is permitted.
+Every browser mutation still relies on server authority. `allowed_actions` remain hints. No frontend Authorization engine, parallel global server store, handwritten application DTO contract or duplicate lifecycle state is permitted.
 
 A browser proof closes only against the actual SPA and real application origin/path required by T9 E4.
 
-## 8. Proof law per implementation node
+## 11. Proof law per implementation node
 
 A semantic/runtime node closes only when all applicable claims satisfy the T9 global validation law:
 
@@ -348,18 +462,20 @@ Each mergeable implementation increment must identify:
 ```text
 accepted authority consumed
 node/tranche owned
+Node Completion Contract clauses advanced/closed
 new or modified production subjects
 positive proof
 causal negative/fault proof
 T9 GF/V obligations advanced or closed
+frontend Screen Contracts/interactions advanced or closed when applicable
 application-census effect limited to already-assigned operations
-cross-cutting census effect, if any, remains within accepted T8-E counts
+cross-cutting census effect remains within accepted T8-E counts
 remaining downstream prerequisites
 ```
 
 No test exemption, baseline waiver, placeholder or dormant capability may be used to turn an unresolved material contradiction green.
 
-## 9. Integration and PR slicing law
+## 12. Integration and PR slicing law
 
 The graph defines dependency/closure boundaries, not a mandate for giant PRs.
 
@@ -375,11 +491,12 @@ no dormant tables/endpoints/workers/frameworks for future capability
 no hand-edited generated application contract projection
 no merge that knowingly breaks a previously closed invariant
 no proof deferred merely because another layer is unfinished when the current claim is testable now
+no semantic S tranche declared complete while its assigned reviewed frontend contract remains unimplemented
 ```
 
 A downstream node may start only when its prerequisite semantics are sufficiently closed to provide the real subject it consumes. Parallelism is allowed only where the DAG permits it; P2 and P3 are the principal intentional early parallel branches.
 
-## 10. T10 barrier overlay — binding order preserved
+## 13. T10 barrier overlay — binding order preserved
 
 T11 does not replace T10 with an implementation-shaped cutover. The accepted monotonic barriers remain the only authority edge:
 
@@ -415,16 +532,22 @@ B4
 
 Post-B3 recovery is forward on R10 authority only. No dual Product authority, legacy read fallback, disposable DEV/test restore as Product truth or compatibility bridge is introduced.
 
-## 11. Stop / reopen routing
+## 14. Stop / reopen routing
 
-Classify implementation evidence before changing architecture:
+Classify implementation or frontend-readiness evidence before changing architecture:
 
 ```text
 implementation/proof defect
   → fix inside the owning implementation node; accepted architecture stays closed
 
+frontend placement/presentation issue with adequate accepted backend truth
+  → correct inside T11 frontend readiness; no Product/T8 reopen
+
 accepted mechanism assumption falsified
   → STOP that path; reopen only the smallest implicated T8 technical owner
+
+required accepted human goal cannot be safely represented from current wire/read models
+  → STOP affected surface; smallest Product/T6/T8-E/T8-F owner reopens as evidence requires
 
 missing/extra application operation or consumer
   → STOP; smallest Product/T6/T8-E reopen; operation 79 never appears silently
@@ -439,14 +562,16 @@ graph dependency/proof boundary itself shown unsound
   → correct T11 before ratification, or bounded T11 reopen after ratification
 ```
 
-Dependency-version churn, provider patch releases, file splits or mechanical refactoring do not by themselves reopen architecture when accepted semantics/boundaries remain intact.
+Dependency-version churn, provider patch releases, private file splits, ornamental UI choice or mechanical refactoring do not by themselves reopen architecture when accepted semantics/boundaries remain intact.
 
-## 12. T11 closure contract
+## 15. T11 closure contract
 
 T11 can be ratified only when all are true:
 
 ```text
 implementation DAG has no unresolved dependency cycle or unowned material work
+Node Completion Contract exists for every P0→P5 / S1→S7 node
+all node exit contracts specify production/persistence/wire/dependency/frontend/proof outcome as applicable
 78/78 application operations are assigned exactly once
 operation 79 is absent
 Idempotency-Key creation census remains exact 10
@@ -457,13 +582,26 @@ exact-byte resources remain exact 4
 T8-E runtime wire-conformance closure is assigned to P5 on the real composed path
 real external-mechanism claims retain E5 proof lanes
 failure/recovery claims retain E6 proof lanes
-frontend is integrated by semantic slice, not a second semantic authority
+accepted T8-B closed-world import graph has a future executable verifier/negative-proof owner
+Frontend Coverage Matrix is complete
+material frontend interaction-surface inventory is complete
+Screen Contract exists for every material surface
+Navigation/Data Graph is complete for every material transition
+functional wireframes exist for all material screens and materially different safe-action states
+Material Interaction Ledger is complete
+backend→frontend trace is complete
+frontend→backend trace is complete
+78/78 frontend operation coverage is reconciled
+zero unresolved MATERIAL frontend/backend coverage finding remains
+frontend remains a semantic consumer, never a second semantic authority
 T10 B0→B4 ordering and point-of-no-return law are preserved exactly
 no T12 work has begun
 no Product implementation has begun
-independent bounded review has converged with no unresolved MATERIAL finding
+independent bounded T11 review has converged with no unresolved MATERIAL finding
 operator ratification is explicit
 ```
+
+The frontend readiness pack must be complete **before** independent final T11 convergence/ratification. T12 then receives an implementation program whose screens/actions/backend relationships are already falsifiable rather than deferred implementation design.
 
 Expected durable promotion after convergence:
 
@@ -471,6 +609,7 @@ Expected durable promotion after convergence:
 docs/architecture/implementation-program.md
 docs/decisions/t11-ratification.md
 docs/index.md route update
+minimum retained implementation-readiness/wireframe pack required by T12/future implementation
 ```
 
-This temporary Lead file must be removed before integration. T11 closure still does **not** authorize Product implementation; T12, Whole-R10 coherence, fresh independent challenge and explicit operator implementation authorization remain downstream gates owned by `docs/roadmap.md`.
+All temporary T11 work files must be removed before integration. T11 closure still does **not** authorize Product implementation; T12, Whole-R10 coherence, fresh independent challenge and explicit operator implementation authorization remain downstream gates owned by `docs/roadmap.md`.
