@@ -13,7 +13,7 @@ Legend:
 ```text
 COVERED       accepted authority supplies a coherent frontend home/contract
 WIREFRAME     authority is coherent but material state/action must still be drawn/reviewed
-FINDING       T11 graph/readiness coherence issue must be corrected before wireframing
+FINDING       T11 graph/readiness coherence issue requires adjudication
 ```
 
 ## 2. Fixed frontend envelope
@@ -33,34 +33,34 @@ ephemeral presentation state          local React state
 generated TypeScript shapes           wire authority
 ```
 
-All 78 application operations require `MetalDocsSession`. Unsafe mutations additionally obey the exact T8-E CSRF/conditional/idempotency profile. OIDC `/auth/login` and `/auth/callback` remain browser integration routes outside the 78-operation census.
+All 78 application operations require `MetalDocsSession`. Unsafe mutations additionally obey exact T8-E CSRF/conditional/idempotency profiles. OIDC `/auth/login` and `/auth/callback` remain browser integration routes outside the 78-operation census.
 
-## 3. Accepted human-goal coverage
+## 3. Accepted human-goal coverage — 16/16
 
-| # | Accepted human goal | Primary frontend home | Accepted backend/wire input | Material interaction obligations | Status |
+| # | Accepted human goal | Primary frontend home | Accepted backend/wire input | Material interaction obligation | Status |
 |---:|---|---|---|---|---|
-| 1 | Establish/end session | application shell + external `/auth/login`/`/auth/callback` integration | `getSession`, `endSession`; OIDC browser routes; `SessionView` | no password input; HttpOnly session cookie; in-memory/server-state CSRF token; 401/session-end behavior; server remains current access authority | WIREFRAME |
-| 2 | Discover official documents | `/documents` Library | `listDocuments` → `DocumentPage` | official/effective discovery only by default; admitted q/filters/cursor; no DRAFT/SUBMITTED as official; selection routes by returned `document_id` | WIREFRAME |
-| 3 | Create Document | `/documents` creation interaction | `getDocumentCreationOptions`, supporting `getDocumentTypeNumberingPreview`, `createDocument` | options are guidance only; numbering preview never reserves; one Idempotency-Key per logical create; accepted result routes to returned Document identity | WIREFRAME |
-| 4 | Inspect official/current Document truth | `/documents/:document_id` Document Official | `getDocument`; supporting `getDocumentResponsibleOwner`, `getRelease`, `getReleaseSource`, `getOfficialRenditionContent`, `getObsolescenceRequest` when referenced | official truth primary; DRAFT never silently rendered; release/source/rendition distinction; disclosure-safe current references; management only through accepted operations | WIREFRAME |
-| 5 | Start/enter open Revision | Document Official → `/documents/:document_id/work` | `getDocument` disclosure-safe `open_revision`; `createDocumentRevision` when absent/eligible | existing open Revision identity comes from server truth; create-next uses idempotent command; History is not current-resource resolver | WIREFRAME |
-| 6 | Author DRAFT | `/documents/:document_id/work` | `getRevision`, `getRevisionDraft`, `getRevisionDraftSource`, `updateRevisionDraft` | exact DRAFT ETag binds local editor/form; stale DRAFT always explicit 412 reconciliation; no silent merge/LWW | WIREFRAME |
-| 7 | Upload/replace DRAFT source | Document Work | `startRevisionDraftUpload`, provider capability PUT, `completeRevisionDraftUpload`, `updateRevisionDraft` | provider PUT != READY != WorkingContent; expired allocation gets a new allocation; intended local bytes preserved where accepted; exact admission remains server authority | WIREFRAME |
-| 8 | Submit / withdraw / cancel | Document Work | `createSubmission`, `getSubmission`, `getSubmissionSource`, `withdrawSubmission`, `cancelRevision` | Submission uses same logical key + semantic DRAFT If-Match on retry; immutable submitted subject; withdrawal/cancel exact state; failures separated from transport ambiguity | WIREFRAME |
-| 9 | See actor-relevant work | `/work` My Work | `listAuthoringWork`, `listGovernanceWork` | projection only; authoring rows route to owner work lens; governance rows route to exact case; no lifecycle authority in My Work | FINDING COV-04 |
-| 10 | Participate in governance | `/work/governance/:attempt_id` | `getGovernanceAttempt`, `listGovernanceFeedback`, `createGovernanceFeedback`, `getGovernanceStepDecision`, `recordGovernanceStepDecision`; exact governed source through admitted reads | immutable governed subject; feedback/decision under current server AuthZ; `allowed_actions` hints only; decision != publish | WIREFRAME |
-| 11 | Inspect Document history | `/documents/:document_id/history` | `getDocumentHistory` + explicitly referenced supporting facts/content | Controlled Documents history only; not current-resource resolver; Audit separate; historical referenced content only when currently authorized | WIREFRAME |
-| 12 | Initiate/manage obsolescence | Document Official | `createObsolescenceRequest`, `getObsolescenceRequest`, `withdrawObsolescenceRequest` | active request identity comes from disclosure-safe current truth; NoHumanApproval can complete synchronously; no fake human Step; target remains effective until success when governance is pending | WIREFRAME |
-| 13 | Administer Organization | `/admin/organization` | `searchProviderSubjects`; Company/User/Profile/ProviderBinding/Eligibility/Area/Group operations | independent ETag domains remain independent; provider search ref is opaque; offboarding/security effects remain atomic; provider claims never Product truth | FINDING COV-01/COV-02 |
-| 14 | Administer access | `/admin/access` | GroupMembership ops + `listRoles`, RoleAssignment ops; supporting User/Group/Area reads | exact static role vocabulary; exact Permission bundles; membership and RoleAssignment writes remain access-sensitive; no custom Role/Permission editor | FINDING COV-01/COV-02 |
-| 15 | Administer document governance | `/admin/document-governance` | DocumentType/governance/eligible-template/numbering/config operations + `getDocumentTemplateRole`/`replaceDocumentTemplateRole` | config ETags; Template is not peer semantic owner; template administration does not grant content/history access; preview non-reserving | FINDING COV-02 |
-| 16 | Inspect Audit | `/audit` | `listAuditEvents` → `AuditEventPage` | paging only; action evidence not current truth; no inferred filter; current historical-visibility AuthZ before paging | WIREFRAME |
+| 1 | Establish/end session | application shell + `/auth/login`/`/auth/callback` | `getSession`, `endSession`; OIDC browser routes; `SessionView` | no password input; HttpOnly session; CSRF material; real 401/end-session behavior; server is current access authority | WIREFRAME |
+| 2 | Discover official documents | `/documents` Library | `listDocuments` → `DocumentPage` | official/effective discovery; admitted q/filters/cursor; no DRAFT/SUBMITTED as official; navigation by returned `document_id` | WIREFRAME |
+| 3 | Create Document | `/documents` creation interaction | `getDocumentCreationOptions`, supporting `getDocumentTypeNumberingPreview`, `createDocument` | options guidance only; preview never reserves; idempotent logical create; result routes to returned Document identity | WIREFRAME |
+| 4 | Inspect official/current Document truth | `/documents/:document_id` | `getDocument`; supporting owner/Release/rendition/obsolescence reads as they become reachable | official truth primary; DRAFT never rendered as official; progressive accepted lens enrichment is explicit | WIREFRAME |
+| 5 | Start/enter open Revision | Document Official → Work | `getDocument` disclosure-safe `open_revision`; `createDocumentRevision` | server supplies open Revision identity; create-next and Work target become available in same implementation tranche | WIREFRAME |
+| 6 | Author DRAFT | `/documents/:document_id/work` | `getRevision`, `getRevisionDraft`, `getRevisionDraftSource`, `updateRevisionDraft` | exact DRAFT ETag; explicit 412 reconciliation; no silent merge/LWW | WIREFRAME |
+| 7 | Upload/replace DRAFT source | Document Work | `startRevisionDraftUpload`, provider PUT, `completeRevisionDraftUpload`, `updateRevisionDraft` | PUT != READY != WorkingContent; expired capability replaced, never revived; admission stays server authority | WIREFRAME |
+| 8 | Submit / withdraw / cancel | Document Work | `createSubmission`, `getSubmission`, `getSubmissionSource`, `withdrawSubmission`, `cancelRevision` | Submission idempotency + DRAFT condition; immutable subject; exact withdrawal/cancel outcomes | WIREFRAME |
+| 9 | See actor-relevant work | `/work` | `listAuthoringWork`, `listGovernanceWork` | projection only; each lane is implemented only when its owner target surface exists | WIREFRAME |
+| 10 | Participate in governance | `/work/governance/:attempt_id` | governance attempt/feedback/decision operations + admitted exact source reads | immutable governed subject; current AuthZ; `allowed_actions` hints only; decision != publish | WIREFRAME |
+| 11 | Inspect Document history | `/documents/:document_id/history` | `getDocumentHistory` + admitted supporting facts/content | semantic history only; not current-resource resolver; surface is regression-enriched as later fact classes become reachable | WIREFRAME |
+| 12 | Initiate/manage obsolescence | Document Official | create/get/withdraw obsolescence operations | active request identity from current server truth; synchronous NoHumanApproval handled without fake Step | WIREFRAME |
+| 13 | Administer Organization | `/admin/organization` | provider-subject search + Company/User/Profile/Binding/Eligibility/Area/Group operations | independent ETag domains; opaque provider ref; atomic offboarding; no provider claim Product truth | WIREFRAME |
+| 14 | Administer access | `/admin/access` | GroupMembership + Role operations, supported by admitted User/Group/Area reads | fixed roles/Permissions; no custom editor; security-bearing membership and RoleAssignment remain server authority | WIREFRAME |
+| 15 | Administer document governance | `/admin/document-governance` | DocumentType/governance/eligibility/numbering/config + concrete Document template-role reads/writes when Documents exist | config ETags; Template not peer owner; route is explicitly enriched after Document creation exists | WIREFRAME |
+| 16 | Inspect Audit | `/audit` | `listAuditEvents` → `AuditEventPage` | paging only; evidence not current truth; no inferred filters | WIREFRAME |
 
-No accepted human goal is currently missing a semantic frontend home. The findings are **T11 execution/readiness graph findings**, not evidence that T8-F Product semantics are wrong.
+No accepted human goal lacks a semantic frontend home. No current row requires a Product/T8-F semantic reopen.
 
 ## 4. Exact 78-operation frontend reconciliation from T8-F
 
-T8-F already provides the authoritative frontend consumer partition. T11 preserves it as frontend coverage truth:
+T8-F's accepted frontend consumer partition remains unchanged:
 
 ```text
 Shell/session                         operations 1–2                  = 2
@@ -78,161 +78,148 @@ Audit                                operation 78                    = 1
 TOTAL                                                              = 78
 ```
 
-Primary frontend home does not transfer semantic ownership. A supporting read may be consumed by another lens only under accepted disclosure and must not create duplicate client truth.
+Primary frontend home does not transfer semantic ownership. Supporting reads may cross lenses only under accepted disclosure and never create duplicate client truth.
 
 ## 5. Cross-cutting architecture → UX obligations
 
 | Accepted invariant | Required frontend behavior | Status |
 |---|---|---|
-| All 78 operations require current session | every protected screen assumes real session bootstrap; implementation graph cannot prove a protected tranche before AuthN/session exists | FINDING COV-01 |
-| Server is Authorization authority | navigation/action hiding may improve UX only when based on actual returned truth; hidden UI is never correctness | WIREFRAME |
-| `SessionView` has no effective Permission snapshot | stable Product navigation cannot be made correct by a client role/permission matrix | WIREFRAME |
-| One semantic owner per meaning | composed screen may read several owner views; each write control routes to exactly one accepted owner operation | WIREFRAME |
-| TanStack Query owns server state | no durable normalized client Product entity/global store becomes truth | COVERED |
-| URL/router owns navigation context | admitted filters/cursors/route ids stay navigation context, not Product state | WIREFRAME |
-| Forms bind to exact loaded ETag | stale whole-replacement and DRAFT-specific preconditions have explicit reconciliation UX; no silent overwrite | WIREFRAME |
-| 10 accepted idempotent POST creations | same logical retry keeps same key; changed/new semantic command gets new key; key never shown as business identity | WIREFRAME |
-| Problems are machine-branched by `Problem.code` | material 401/403/409/410/412/422/503 states cannot be collapsed into one generic toast when safe next action differs | WIREFRAME |
-| Exact bytes have semantic URLs | provider bucket/key/version never displayed/parsed as Product identity; corruption fails before success presentation | WIREFRAME |
-| Provider PUT != admitted content | upload progress/success cannot claim WorkingContent before completion/admission + DRAFT attachment | WIREFRAME |
-| `allowed_actions` are hints | every command still rechecks canonical server truth | COVERED |
-| Cursor paging is seek/integrity protected | no page-number/offset/total-count UX contract is invented | WIREFRAME |
-| DocumentOfficialView current references are disclosure-safe | work/obsolescence navigation must use returned current references rather than History/Audit inference | WIREFRAME |
-| Release is system-owned | no Publish button/public Release mutation is invented | COVERED |
-| Audit != History != current truth | UI may cross-link admitted facts but never merges them into lifecycle authority | WIREFRAME |
-| T8-B default-deny import graph | React feature layout never justifies new Go owner/application/package edges | COVERED |
-| Hard no screen-shaped API | visual convenience cannot authorize operation 79 or a new read model | COVERED |
+| All 78 operations require current session | real AuthN/session + canonical AuthZ must precede protected semantic browser proof | COVERED by corrected T11 graph |
+| Server is Authorization authority | visibility may improve UX but hidden UI is never correctness | WIREFRAME |
+| `SessionView` has no effective Permission snapshot | no client role/permission navigation matrix | WIREFRAME |
+| One semantic owner per meaning | composed screen may read several owners; each write goes to exactly one accepted operation | WIREFRAME |
+| TanStack Query owns server state | no durable normalized Product entity/global store | COVERED |
+| Forms bind to exact ETag | stale whole-replacement/DRAFT states need explicit safe reconciliation | WIREFRAME |
+| 10 idempotent POST creations | same logical retry keeps key; changed/new command gets new key | WIREFRAME |
+| Branch on `Problem.code` | materially different safe-next-action failures cannot collapse into generic toast | WIREFRAME |
+| Exact bytes have semantic URLs | provider location never Product identity; integrity failure precedes success presentation | WIREFRAME |
+| Provider PUT != admitted content | upload UI cannot claim WorkingContent before completion/admission + DRAFT attachment | WIREFRAME |
+| `allowed_actions` are hints | command always rechecks canonical truth | COVERED |
+| Cursor paging | no offset/page-number/total-count contract | WIREFRAME |
+| Disclosure-safe current references | work/obsolescence navigation uses returned current references, not History/Audit inference | WIREFRAME |
+| Release system-owned | no Publish button/public Release mutation | COVERED |
+| Audit != History != current truth | cross-links may exist only through admitted facts; no merged lifecycle authority | WIREFRAME |
+| T8-B default-deny import graph | screen organization never justifies new backend dependency edge | COVERED |
+| Hard no screen-shaped API | visual convenience cannot authorize operation 79/new read | COVERED |
 
-## 6. Coverage findings
+## 6. Coverage findings and adjudication
 
-### COV-01 — Original T11 S1→S2 order cannot close real HTTP/browser proof
+### COV-01 — Protected HTTP ordering cycle — MATERIAL / CORRECTED
 
-Current candidate before this matrix says:
+Initial T11 ordered `Organization → Authentication + Authorization` while every application operation requires `MetalDocsSession` and S1 claimed real E3/E4 proof.
 
-```text
-S1 Organization
-→ S2 Authentication + Authorization
-```
+Accepted T3/T10 already provide explicit non-serving bootstrap/recovery concern; T10 assigns its exact runtime realization to T11 planning.
 
-But T8-E requires `MetalDocsSession` on **all 78 application operations**. S1's own completion contract claims real E3/E4 Organization administration. That is impossible before Authentication/session and canonical Authorization are executable.
+**Correction:** P3 owns fenced non-serving bootstrap realization; first semantic tranche combines Identity + Organization + Access, establishing real AuthN/AuthZ before all later protected Product work.
 
-Accepted T3/T10 already provide the escape from a bootstrap paradox:
+### COV-02 — Artificial Organization/Access frontend split — MATERIAL / CORRECTED
 
-```text
-bootstrap/recovery = explicit non-serving operations concern
-not an ordinary RBAC bypass
-not a Product endpoint
-not operation 79
-```
+Admin Organization uses Authentication-owned provider-subject lookup; Admin Access needs current Organization identity/reference truth. The old split created cross-tranche incomplete screens.
 
-T10 further states that exact runtime realization of semantic bootstrap belongs to T11 implementation planning.
+**Correction:** operations 1–33 close together in S1. Semantic owners remain separate internally; the tranche is vertical implementation, not merged authority.
 
-**Disposition:** MATERIAL T11 graph defect. Do not weaken S1 proof. Correct the graph and make non-serving bootstrap realization a P3 prerequisite to the first protected semantic tranche.
+### COV-03 — Stable route incorrectly treated as single completion moment — MATERIAL / CORRECTED
 
-### COV-02 — Original T11 tranche boundaries do not align with accepted frontend dependency homes
+Document Official, Admin Document Governance, My Work and History acquire admitted capability at different later slices.
 
-Examples:
+**Correction:** Node Completion Contracts now specify progressive route/lens enrichment explicitly and forbid claiming future regions/actions early.
 
-```text
-searchProviderSubjects
-  semantic Authentication read
-  primary frontend consumer = Admin / Organization provider-binding workflow
+### COV-04 — My Work governance could expose a dead target — MATERIAL / CORRECTED
 
-getDocumentTemplateRole / replaceDocumentTemplateRole
-  paths under Document
-  accepted T8-F primary frontend home = Admin / Document Governance
+`listGovernanceWork` targets Governance Case loaded by `getGovernanceAttempt`.
 
-Admin / Access
-  GroupMembership + RoleAssignment behavior
-  requires admitted User/Group/Area reference reads for usable selection/context
-```
+**Correction:** operation 55 moves to S5 with operations 67–74 so governance projection and real target close together.
 
-The prior 26/7/10/... partition is mathematically correct but creates artificial cross-tranche UI incompleteness.
+### COV-05 — Create-next Revision / authoring work could expose dead Document Work target — MATERIAL / CORRECTED
 
-**Disposition:** MATERIAL T11 decomposition defect, not Product/T8-F defect. Prefer fewer vertical tranches aligned to complete user-facing capability clusters.
+A second dependency pass found the same issue for `createDocumentRevision` and `listAuthoringWork`: their safe user consequence is entry into the real Document Work surface.
 
-### COV-03 — Stable route != one-and-done implementation tranche
+**Correction:** operation 52 and operation 54 move to S4 with operations 56–66. S3 Document Official explicitly does not claim the create/enter-Revision affordance before S4.
 
-`/documents/:document_id` is one stable Document Official lens, but accepted behavior is progressively supplied by different capability slices:
+## 7. Corrected T11 implementation tranche partition
 
-```text
-core current official truth / owner management
-→ later Release/source/OfficialRendition presentation
-→ later active obsolescence create/read/withdraw
-```
-
-Likewise `/work` contains authoring and governance projections whose target owner surfaces close at different times.
-
-**Disposition:** completion contracts must state the exact **route capability state at each tranche exit**. A route may be implemented progressively without creating a second frontend phase; later slices enrich the same accepted lens.
-
-### COV-04 — My Work governance row must not become a dead navigation path
-
-`listGovernanceWork` supplies governance projection rows whose target is `/work/governance/:attempt_id` loaded by `getGovernanceAttempt`.
-
-Implementing the projection materially before the target case surface would either expose a dead action or require an implementation exception.
-
-**Disposition:** assign `listGovernanceWork` to the Governance/Release tranche that also implements the target Governance Case, while `listAuthoringWork` stays with the Document core/authoring tranche. This changes T11 implementation assignment only; operation meaning remains T8-E/T8-F.
-
-## 7. Candidate corrected implementation tranche partition
-
-The smallest coherent vertical partition after COV-01→04 is:
+The smallest coherent partition after COV-01→05 is:
 
 ```text
 S1  Identity + Organization + Access
     operations 1–33                                      = 33
     + /auth/login + /auth/callback outside census
 
-S2  Document Governance administration
-    operations 34–43 + 50–51                            = 12
+S2  Document Governance base configuration
+    operations 34–43                                     = 10
 
-S3  Library + Document core + authoring/history base
-    operations 44–49 + 52–54                             = 9
+S3  Library + Document core + template-role + History
+    operations 44–51 + 53                                 = 9
 
-S4  Document Work + Revision/content/Submission
-    operations 56–66                                    = 11
+S4  Revision authoring + My Work authoring + content + Submission
+    operation 52 + operation 54 + operations 56–66       = 13
 
 S5  Governance work + Governance Case + Release/rendition
-    operation 55 + operations 67–74                      = 9
+    operation 55 + operations 67–74                       = 9
 
 S6  Obsolescence + Audit
-    operations 75–78                                     = 4
+    operations 75–78                                      = 4
 
-TOTAL                                                    = 78
+TOTAL                                                     = 78
 ```
 
 Count proof:
 
 ```text
-33 + 12 + 9 + 11 + 9 + 4 = 78
+33 + 10 + 9 + 13 + 9 + 4 = 78
 ```
 
-Properties:
+Non-contiguous assignments deliberately prevent dead user paths:
 
 ```text
-zero operation reassigned semantically
-zero Product/API meaning changed
-zero new application operation
-operation 79 absent
-fewer artificial tranche seams
-AuthN/session/Authorization available before every protected Product surface
-Admin Organization + Access close together against usable identity/reference truth
-Admin Document Governance owns its accepted T8-F primary operation set
-My Work governance projection closes with its real Governance Case target
-Document Official remains one route/lens progressively enriched by S3/S5/S6
+50–51 concrete Document template-role
+  → S3 after ordinary Document creation exists; frontend home remains Admin Document Governance
+
+52 createDocumentRevision + 54 listAuthoringWork
+  → S4 with live Document Work target
+
+55 listGovernanceWork
+  → S5 with live Governance Case target
 ```
 
-This is a T11 implementation-graph correction only.
+No Product/API meaning changes. No operation is added or removed.
 
-## 8. Coverage Matrix closure status
+## 8. Progressive lens implementation map
+
+```text
+/admin/document-governance
+  S2 base DocumentType/governance/eligible-template/numbering/config
+  → S3 concrete Document template-role administration
+
+/documents/:document_id
+  S3 official/core + responsible-owner
+  → S4 create/enter Revision
+  → S5 Release/source/OfficialRendition presentation
+  → S6 obsolescence state/actions
+
+/work
+  S4 authoring projection + live Work target
+  → S5 governance projection + live Governance Case target
+
+/documents/:document_id/history
+  S3 reachable semantic history
+  → S4/S5/S6 regression/enrichment as additional accepted facts become reachable
+```
+
+This is one stable T8-F route set, not duplicate routes or a late second frontend phase.
+
+## 9. Coverage Matrix closure status
 
 ```text
 accepted human goals mapped                 16 / 16
 stable route/lens homes                     covered
 T8-F operation consumer reconciliation      78 / 78
+T11 implementation rows                     78 / 78 exactly once
 operation 79                                absent
-material T11 graph findings                 4
+material T11 coverage findings              5 found / 5 adjudicated
+unresolved MATERIAL coverage finding        0
 Product/T8-F semantic reopen                not justified by current evidence
 wireframes                                  not started
 ```
 
-COV-01→04 must be folded into the T11 Lead + Node Completion Contracts before Screen Contract derivation proceeds. Wireframing remains blocked until that graph correction is coherent.
+F1 is complete. The next frontend-readiness step is **F2 material interaction-surface inventory**, followed by Screen Contracts; wireframing remains intentionally later.
