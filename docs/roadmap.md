@@ -15,7 +15,7 @@ REPOSITORY RESET                      MERGED / OPERATOR-RATIFIED
 REPOSITORY STANDARD V1 ALIGNMENT      MERGED
 PRODUCT / OWNERSHIP                   OPERATOR-APPROVED
 T1 → T8-H                             CLOSED / OPERATOR-RATIFIED / INTEGRATED
-T9 GOLDEN FLOWS / VALIDATION          OPEN / ACTIVE — REVIEW CONVERGED / RATIFICATION PENDING
+T9 GOLDEN FLOWS / VALIDATION          CLOSED / OPERATOR-RATIFIED / INTEGRATION AUTHORIZED
 T10 → T12                             NOT OPEN
 IMPLEMENTATION                        BLOCKED
 LEGACY IMPLEMENTATION                 ABSENT FROM LIVE TREE
@@ -23,94 +23,78 @@ LEGACY IMPLEMENTATION                 ABSENT FROM LIVE TREE
 
 ## Current gate
 
-T9 — Golden Flows & Validation Baseline is **OPEN / ACTIVE** as of 2026-08-21 by explicit operator authorization.
+T9 — Golden Flows & Validation Baseline is **CLOSED / OPERATOR-RATIFIED** as of 2026-08-21. The operator separately authorized squash integration of PR #154 after bounded independent Fable convergence.
 
-Opening proof:
+The durable T9 authority is `architecture/validation-baseline.md`; immutable ratification evidence is `decisions/t9-ratification.md`. Temporary review/work Evidence is not authority and must not land in `main`.
 
-```text
-opening main                       82832cce62d11ea90575fb484b97e3c934c03e37
-opening branch                     arch/t9-golden-flows
-open PRs before T9                 0
-last integrated closeout           PR #151 / MERGED
-closeout merge-candidate CI        #1121 SUCCESS
-T1 → T8-H                          CLOSED / OPERATOR-RATIFIED / INTEGRATED
-application operations             78
-operation 79                       ABSENT
-T10 → T12                          NOT OPEN
-Product implementation             BLOCKED
-legacy implementation              ABSENT
-```
-
-The active branch-only T9 candidate is `docs/work/current/t9-golden-flows.md`. It is temporary work/Evidence, not durable architecture authority. It preserves exactly **6 composed Golden Flows**, **10 cross-cutting validation properties**, **6 evidence classes**, the **78-operation** application census and operation 79 absent.
-
-## T9 review state
-
-The operator explicitly approved the Lead candidate direction at:
+Ratification proof:
 
 ```text
-approved Lead candidate            2d5d127e95821eac355296e0a7f09c93aef6cef3
-approved candidate required CI     #1127 SUCCESS
+opening main                           82832cce62d11ea90575fb484b97e3c934c03e37
+candidate PR                           #154
+operator-approved Lead candidate       2d5d127e95821eac355296e0a7f09c93aef6cef3
+Lead candidate required CI             #1127 SUCCESS
+Round-1 Evidence PR                    #155 CLOSED / UNMERGED
+Round-1 review CI                      #1128 SUCCESS
+Round-1 verdict                        NOT CONVERGED / MATERIAL=2
+technical correction commit            ca3a72d3f92eacea734bd1c583cd981e6e787bce
+independently reviewed candidate HEAD  eb7e0147cf575fe69290c231ea360af229917eeb
+corrected candidate required CI        #1130 SUCCESS
+Round-2 Evidence PR                    #156 CLOSED / UNMERGED
+Round-2 final review HEAD              27b7ce63a8c63169b6ac8b582ee49621e7c86355
+Round-2 review CI                      #1132 SUCCESS
+Round-2 verdict                        CONVERGED / MATERIAL=0
+Round 3                                NOT JUSTIFIED
+post-review status carrier             c5fba2b179e1e0a9a806df83654ea6daf6e67513
+status-carrier required CI             #1133 SUCCESS
+operator ratification                  EXPLICIT / 2026-08-21
+merge authorization                    EXPLICIT / 2026-08-21
 ```
 
-Independent Fable Round 1 reviewed that exact candidate through isolated Draft PR #155:
+Round-1 adjudication closed two material proof gaps without reopening T1→T8:
 
 ```text
-review PR                           #155 CLOSED / UNMERGED
-review branch                       review/t9-fable
-review HEAD                         47483960e596539c69dc32139eb069dcc696694f
-review CI                           #1128 SUCCESS
-review delta                        docs/work/current/ai-dialog.md only
-verdict                             NOT CONVERGED
-MATERIAL findings                   2
-Round 2 justified                   YES
+F1  runtime wire-conformance ownership
+    → T9 V1 owns the future executable proof lane for accepted T8-E §9.4 fixture classes
+
+F2  authentication-boundary falsification
+    → GF1 causally attacks OIDC callback verification and ProviderSubjectBinding admission
 ```
 
-Lead adjudication accepted both MATERIAL findings and four bounded MINOR precisions without reopening T1→T8:
+Four bounded MINOR precisions also made session lifecycle revocation, managed-content GC/backup-pin race, closed T3 §15 Audit-census coverage and concurrent Document-code allocation explicit. Round 2 confirmed all corrections and found no MATERIAL regression. Its only MINOR was a safe-direction execution-mode sentence; durable promotion resolves it by distinguishing T9 baseline ratification from future runtime proof execution.
+
+## Ratified T9 baseline
 
 ```text
-F1 MATERIAL  ACCEPT — V1 owns runtime execution of T8-E §9.4 wire-conformance classes
-F2 MATERIAL  ACCEPT — GF1 attacks the OIDC callback/binding admission boundary
-F3 MINOR     ACCEPT — session expiry/endSession/binding-replacement revocation explicit
-F4 MINOR     ACCEPT — managed-content GC + backup-pin/GC race explicit
-F5 MINOR     ACCEPT — V4 enumeration bound to closed T3 §15 Audit census
-F6 MINOR     ACCEPT — concurrent distinct Document-code allocation explicit
-F7 NOTE      traceability only
-F8 NOTE      no change
+Golden Flows                         exactly 6
+cross-cutting validation properties exactly 10
+evidence classes                     exactly 6
+application operations               exactly 78
+orphaned operations                  0
+invented application operations      0
+operation 79                         absent
+new Permission                       none
+new semantic owner                   none
+T1→T8 reopen                         none
+Product implementation               BLOCKED
 ```
 
-Corrected candidate after Round-1 adjudication:
+The six Golden Flows cover:
 
 ```text
-technical correction commit         ca3a72d3f92eacea734bd1c583cd981e6e787bce
-reviewed corrected candidate HEAD    eb7e0147cf575fe69290c231ea360af229917eeb
-corrected candidate required CI      #1130 SUCCESS
-Golden Flows                         6
-cross-cutting properties             10
-evidence classes                     6
-application operations               78
-operation 79                          ABSENT
-new Product authority                NONE
-T1→T8 reopen                          NONE
+GF1 identity / session / access / revocation
+GF2 governance configuration → atomic Document creation
+GF3 Revision authoring / upload admission / concurrency
+GF4 governance → Release / OfficialRendition
+GF5 official discovery / obsolescence / disclosure-safe routing
+GF6 runtime failure isolation / shutdown / backup-restore readiness
 ```
 
-Bounded Fable Round 2 reviewed that exact corrected candidate through isolated Draft PR #156:
+The ten cross-cutting properties cover canonical wire/runtime conformance, architecture dependency closure, AuthN/AuthZ/CSRF, transaction+Audit atomicity, idempotency/replay, ETag/concurrency, exact-content/malware/rendition integrity, River durable work, runtime readiness/resources/observability and backup/restore privacy/security readiness.
 
-```text
-review PR                           #156 CLOSED / UNMERGED
-review branch                       review/t9-fable-r2
-final review HEAD                   27b7ce63a8c63169b6ac8b582ee49621e7c86355
-review CI                           #1132 SUCCESS
-review delta                        docs/work/current/ai-dialog.md only
-verdict                             CONVERGED
-MATERIAL findings                   0
-Round 3 justified                   NO
-```
+T9 ratifies the **validation contract**, not an assertion that Product implementation already exists or has passed runtime tests. Later implementation/readiness work must execute or mechanically inspect the real production subject as required; mock-only, fixture-only and self-proving probes cannot close claims about real runtime/dependency behavior.
 
-Round 2 confirmed F1/F2 closure, F3–F6 boundedness and the complete fixed envelope. One non-blocking MINOR remains: one §7 closure sentence is phrased in execution mode while adjacent T9 requirements are plan-mode. It fails closed and changes no accepted property; align that wording during the next natural candidate promotion/closure edit. No additional Fable round is justified.
-
-T9 must prove accepted composition rather than manufacture implementation. A material contradiction reopens only the smallest owning upstream authority; test convenience may not create operation 79, new Product state, new Permission, new semantic owner or new runtime capability.
-
-## Ratified T8-H baseline preserved by T9
+## Integrated T8 baseline preserved by T9
 
 ```text
 accepted application operations      78
@@ -134,34 +118,32 @@ Redis / BFF / realtime / external Search / generic event bus absent
 Product implementation               BLOCKED
 ```
 
-The bounded T8-E-FR read-symmetry meaning remains executable only through the T8-E wire SSOT. T9 validates it; it does not create another wire/read authority.
+The bounded T8-E-FR read-symmetry meaning remains executable only through the T8-E wire SSOT. T9 validates that contract; it creates no second wire/read authority.
 
 ## Exact next action
 
 ```text
-operator ratification of the corrected, independently converged T9 candidate
-→ if ratified, promote/absorb the T9 candidate into durable routed authority
-→ align the non-blocking Fable Round-2 §7 wording precision during that promotion
-→ remove temporary docs/work/current/t9-golden-flows.md before merge candidacy
-→ record immutable T9 ratification evidence and update this roadmap
-→ run required CI on the exact closure candidate
-→ do not open T10 until T9 is integrated and the operator separately authorizes T10
-→ do not begin T11 or T12
-→ do not implement Product code
+finish T9 closure candidate on PR #154
+→ remove temporary docs/work/current/t9-golden-flows.md
+→ required CI must pass on the exact closure HEAD
+→ mark PR #154 Ready and obtain merge-candidate required CI on the same exact HEAD
+→ squash merge PR #154 using expected HEAD protection
+→ verify integrated tree / main
+→ record T9 integration status without opening T10
 ```
 
-Cross-repository Marketplace review is complete and is not a T9 blocker. Candidate/review branch cleanup is non-authoritative housekeeping.
+T10 requires separate explicit operator authorization after T9 integration. T11/T12 remain closed. Product implementation remains blocked.
 
 ## Remaining architecture program
 
 | Stage | Owns | Opens / exits |
 |---|---|---|
-| T8-E — Executable Wire Contract | Exact OpenAPI application wire, schemas, headers, problems, ETags, idempotency, pagination, upload/exact-byte contract, generated Go/TypeScript boundaries | CLOSED / OPERATOR-RATIFIED / INTEGRATED; T8-E-FR meaning retained and executable representation consolidated in wire SSOT |
+| T8-E — Executable Wire Contract | Exact OpenAPI application wire, schemas, headers, problems, ETags, idempotency, pagination, upload/exact-byte contract, generated Go/TypeScript boundaries | CLOSED / OPERATOR-RATIFIED / INTEGRATED |
 | T8-F — Frontend Realization | Route tree, feature/package topology, generated transport consumption, query/state behavior, read-model consumption, editor/viewer boundaries | CLOSED / OPERATOR-RATIFIED / INTEGRATED |
 | T8-G — Runtime / Process / Deployment | Binaries/processes, River workers, renderer/scanner/provider boundaries, startup/readiness/shutdown, configuration/secrets, trust/network boundaries, observability, recovery/runtime profiles | CLOSED / OPERATOR-RATIFIED / INTEGRATED |
 | T8-H — Whole-T8 Global Coherence Review | Cross-check backend, persistence, wire, frontend, runtime and accepted upstream authorities as one system | CLOSED / OPERATOR-RATIFIED / INTEGRATED |
-| T9 — Golden Flows & Validation Baseline | Falsifiable composed-system flows and proof classes | OPEN / ACTIVE; independent review CONVERGED; operator ratification pending |
-| T10 — Transition / Cutover | Real current→target transition and rollback barriers | NOT OPEN; requires T9 integration and separate operator authorization |
+| T9 — Golden Flows & Validation Baseline | Falsifiable composed-system flows and proof classes | CLOSED / OPERATOR-RATIFIED / INTEGRATION AUTHORIZED |
+| T10 — Transition / Cutover | Real current→target transition and rollback barriers | NOT OPEN; requires separate operator authorization after T9 integration |
 | T11 — Implementation Program & Execution Graph | Bounded work graph and proof obligations | NOT OPEN; opens after T1→T10 accepted |
 | T12 — Adversarial Implementation-Readiness | Independent implementation-readiness attack | NOT OPEN; opens after T11 |
 
@@ -171,7 +153,7 @@ Implementation remains blocked until all are true:
 
 ```text
 T8  CLOSED / OPERATOR-RATIFIED / INTEGRATED
-T9  CLOSED / OPERATOR-RATIFIED
+T9  CLOSED / OPERATOR-RATIFIED / INTEGRATED
 T10 CLOSED / OPERATOR-RATIFIED
 T11 CLOSED / OPERATOR-RATIFIED
 T12 CLOSED / OPERATOR-RATIFIED
