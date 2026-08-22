@@ -15,7 +15,7 @@ REPOSITORY RESET                      MERGED / OPERATOR-RATIFIED
 REPOSITORY STANDARD V1 ALIGNMENT      MERGED
 PRODUCT / OWNERSHIP                   OPERATOR-APPROVED
 T1 → T10                              CLOSED / OPERATOR-RATIFIED / INTEGRATED
-T11                                   NEXT / NOT STARTED
+T11                                   OPEN / ACTIVE CANDIDATE
 T12                                   NOT OPEN
 IMPLEMENTATION                        BLOCKED
 LEGACY IMPLEMENTATION                 ABSENT FROM LIVE TREE
@@ -23,145 +23,295 @@ LEGACY IMPLEMENTATION                 ABSENT FROM LIVE TREE
 
 ## Current gate
 
-T10 — Transition / Cutover is **CLOSED / OPERATOR-RATIFIED / INTEGRATED** as of 2026-08-22 after bounded independent Fable convergence and authorized squash integration.
+T11 remains **OPEN / ACTIVE** on Draft PR #162.
 
-Durable T10 authority:
-
-```text
-architecture/transition.md
-```
-
-Immutable ratification evidence:
+Reusable frontend planning method:
 
 ```text
-decisions/t10-ratification.md
+docs/development/functional-html-wireframe-method.md
+Frontend Product Experience Planning Method v2.1
+Fable Round 2: CONVERGED / MATERIAL=0
 ```
 
-Current progression, implementation permission and exact next action remain owned here.
+The prior all-at-once MetalDocs HTML prototype is **SUPERSEDED / NOT ACCEPTED** and is not an implementation baseline.
 
-## T10 integrated proof
+The current frontend gate is:
 
 ```text
-opening main                           fc7030e98021bdb55fa806df68821cf19ed1a40c
-candidate PR                           #158
-operator-approved original Lead        0b90f26690b2b2bbf627f0c72283ff14c0ce9b84
-original Lead required CI              #1153 SUCCESS
-Round-1 Evidence PR                    #159 CLOSED / UNMERGED
-Round-1 final review HEAD              0f47dfc2365433b5950fccac4b48106e7a7fa453
-Round-1 review CI                      #1155 SUCCESS
-Round-1 verdict                        NOT CONVERGED / MATERIAL=3
-technical correction commit            7c5bb3e0106657c6e0db993afbe8d646b0ac09d1
-independently reviewed candidate HEAD  c1afc292bc94f48bfd2146c3b4374342ff5c2701
-corrected candidate required CI        #1157 SUCCESS
-Round-2 Evidence PR                    #160 CLOSED / UNMERGED
-Round-2 final review HEAD              937aebf9688516d1b0b1245eb014c0a6c03d6e7e
-Round-2 review CI                      #1159 SUCCESS
-Round-2 verdict                        CONVERGED / MATERIAL=0
-Round 3                                NOT JUSTIFIED
-post-review status carrier             aadb2a81136dcf5020804c86738dc84c263d52f8
-status-carrier required CI             #1160 SUCCESS
-operator ratification                  EXPLICIT / 2026-08-22
-closure candidate HEAD                 cc408964e4e9e4719e9bc0808b9ec49a076df89f
-Draft required CI                      #1166 SUCCESS
-merge authorization                    EXPLICIT / 2026-08-22
-merge-candidate required CI            #1167 SUCCESS
-candidate tree                         c3de41e73ee153278e0869ac80640cc945ae26b2
-squash merge / integrated main         e8f415ec16df9cc2d4623981412e1ac21c3c6647
-integrated main tree                   c3de41e73ee153278e0869ac80640cc945ae26b2
-T10 integration                        VERIFIED
+B01 — App Shell + Global Information Architecture   LOCKED / OPERATOR-RATIFIED
+B02 — Library / discovery                           LOCKED / OPERATOR-RATIFIED
+B03 — Document Official                             OPEN / CANDIDATE / NOT LOCKED
+B04 — Document Work / authoring                     NOT OPEN
 ```
 
-The squash merge integrated the exact authorized closure tree: candidate `cc408964...` and integrated `main @ e8f415ec...` both resolve to tree `c3de41e73ee153278e0869ac80640cc945ae26b2`.
-
-Round-1 corrections remained bounded to T10. No T1→T9 authority reopened.
-
-## Ratified T10 result
+B01 was operator-locked on 2026-08-22 after the revised **Home A — Central operacional** visual walkthrough. Its bounded durable record and canonical rendered structural artifact are:
 
 ```text
-B0  source truth classified
-B1  target privately prepared
-B2  exact production candidate proven + verified clean seal
-B3  first post-seal authoritative R10 Product mutation / point of no return
-B4  authoritative recovery point exists + disposable serving estate fenced + canonical R10 serving activated
+docs/work/current/t11-b01-app-shell.md
+docs/work/current/t11-b01-app-shell-wireframe.html
 ```
 
-Core transition law:
+B01 P9 Screen Contract / bidirectional trace and bounded P10 consolidation are complete in the B01 record. The lock freezes the current structural baseline but remains subject to the normal smallest-scope evidence-backed reopen law.
+
+B02 was operator-locked on 2026-08-22 after iterative visual adjudication from table-first hypotheses to **C3 — Discovery-first Library with Por tipo + Por área**. Its bounded record and canonical rendered structural artifact are:
 
 ```text
-one-way greenfield activation
-proof before authority
-operations/provenance clean seal, never Product activation state
-first authoritative Product commit = point of no return
-authoritative recovery point before ordinary serving
-DEV/test user-serving paths fenced before ordinary serving
-single business authority
-post-B3 forward recovery only
+docs/work/current/t11-b02-library.md
+docs/work/current/t11-b02-library-wireframe.html
 ```
 
-Explicitly absent:
+B02-F1 is resolved by the bounded `B02-LD` Library read-composition precision: the first page of the existing `listDocuments` operation supplies complete disclosure-safe discovery options for Document Type, Area and responsible owner from the actor's currently disclosable status universe. It adds no operation, owner, Permission or route; operation 79 remains absent. B02 P9 Screen Contract / bidirectional trace and bounded P10 consolidation are complete in the B02 record. The precision must be consolidated into effective T6/T8-E/T8-F owners before T11 integration.
+
+B03 is now OPEN / CANDIDATE. Its bounded current record is:
 
 ```text
-historical business migration
-generic ETL/import framework
-dual write
-dual Product authority
-legacy read fallback
-schema/API compatibility bridge
-Product activation marker/table/endpoint
-operation 79
+docs/work/current/t11-b03-document-official.md
 ```
 
-## Preserved integrated baseline
+B03 authority recovery, targeted reference study, genuine A/B/C structural hypotheses and lightweight data/action feasibility are complete enough for operator visual review. Leading direction is **viewer-first + collapsible right information pane**. `B03-F1` remains OPEN: the official lens needs server-derived command-affordance hints for create Revision / replace responsible owner / create obsolescence / withdraw obsolescence without rebuilding Authorization in React. Candidate precision is `DocumentOfficialView.allowed_actions`, mirroring the existing GovernanceCase pattern and adding no operation, owner, Permission or route.
+
+Only the operator may set `LOCKED`. B04 remains NOT OPEN.
+
+## T11 fixed system invariants
 
 ```text
-accepted application operations      78
-orphaned operations                  0
-invented application operations      0
-operation 79                         absent
-Idempotency-Key creations            exact 10
-ETag read / mutation domains         13 / 13
-exact-byte resources                 exact 4
-stable SPA route meanings            exact accepted T6 route set
-frontend semantic owner added        none
-frontend Authorization engine        absent
-parallel global server store         absent
-one modular-monolith application runtime
-one PostgreSQL product-state database
-River workers in-process
-one active ManagedContentStore
-private conditional renderer + MalwareInspector
-verified ephemeral exact-byte spool
-Redis / BFF / realtime / external Search / generic event bus absent
-Product implementation               BLOCKED
+opening integrated main               cae6ba48df5d611959c0390e0f2b9b8194d62a9d
+branch                                 arch/t11-implementation-program
+Draft PR                               #162
+application operations                 78
+orphaned / invented                    0 / 0
+operation 79                           ABSENT
+Idempotency-Key creations             10
+ETag read / mutation domains          13 / 13
+exact-byte resources                  4
+Product implementation                BLOCKED
 ```
 
-T7 remains binding: Launch has no historical business corpus to migrate. Any contrary concrete evidence triggers the smallest bounded reopen rather than silent preservation or compatibility machinery.
+The operator-approved T8-E-RO precision remains binding and adds no operation, Permission, owner or route.
+
+## Frontend planning correction
+
+The first T11 frontend pass proved backend/screen coverage but moved directly from semantic Screen Contracts to a whole-product HTML prototype. Operator review rejected that workflow because it skipped deliberate product/UX planning for:
+
+```text
+user needs / jobs
+information architecture
+navigation mental model
+reference study
+layout alternatives
+screen hierarchy
+relative size / density
+cards vs tables vs lists vs master-detail
+progressive disclosure
+screen-by-screen operator visual walkthrough
+pattern derivation after reviewed repetition
+```
+
+No Product/T1→T10 authority was reopened by this methodological correction.
+
+## Frontend Product Experience Planning Method v2.1
+
+The converged process is:
+
+```text
+GLOBAL FOUNDATION
+P0  accepted authority
+P1  actors / jobs / user needs
+P2  end-to-end user flows
+P3  frontend coverage
+P4  candidate Information Architecture
+P5  screen / material-surface inventory
+
+PER-BLOCK LOOP
+P6  targeted reference study when triggered
+P7  competing layout hypotheses when ambiguity is real
+P8  rendered structural wireframe + operator visual adjudication
+    → only operator may LOCK
+P9  Screen Contract + bidirectional backend trace
+P10 bounded pattern consolidation after LOCK
+P11 interaction realization / low-fi prototype after structural lock
+
+ASSEMBLED CLOSURE
+P10 terminal pattern reconciliation
+P11 assembled interaction prototype when required
+P12 adversarial UX + architecture walkthrough
+P13 visual-design handoff + structural-conformance review
+P14 frontend implementation-readiness closure
+```
+
+Hard laws include:
+
+```text
+no whole-product wireframe generation in one pass
+no assistant/reviewer/tool may set LOCKED
+P8 must be a rendered/viewable visual artifact; prose alone is insufficient
+no layout chosen merely from backend shape
+no shared pattern frozen before reviewed repetition exists
+no screen-shaped API for frontend convenience
+accessibility + responsive behavior are structural
+material assumptions remain registered until probed/resolved
+visual design cannot silently change locked structure
+```
+
+### Methodology review proof
+
+```text
+v2 candidate HEAD                     a9e6f3b3ae2b8e56c65d8114e1551e40ec1d7161
+candidate CI                          #1218 SUCCESS
+Round 1 Evidence PR                   #163 CLOSED / UNMERGED
+Round 1 verdict                       NOT CONVERGED
+Round 1 findings                      MATERIAL=2 / IMPORTANT=10
+corrected v2.1 HEAD                   4b0bf734e70e59e06008d401a0d3d12d9540310e
+corrected CI                          #1221 SUCCESS
+Round 2 Evidence PR                   #164 CLOSED / UNMERGED
+Round 2 valid Evidence HEAD           e2336bab468e04a56ed850cfa93a1fb6f53ca530
+Round 2 CI                            #1223 SUCCESS
+Round 2 verdict                       CONVERGED
+Round 2 findings                      MATERIAL=0 / IMPORTANT=0 / OPTIONAL=3
+Round 3                               NOT JUSTIFIED
+```
+
+Fable's original Round-2 response commit `f950ccabe1293926e481951ebda3cfebbccf91a1` was accidentally authored on the old Round-1 lineage. Its exact `ai-dialog.md` blob was re-anchored byte-identically onto the correct Round-2 branch rooted at `4b0bf734...`; CI #1223 verified Repository Standard isolation. The review text was not altered.
+
+The three Round-2 notes are non-blocking realization precision and do not justify a methodology change or Round 3.
+
+## MetalDocs UX block program
+
+Current block sequence:
+
+```text
+B01  App Shell + Global Information Architecture   LOCKED / OPERATOR-RATIFIED
+B02  Library / discovery                            LOCKED / OPERATOR-RATIFIED
+B03  Document Official                              CURRENT / CANDIDATE / NOT LOCKED
+B04  Document Work / authoring                      NOT OPEN
+B05  My Work                                        NOT OPEN
+B06  Governance                                     NOT OPEN
+B07  History / Audit                                NOT OPEN
+B08  Administration                                 NOT OPEN
+```
+
+Names/order after B01 remain candidate because later evidence may refine grouping without changing Product authority. Any locked-block reopen follows the normal smallest-scope finding law and does not invalidate later work automatically.
+
+Each material block follows:
+
+```text
+bounded authority + user goals
+→ targeted reference study when triggered
+→ 2–3 structural hypotheses when real ambiguity exists
+→ lightweight backend/data feasibility check
+→ rendered visual structural candidate
+→ operator walkthrough: hierarchy / position / size / density / discoverability
+→ findings / revision
+→ OPERATOR LOCK
+→ Screen Contract + backend trace
+→ bounded pattern consolidation
+→ interaction realization only after lock
+```
+
+The assistant and operator converse block-by-block. Remaining screens are never generated automatically as baseline.
+
+## Final implementation DAG candidate
+
+The backend/implementation partition remains:
+
+```text
+P0 authority / implementation-admission pin
+ ↓
+P1 structural + executable-contract spine
+ ├────────────────────┐
+P2 persistence        P3 runtime/dependency/non-serving bootstrap
+ └──────────┬─────────┘
+            ↓
+S1 Identity + Organization + Access                         33
+ ↓
+S2 Document Governance configuration                       10
+ ↓
+S3 Document core + creation + authoring + Submission       22
+   + Library + My Work authoring + History
+ ↓
+S4 Governance work + Governance Case + Release/rendition    9
+ ↓
+S5 Obsolescence + Audit                                     4
+ ↓
+P4 runtime / durable-work / recovery closure
+ ↓
+T10 B1 private target
+ ↓
+P5 whole implementation proof closure
+ ↓
+T10 B2 → B3 → B4
+```
+
+`33 + 10 + 22 + 9 + 4 = 78`.
+
+UX replanning may refine presentation but may not change the operation census or Product semantics without a material bounded reopen.
+
+## T8-E-RO — approved responsible-owner precision
+
+Existing operation 47 remains `getDocument`. `DocumentOfficialView` gains:
+
+```text
+responsible_owner_candidates?: UserReference[]
+```
+
+Binding law:
+
+```text
+present iff current document.owner.manage = ALLOW for the exact Document
+contents = complete existing + same-Company + ENABLED Users
+order = user_id ASC
+absence discloses neither candidate existence nor reason
+```
+
+The list grants no authority and is outside the ResponsibleOwner ETag domain. Replacement still rechecks current AuthZ, D4 eligibility/offboarding serialization and `If-Match`.
+
+Before T11 integration, effective T6/T8-E/T8-F owners must consolidate this approved precision together with the B02-LD Library discovery precision and any later operator-approved B03 read precision.
+
+## T10 preserved authority
+
+Binding barriers remain:
+
+```text
+B0 source truth
+→ B1 private target
+→ B2 exact candidate proof + verified clean seal
+→ B3 first authoritative Product mutation / point of no return
+→ B4 authoritative recovery point + serving fence + canonical activation
+```
+
+No historical business migration, dual Product authority, legacy fallback, compatibility bridge, Product activation marker or operation 79 is introduced.
 
 ## Exact next action
 
 ```text
-operator authorization to open T11 — Implementation Program & Execution Graph
-→ if authorized, start fresh from the then-current integrated main containing this T10 closeout; revalidate its exact SHA before work
-→ derive the smallest bounded implementation work graph and proof obligations from accepted T1→T10 authority
-→ preserve the exact 78-operation census and operation-79 absence
+B01 remains LOCKED / operator-ratified
+→ B02 remains LOCKED / operator-ratified
+→ B03 is OPEN / CANDIDATE / NOT LOCKED
+→ operator visually compare the rendered B03 Document Official hypotheses
+→ leading direction: viewer-first + collapsible right information pane
+→ inspect material states: effective + open work, effective clean, obsolete, no official Release
+→ iterate B03 hierarchy / content-to-metadata ratio / action placement from operator feedback
+→ resolve B03-F1 before any B03 LOCK: prove server-derived command affordance hints without frontend Authorization duplication and without operation 79
+→ only operator may LOCK B03
+→ only after B03 LOCK complete P9 Screen Contract / bidirectional trace and P10 bounded pattern consolidation
+→ do not open B04 as baseline before B03 LOCK
+→ do not generate B04+ in advance
 → do not begin T12
-→ do not implement Product code while the roadmap implementation gate remains BLOCKED
+→ do not implement Product code
 ```
-
-T11 is **NEXT / NOT STARTED** and is not open without separate explicit operator authorization. T12 remains closed. Product implementation remains blocked.
 
 ## Remaining architecture program
 
-| Stage | Owns | Opens / exits |
+| Stage | Owns | State |
 |---|---|---|
-| T8-E — Executable Wire Contract | Exact OpenAPI application wire, schemas, headers, problems, ETags, idempotency, pagination, upload/exact-byte contract, generated Go/TypeScript boundaries | CLOSED / OPERATOR-RATIFIED / INTEGRATED |
-| T8-F — Frontend Realization | Route tree, feature/package topology, generated transport consumption, query/state behavior, read-model consumption, editor/viewer boundaries | CLOSED / OPERATOR-RATIFIED / INTEGRATED |
-| T8-G — Runtime / Process / Deployment | Binaries/processes, River workers, renderer/scanner/provider boundaries, startup/readiness/shutdown, configuration/secrets, trust/network boundaries, observability, recovery/runtime profiles | CLOSED / OPERATOR-RATIFIED / INTEGRATED |
-| T8-H — Whole-T8 Global Coherence Review | Cross-check backend, persistence, wire, frontend, runtime and accepted upstream authorities as one system | CLOSED / OPERATOR-RATIFIED / INTEGRATED |
-| T9 — Golden Flows & Validation Baseline | Falsifiable composed-system flows and proof classes | CLOSED / OPERATOR-RATIFIED / INTEGRATED |
-| T10 — Transition / Cutover | Real current→target transition, authority edge, recovery and rollback barriers | CLOSED / OPERATOR-RATIFIED / INTEGRATED |
-| T11 — Implementation Program & Execution Graph | Bounded work graph and proof obligations | NEXT / NOT STARTED; requires separate operator authorization |
-| T12 — Adversarial Implementation-Readiness | Independent implementation-readiness attack | NOT OPEN; opens after T11 |
+| T8-E | Executable application wire | CLOSED / INTEGRATED; T8-E-RO + B02-LD consolidation pending T11 close |
+| T8-F | Frontend realization | CLOSED / INTEGRATED; T8-E-RO + B02-LD consolidation pending T11 close |
+| T8-G | Runtime / process / deployment | CLOSED / INTEGRATED |
+| T8-H | Whole-T8 coherence | CLOSED / INTEGRATED |
+| T9 | Golden Flows / validation baseline | CLOSED / INTEGRATED |
+| T10 | Transition / cutover | CLOSED / INTEGRATED |
+| T11 | Implementation graph + implementation-readiness | OPEN / B01+B02 LOCKED; B03 OPEN / CANDIDATE |
+| T12 | Adversarial implementation-readiness | NOT OPEN |
 
 ## Final implementation gate
 
@@ -180,4 +330,4 @@ operator implementation authorization = explicit
 
 ## Reopen law
 
-Completed Product/R10 decisions reopen only on material evidence defined by the owning authority or the DevelopmentConexus Engineering Method. Preference, sunk cost, old implementation shape, hypothetical future capability or generic infrastructure fashion are not reopen triggers.
+Completed Product/R10 decisions reopen only on material evidence defined by the owning authority or the DevelopmentConexus Engineering Method. Preference, sunk cost, old implementation shape, hypothetical future capability or infrastructure fashion are not reopen triggers.
