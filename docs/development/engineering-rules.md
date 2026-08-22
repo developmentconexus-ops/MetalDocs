@@ -23,6 +23,16 @@ This page contains only MetalDocs-specific controls.
 
 Before the first future implementation/code/schema/runtime commit is authorized, restore a secret-scanning control appropriate to the new repository shape.
 
+## Frontend planning visual evidence
+
+While an architecture/planning PR remains Draft, P8 rendered structural wireframes may be tracked as temporary HTML evidence only under:
+
+```text
+docs/work/current/*.html
+```
+
+This exception exists so the operator-reviewed visual artifact remains reproducible in its actual rendered medium. It does not admit production frontend code, scripts, dependencies, runtime assets, or HTML outside that bounded temporary-work root. The existing `docs/work/**` merge-candidate rule still requires all such temporary planning artifacts to be absent before integration.
+
 ## Forward decision obligations
 
 Remaining architecture stages consume current owning authorities plus `docs/decisions/forward-obligations.md`:
