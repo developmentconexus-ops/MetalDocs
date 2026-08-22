@@ -38,11 +38,20 @@ The prior all-at-once MetalDocs HTML prototype is **SUPERSEDED / NOT ACCEPTED** 
 The current frontend gate is:
 
 ```text
-B01 — App Shell + Global Information Architecture
-status: CANDIDATE / NOT LOCKED
+B01 — App Shell + Global Information Architecture   LOCKED / OPERATOR-RATIFIED
+B02 — Library / discovery                           NEXT / NOT OPEN
 ```
 
-Only the operator may set `LOCKED`. No later material block may become baseline before B01 is operator-locked unless the operator explicitly authorizes parallel candidate work.
+B01 was operator-locked on 2026-08-22 after the revised **Home A — Central operacional** visual walkthrough. Its bounded durable record and rendered structural artifact are:
+
+```text
+docs/work/current/t11-b01-app-shell.md
+docs/work/current/t11-b01-app-shell-wireframe.html
+```
+
+B01 P9 Screen Contract / bidirectional trace and bounded P10 consolidation are complete in the B01 record. The lock freezes the current structural baseline but remains subject to the normal smallest-scope evidence-backed reopen law.
+
+Only the operator may set `LOCKED`. B02 may now be opened as a future CANDIDATE because B01 is locked, but B02 is not opened by this roadmap update itself.
 
 ## T11 fixed system invariants
 
@@ -149,11 +158,11 @@ The three Round-2 notes are non-blocking realization precision and do not justif
 
 ## MetalDocs UX block program
 
-Candidate block sequence:
+Current block sequence:
 
 ```text
-B01  App Shell + Global Information Architecture   CURRENT / CANDIDATE
-B02  Library / discovery                            NOT OPEN
+B01  App Shell + Global Information Architecture   LOCKED / OPERATOR-RATIFIED
+B02  Library / discovery                            NEXT / NOT OPEN
 B03  Document Official                              NOT OPEN
 B04  Document Work / authoring                      NOT OPEN
 B05  My Work                                        NOT OPEN
@@ -162,7 +171,7 @@ B07  History / Audit                                NOT OPEN
 B08  Administration                                 NOT OPEN
 ```
 
-Names/order after B01 remain candidate because the global IA may refine grouping without changing Product authority.
+Names/order after B01 remain candidate because later evidence may refine grouping without changing Product authority. Any B01 reopen follows the normal smallest-scope finding law and does not invalidate later work automatically.
 
 Each material block follows:
 
@@ -256,17 +265,17 @@ No historical business migration, dual Product authority, legacy fallback, compa
 ## Exact next action
 
 ```text
-OPEN B01 as CANDIDATE only
-→ recover smallest B01 authority + user-goal evidence
-→ derive candidate global IA/object-task grouping
-→ targeted reference study of comparable DMS/knowledge/SaaS shells and established design-system navigation patterns
-→ propose 2–3 global App Shell / IA hypotheses only where genuine ambiguity exists
-→ perform lightweight data/navigation feasibility check
-→ render bounded grayscale structural candidates that the operator can actually view
-→ operator + assistant discuss navigation, hierarchy, position, size, density, browse/search entry and future extension seams
-→ revise until operator explicitly LOCKS B01
-→ only after B01 LOCK complete its Screen Contract / trace and pattern consolidation
-→ do not open B02 as baseline before B01 LOCK
+B01 remains LOCKED / operator-ratified
+→ do not reopen B01 by preference; use smallest-scope evidence-backed reopen only if later evidence falsifies it
+→ NEXT: open B02 — Library / discovery as CANDIDATE only
+→ recover the smallest B02 authority + user-goal evidence
+→ study official-document discovery/findability references only where triggered
+→ compare genuine Library structural hypotheses when ambiguity is real
+→ perform lightweight data/filter/navigation feasibility
+→ render only the B02 grayscale structural candidate
+→ operator + assistant visually adjudicate B02
+→ only operator may LOCK B02
+→ do not generate B03+ in advance
 → do not begin T12
 → do not implement Product code
 ```
@@ -281,7 +290,7 @@ OPEN B01 as CANDIDATE only
 | T8-H | Whole-T8 coherence | CLOSED / INTEGRATED |
 | T9 | Golden Flows / validation baseline | CLOSED / INTEGRATED |
 | T10 | Transition / cutover | CLOSED / INTEGRATED |
-| T11 | Implementation graph + implementation-readiness | OPEN / B01 global IA candidate gate |
+| T11 | Implementation graph + implementation-readiness | OPEN / B01 LOCKED; B02 NEXT / NOT OPEN |
 | T12 | Adversarial implementation-readiness | NOT OPEN |
 
 ## Final implementation gate
