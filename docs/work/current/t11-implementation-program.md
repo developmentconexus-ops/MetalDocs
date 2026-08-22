@@ -19,6 +19,9 @@ Product implementation                BLOCKED
 legacy implementation in live tree    ABSENT
 application operations                78
 operation 79                          ABSENT
+Idempotency-Key creations             exact 10
+ETag read / mutation domains          13 / 13
+exact-byte resources                  exact 4
 ```
 
 The future execution graph defined here is inert while the roadmap implementation gate is BLOCKED. It becomes executable only after every final implementation-gate condition in `docs/roadmap.md` is satisfied, including T12 closure, Whole-R10 coherence, fresh independent challenge and explicit operator implementation authorization.
@@ -123,14 +126,18 @@ S7 Obsolescence + Audit read — 4 ops
         ↓
 P4 runtime / recovery closure
         ↓
-P5 whole implementation proof closure
+T10 B1 private target
         ↓
-T10 B2 clean seal
+P5 whole implementation proof closure on the exact private candidate
         ↓
-T10 B3 first authoritative Product mutation
+T10 B2 real proof + clean seal
+        ↓
+T10 B3 first authoritative Product mutation / point of no return
         ↓
 T10 B4 recovery point + serving fence + canonical activation
 ```
+
+T10 B0 remains a prerequisite to treating any target preparation as cutover and must be revalidated before B1. It is not converted into a Product implementation node.
 
 `26 + 7 + 10 + 12 + 11 + 8 + 4 = 78`.
 
@@ -152,7 +159,7 @@ Frontend is deliberately **not** a late standalone semantic phase. P1 establishe
 | S6 | GovernanceAttempt/Step/feedback/decision, Release and OfficialRendition | S5 + P3 River/renderer/scanner mechanisms | 8 | GF4; E2+E3+E5+E6; V4/V5/V6/V7/V8; browser lens when claimed |
 | S7 | obsolescence commands/reads plus Audit event read | S6 | 4 | GF5 with discovery/history from prior slices; E2+E3+E4 as claim-relevant; disclosure/history/Audit falsifiers |
 | P4 | final runtime failure isolation, durable-work, shutdown and recovery behavior | S1→S7 + P3 | 0 | GF6; E2+E5+E6; V8/V9/V10 |
-| P5 | exact whole-implementation candidate and proof dossier | all prior nodes | 78 closed | 6/6 GF; 10/10 V; T8-E runtime conformance classes; 78/78 census; real-dependency proof where claimed |
+| P5 | exact whole-implementation candidate and proof dossier | all prior nodes + B1 private target | 78 closed | 6/6 GF; 10/10 V; T8-E runtime conformance classes; 78/78 operations; idempotent creations 10; ETag domains 13/13; exact-byte resources 4; real-dependency proof where claimed |
 
 A node may use more evidence classes than its minimum when the protected claim requires them. The table is not permission to replace a stronger accepted proof with a weaker one.
 
@@ -345,7 +352,8 @@ new or modified production subjects
 positive proof
 causal negative/fault proof
 T9 GF/V obligations advanced or closed
-78-operation census delta = 0 unless implementing an already-assigned operation
+application-census effect limited to already-assigned operations
+cross-cutting census effect, if any, remains within accepted T8-E counts
 remaining downstream prerequisites
 ```
 
@@ -387,13 +395,16 @@ Execution mapping:
 
 ```text
 B0
-  revalidate source/business-authority classification before target preparation is treated as cutover
+  must be current before any target preparation is treated as cutover; source/business-authority classification is revalidated before B1 work
 
 B1
-  may be reached only by a privately prepared target using accepted runtime components; ordinary canonical serving remains fenced
+  follows implementation/runtime preparation only when the exact target candidate is private and ordinary canonical serving remains fenced
+
+P5
+  runs the complete T9 proof closure against that exact B1 private production candidate
 
 B2
-  requires the exact P5 candidate to satisfy real T9 proof and the accepted operations/provenance clean seal
+  requires the exact P5 candidate to satisfy real T9 proof plus the accepted operations/provenance clean seal
 
 B3
   occurs only after B2 and explicit launch authorization; the first authoritative R10 Product mutation is the point of no return
@@ -438,6 +449,9 @@ T11 can be ratified only when all are true:
 implementation DAG has no unresolved dependency cycle or unowned material work
 78/78 application operations are assigned exactly once
 operation 79 is absent
+Idempotency-Key creation census remains exact 10
+ETag read / mutation domains remain 13 / 13
+exact-byte resources remain exact 4
 6/6 Golden Flows have a future implementation/proof owner
 10/10 T9 cross-cutting properties have a future implementation/proof owner
 T8-E runtime wire-conformance closure is assigned to P5 on the real composed path
