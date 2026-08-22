@@ -10,346 +10,220 @@ summary: Sole mutable MetalDocs stage, gate, implementation-status, and next-act
 ## Current state
 
 ```text
-REPOSITORY MODE                       CLEAN-SLATE / ARCHITECTURE-FIRST
-REPOSITORY RESET                      MERGED / OPERATOR-RATIFIED
-REPOSITORY STANDARD V1 ALIGNMENT      MERGED
-PRODUCT / OWNERSHIP                   OPERATOR-APPROVED
-T1 → T10                              CLOSED / OPERATOR-RATIFIED / INTEGRATED
-T11                                   OPEN / ACTIVE CANDIDATE
-T12                                   NOT OPEN
-IMPLEMENTATION                        BLOCKED
-LEGACY IMPLEMENTATION                 ABSENT FROM LIVE TREE
+REPOSITORY MODE       CLEAN-SLATE / ARCHITECTURE-FIRST
+T1 → T10              CLOSED / OPERATOR-RATIFIED / INTEGRATED
+T11                   OPEN / ACTIVE CANDIDATE
+T12                   NOT OPEN
+IMPLEMENTATION         BLOCKED
+Draft PR               #162
+branch                 arch/t11-implementation-program
+opening main           cae6ba48df5d611959c0390e0f2b9b8194d62a9d
 ```
 
-## Current gate
+Repository-local Product/architecture authority remains in `docs/product/**`, `docs/architecture/**`, and `docs/decisions/**`. `docs/work/current/**` is temporary Draft planning/evidence and cannot survive a merge candidate.
 
-T11 remains **OPEN / ACTIVE** on Draft PR #162.
+## Frontend Product Experience gate
 
-Reusable frontend planning method:
+Method:
 
 ```text
 docs/development/functional-html-wireframe-method.md
 Frontend Product Experience Planning Method v2.1
-Fable Round 2: CONVERGED / MATERIAL=0
 ```
 
-The prior all-at-once MetalDocs HTML prototype is **SUPERSEDED / NOT ACCEPTED** and is not an implementation baseline.
-
-The current frontend gate is:
+Current block state:
 
 ```text
-B01 — App Shell + Global Information Architecture   LOCKED / OPERATOR-RATIFIED
-B02 — Library / discovery                           LOCKED / OPERATOR-RATIFIED
-B03 — Document Official                             OPEN / CANDIDATE / NOT LOCKED
-B04 — Document Work / authoring                     NOT OPEN
+B01  App Shell + Global IA       LOCKED / OPERATOR-RATIFIED
+      notification delta         REOPEN CANDIDATE / OPERATOR-RATIFIED / P8 NOT YET RE-LOCKED
+
+B02  Library / discovery         LOCKED / OPERATOR-RATIFIED
+
+B03  Document Official           OPEN / CANDIDATE / NOT LOCKED
+      Discussion/Notifications   D0→D8 OPERATOR-RATIFIED CANDIDATE
+      Lead GCR                   NOT CONVERGED — MATERIAL=3 / IMPORTANT=6
+
+B04+                             NOT OPEN
 ```
 
-B01 was operator-locked on 2026-08-22 after the revised **Home A — Central operacional** visual walkthrough. Its bounded durable record and canonical rendered structural artifact are:
+B01 preserved baseline:
 
 ```text
-docs/work/current/t11-b01-app-shell.md
-docs/work/current/t11-b01-app-shell-wireframe.html
+Início       = current operational situation
+Minha Caixa  = assigned work
+Documentos   = official document truth / creation
+Gestão       = system configuration
+Evidência    = audit/evidence
 ```
 
-B01 P9 Screen Contract / bidirectional trace and bounded P10 consolidation are complete in the B01 record. The lock freezes the current structural baseline but remains subject to the normal smallest-scope evidence-backed reopen law. The operator-required in-application Notification capability discovered during B03 may justify exactly such a bounded B01 reopen for notification chrome; no B01 structure is changed until that mini-design is ratified.
-
-B02 was operator-locked on 2026-08-22 after iterative visual adjudication from table-first hypotheses to **C3 — Discovery-first Library with Por tipo + Por área**. Its bounded record and canonical rendered structural artifact are:
+The notification reopen candidate keeps the sidebar unchanged and adds only:
 
 ```text
-docs/work/current/t11-b02-library.md
-docs/work/current/t11-b02-library-wireframe.html
+utility-header bell + unseen badge
+Quick Inbox
+stable /notifications full Inbox route
 ```
 
-B02-F1 is resolved by the bounded `B02-LD` Library read-composition precision: the first page of the existing `listDocuments` operation supplies complete disclosure-safe discovery options for Document Type, Area and responsible owner from the actor's currently disclosable status universe. It adds no operation, owner, Permission or route; operation 79 remains absent. B02 P9 Screen Contract / bidirectional trace and bounded P10 consolidation are complete in the B02 record. The precision must be consolidated into effective T6/T8-E/T8-F owners before T11 integration.
+A smallest-scope rendered P8 delta is required before the implicated B01 scope may be re-LOCKED.
 
-B03 is now OPEN / CANDIDATE. Its bounded current record is:
+B03 direction remains:
 
 ```text
-docs/work/current/t11-b03-document-official.md
+/documents/:document_id
+= stable Document ficha/record first
+→ explicit read-only official-content viewer
+→ Document Discussion on the stable Document
+
+Document Work   remains separate B04
+Governance Case remains separate B06
+History         remains separate B07
 ```
 
-Direct operator feedback plus bounded legacy evidence corrected the initial viewer-first hypothesis. Current B03 direction is **record/ficha first + deliberate distinct read-only official-content viewer**. The stable Document record must communicate identity, official truth, responsibility, current work/obsolescence context, history entry, management affordances and the operator-required Document Discussion surface.
+B03-F1 remains open: server-derived Document Official `allowed_actions` precision for create Revision / owner replacement / obsolescence actions without frontend AuthZ duplication.
 
-Two material B03 findings are now open:
+## Current accepted system invariants
+
+Until the bounded Discussion/Notifications reopen is fully corrected, independently challenged, consolidated and promoted, current integrated authority remains:
 
 ```text
-B03-F1
-server-derived command-affordance hints for
-create Revision / replace responsible owner / create obsolescence / withdraw obsolescence
-without rebuilding Authorization in React
-
-B03-F2
-operator-required stable-Document Discussion
-+ @mention of current MetalDocs Users
-+ required in-application Notification
+semantic owners                  4 business + Audit supporting
+stable SPA routes                10
+application operations           78
+operation 79                     ABSENT
+Idempotency-Key creations        10
+ETag read / mutation domains     13 / 13
+exact-byte resources             4
+Product implementation           BLOCKED
 ```
 
-B03-F2 is a genuine bounded Product/architecture reopen trigger. Current Product/T3/T5/T6/T8-E/T8-F authority has no Document Discussion semantic model, mention contract or Notification surface; Notifications were explicitly deferred absent a named consumer. The operator has now supplied that consumer and requires the capability before Launch V1.
-
-B03 is temporarily paused at the B03-F2 mini-design gate. The mini-design must close the user-visible semantics that can change B01/B03 and backend contracts before visual adjudication resumes. Framework/repository/library selection is explicitly later evidence work and may not define Product semantics.
-
-Only the operator may set `LOCKED`. B04 remains NOT OPEN.
-
-## T11 fixed system invariants
+Existing operator-approved T11 precisions remain candidate for T11 consolidation:
 
 ```text
-opening integrated main               cae6ba48df5d611959c0390e0f2b9b8194d62a9d
-branch                                 arch/t11-implementation-program
-Draft PR                               #162
-application operations                 78
-orphaned / invented                    0 / 0
-operation 79                           ABSENT
-Idempotency-Key creations             10
-ETag read / mutation domains          13 / 13
-exact-byte resources                  4
-Product implementation                BLOCKED
+T8-E-RO  responsible_owner_candidates on getDocument
+B02-LD   first-page Library discovery options
 ```
 
-These are the **currently accepted** system invariants. B03-F2 is an authorized material reopen candidate, not permission to silently change them. Exact operation, Permission, idempotency and async deltas are updated only after the Discussion/@Mention/Notification mini-design is operator-ratified and the smallest implicated authorities are explicitly reopened.
+## Discussion / Mention / Notifications bounded reopen candidate
 
-The operator-approved T8-E-RO precision remains binding and adds no operation, Permission, owner or route.
-
-## Frontend planning correction
-
-The first T11 frontend pass proved backend/screen coverage but moved directly from semantic Screen Contracts to a whole-product HTML prototype. Operator review rejected that workflow because it skipped deliberate product/UX planning for:
+Operator-ratified Product/UX candidate:
 
 ```text
-user needs / jobs
-information architecture
-navigation mental model
-reference study
-layout alternatives
-screen hierarchy
-relative size / density
-cards vs tables vs lists vs master-detail
-progressive disclosure
-screen-by-screen operator visual walkthrough
-pattern derivation after reviewed repetition
+stable-Document Discussion
+immutable Launch DiscussionMessage
+chronological timeline + optional one-message reply reference
+semantic @Mention(user_id)
+purpose-built disclosure-safe mention autocomplete
+in-app Notification only; no Launch email/push
+new document.discuss write Permission
+Notifications = second supporting semantic owner
+seen / read-unread / archive-unarchive Inbox lifecycle
+current source disclosure always rechecked
+bell + Quick Inbox + /notifications
 ```
 
-No Product/T1→T10 authority was reopened by this methodological correction.
-
-## Frontend Product Experience Planning Method v2.1
-
-The converged process is:
+Candidate technical result after D7/D8:
 
 ```text
-GLOBAL FOUNDATION
-P0  accepted authority
-P1  actors / jobs / user needs
-P2  end-to-end user flows
-P3  frontend coverage
-P4  candidate Information Architecture
-P5  screen / material-surface inventory
+semantic owners                  4 business + 2 supporting
+stable SPA routes                11
+PermissionCode values            16
+application operations           86
+Idempotency-Key creations        11
+ETag read / mutation domains     13 / 13
+exact-byte resources             4
 
-PER-BLOCK LOOP
-P6  targeted reference study when triggered
-P7  competing layout hypotheses when ambiguity is real
-P8  rendered structural wireframe + operator visual adjudication
-    → only operator may LOCK
-P9  Screen Contract + bidirectional backend trace
-P10 bounded pattern consolidation after LOCK
-P11 interaction realization / low-fi prototype after structural lock
-
-ASSEMBLED CLOSURE
-P10 terminal pattern reconciliation
-P11 assembled interaction prototype when required
-P12 adversarial UX + architecture walkthrough
-P13 visual-design handoff + structural-conformance review
-P14 frontend implementation-readiness closure
+generic EventBus                 absent
+external broker                  absent
+Redis baseline                   absent
+River durable-work mechanism     preserved
+Notification creation            same local PostgreSQL Scope as accepted Mention
+Notification realtime            SSE invalidation only
+Launch wake-up                   in-process coalescing mechanism candidate
+multi-replica wake-up seam       PostgreSQL LISTEN/NOTIFY first candidate
+Discussion composer              Lexical mechanism; Product persists Text | Mention(user_id)
 ```
 
-Hard laws include:
+These values are **candidate reopen results, not yet promoted current authority**.
+
+Durable candidate records:
 
 ```text
-no whole-product wireframe generation in one pass
-no assistant/reviewer/tool may set LOCKED
-P8 must be a rendered/viewable visual artifact; prose alone is insufficient
-no layout chosen merely from backend shape
-no shared pattern frozen before reviewed repetition exists
-no screen-shaped API for frontend convenience
-accessibility + responsive behavior are structural
-material assumptions remain registered until probed/resolved
-visual design cannot silently change locked structure
+docs/work/current/t11-b03-discussion-notification-mini-design.md
+docs/work/current/t11-b03-notification-ownership-reopen.md
+docs/work/current/t11-b03-notification-engagement.md
+docs/work/current/t11-b03-discussion-notification-d5.md
+docs/work/current/t11-b01-notifications-reopen.md
+docs/work/current/t11-b03-discussion-notification-d7-contract.md
+docs/work/current/t11-b03-notification-technology-spike.md
+docs/work/current/t11-notifications-global-coherence-review.md
 ```
 
-### Methodology review proof
+## Lead Global Coherence Review
+
+Current Lead GCR verdict:
 
 ```text
-v2 candidate HEAD                     a9e6f3b3ae2b8e56c65d8114e1551e40ec1d7161
-candidate CI                          #1218 SUCCESS
-Round 1 Evidence PR                   #163 CLOSED / UNMERGED
-Round 1 verdict                       NOT CONVERGED
-Round 1 findings                      MATERIAL=2 / IMPORTANT=10
-corrected v2.1 HEAD                   4b0bf734e70e59e06008d401a0d3d12d9540310e
-corrected CI                          #1221 SUCCESS
-Round 2 Evidence PR                   #164 CLOSED / UNMERGED
-Round 2 valid Evidence HEAD           e2336bab468e04a56ed850cfa93a1fb6f53ca530
-Round 2 CI                            #1223 SUCCESS
-Round 2 verdict                       CONVERGED
-Round 2 findings                      MATERIAL=0 / IMPORTANT=0 / OPTIONAL=3
-Round 3                               NOT JUSTIFIED
+NOT CONVERGED
+MATERIAL   3
+IMPORTANT  6
 ```
 
-Fable's original Round-2 response commit `f950ccabe1293926e481951ebda3cfebbccf91a1` was accidentally authored on the old Round-1 lineage. Its exact `ai-dialog.md` blob was re-anchored byte-identically onto the correct Round-2 branch rooted at `4b0bf734...`; CI #1223 verified Repository Standard isolation. The review text was not altered.
-
-The three Round-2 notes are non-blocking realization precision and do not justify a methodology change or Round 3.
-
-## MetalDocs UX block program
-
-Current block sequence:
+The three material findings do **not** change the Product capability set or the candidate `4+2 / 11 routes / 86 ops / 11 idempotent creates` result. They require authority/enforcement corrections:
 
 ```text
-B01  App Shell + Global Information Architecture   LOCKED / OPERATOR-RATIFIED
-B02  Library / discovery                            LOCKED / OPERATOR-RATIFIED
-B03  Document Official                              CURRENT / CANDIDATE / NOT LOCKED; B03-F2 MINI-DESIGN GATE
-B04  Document Work / authoring                      NOT OPEN
-B05  My Work                                        NOT OPEN
-B06  Governance                                     NOT OPEN
-B07  History / Audit                                NOT OPEN
-B08  Administration                                 NOT OPEN
+M1  Mention eligibility:
+    Organization authors User facts;
+    Controlled Documents authors resource predicate facts;
+    Authorization alone decides ALLOW/DENY;
+    application coordinates.
+    Author + Mention-target ENABLED eligibility must serialize with offboarding.
+
+M2  Notification presentability:
+    current source disclosure must be composed server-side before public page/count results;
+    no frontend post-filter and no copied ACL/presentable authority in Notifications.
+
+M3  SSE/wake-up:
+    preserve transport -> application inbound direction;
+    platform realtime remains mechanism only;
+    wake after successful Notification creation/engagement commit, never from semantic owners.
 ```
 
-Names/order after B01 remain candidate because later evidence may refine grouping without changing Product authority. Any locked-block reopen follows the normal smallest-scope finding law and does not invalidate later work automatically.
-
-Each material block follows:
-
-```text
-bounded authority + user goals
-→ targeted reference study when triggered
-→ 2–3 structural hypotheses when real ambiguity exists
-→ lightweight backend/data feasibility check
-→ rendered visual structural candidate
-→ operator walkthrough: hierarchy / position / size / density / discoverability
-→ findings / revision
-→ OPERATOR LOCK
-→ Screen Contract + backend trace
-→ bounded pattern consolidation
-→ interaction realization only after lock
-```
-
-The assistant and operator converse block-by-block. Remaining screens are never generated automatically as baseline.
-
-## Final implementation DAG candidate
-
-The backend/implementation partition remains:
-
-```text
-P0 authority / implementation-admission pin
- ↓
-P1 structural + executable-contract spine
- ├────────────────────┐
-P2 persistence        P3 runtime/dependency/non-serving bootstrap
- └──────────┬─────────┘
-            ↓
-S1 Identity + Organization + Access                         33
- ↓
-S2 Document Governance configuration                       10
- ↓
-S3 Document core + creation + authoring + Submission       22
-   + Library + My Work authoring + History
- ↓
-S4 Governance work + Governance Case + Release/rendition    9
- ↓
-S5 Obsolescence + Audit                                     4
- ↓
-P4 runtime / durable-work / recovery closure
- ↓
-T10 B1 private target
- ↓
-P5 whole implementation proof closure
- ↓
-T10 B2 → B3 → B4
-```
-
-`33 + 10 + 22 + 9 + 4 = 78` is the current accepted implementation partition. B03-F2 may require a bounded DAG/census amendment after ratification; no speculative count is assigned beforehand.
-
-## T8-E-RO — approved responsible-owner precision
-
-Existing operation 47 remains `getDocument`. `DocumentOfficialView` gains:
-
-```text
-responsible_owner_candidates?: UserReference[]
-```
-
-Binding law:
-
-```text
-present iff current document.owner.manage = ALLOW for the exact Document
-contents = complete existing + same-Company + ENABLED Users
-order = user_id ASC
-absence discloses neither candidate existence nor reason
-```
-
-The list grants no authority and is outside the ResponsibleOwner ETag domain. Replacement still rechecks current AuthZ, D4 eligibility/offboarding serialization and `If-Match`.
-
-Before T11 integration, effective T6/T8-E/T8-F owners must consolidate this approved precision together with the B02-LD Library discovery precision and any later operator-approved B03 read/collaboration precision.
-
-## T10 preserved authority
-
-Binding barriers remain:
-
-```text
-B0 source truth
-→ B1 private target
-→ B2 exact candidate proof + verified clean seal
-→ B3 first authoritative Product mutation / point of no return
-→ B4 authoritative recovery point + serving fence + canonical activation
-```
-
-No historical business migration, dual Product authority, legacy fallback, compatibility bridge or Product activation marker is introduced. Any future operation-census delta from B03-F2 must be explicitly ratified before it becomes current authority.
+Important corrections cover race-safe batch seen, completed idempotency replay, Audit/History non-duplication, persistence constraints, OpenAPI SSE proof, and visual/upstream sequencing. Exact text is owned by `docs/work/current/t11-notifications-global-coherence-review.md`.
 
 ## Exact next action
 
 ```text
-B01 remains LOCKED / operator-ratified, subject only to evidence-backed smallest-scope reopen
-→ B02 remains LOCKED / operator-ratified
-→ B03 is OPEN / CANDIDATE / NOT LOCKED
-→ B03-F2 mini-design gate is CURRENT
-→ close, one decision at a time:
-     Discussion read/write eligibility
-     message/reply semantics
-     @mention candidate + validation semantics
-     in-app Notification create/read/unread/navigation semantics
-     information-disclosure/offboarding behavior
-     smallest B01 notification-chrome impact
-     smallest Product/T3/T5/T6/T8-E/T8-F reopen set
-→ do NOT select chat/notification framework before semantics are frozen
-→ operator ratifies mini-design
-→ consolidate only the smallest approved upstream authority delta
-→ update exact operation / Permission / idempotency / async census from approved delta
-→ apply bounded B01 reopen only if notification chrome requires it
-→ resume B03 record-first wireframe with real Discussion semantics
-→ resolve B03-F1 before any B03 LOCK
-→ only operator may LOCK B03
-→ only after B03 LOCK complete P9 Screen Contract / bidirectional trace and P10 bounded pattern consolidation
-→ do not open B04 as baseline before B03 LOCK
-→ do not generate B04+ in advance
-→ do not begin T12
-→ do not implement Product code
+1. Operator adjudicates Lead GCR M1→M3 + I1→I6.
+2. Apply accepted bounded corrections to the D0→D8 candidate package.
+3. Re-run Lead Global Coherence Review; require MATERIAL=0 and IMPORTANT=0 for convergence.
+4. Run METHOD-required fresh independent challenge on the corrected package.
+5. Adjudicate reviewer evidence; repeat only if material/important findings remain.
+6. Consolidate the smallest approved delta into Product / T1 / Ownership / T3 / T5 / T6 / T8-B→G / T9 / T11 authorities.
+7. Only then promote exact 4+2 / 11 routes / 86 operations / 11 Idempotency-Key creations as current authority.
+8. Render and adjudicate smallest B01 P8 notification delta; only operator may re-LOCK it.
+9. Resume B03 P8 with real Discussion/Notification semantics; resolve B03-F1; only operator may LOCK B03.
+10. Do not open B04+, T12, or Product implementation before their normal gates.
 ```
 
-## Remaining architecture program
-
-| Stage | Owns | State |
-|---|---|---|
-| T8-E | Executable application wire | CLOSED / INTEGRATED; T8-E-RO + B02-LD consolidation pending T11 close; B03-F2 may cause bounded reopen |
-| T8-F | Frontend realization | CLOSED / INTEGRATED; T8-E-RO + B02-LD consolidation pending T11 close; B03-F2 may cause bounded reopen |
-| T8-G | Runtime / process / deployment | CLOSED / INTEGRATED |
-| T8-H | Whole-T8 coherence | CLOSED / INTEGRATED |
-| T9 | Golden Flows / validation baseline | CLOSED / INTEGRATED |
-| T10 | Transition / cutover | CLOSED / INTEGRATED |
-| T11 | Implementation graph + implementation-readiness | OPEN / B01+B02 LOCKED; B03 OPEN / B03-F2 MINI-DESIGN GATE |
-| T12 | Adversarial implementation-readiness | NOT OPEN |
-
-## Final implementation gate
-
-Implementation remains blocked until all are true:
+## Hard stops
 
 ```text
-T8  CLOSED / OPERATOR-RATIFIED / INTEGRATED
-T9  CLOSED / OPERATOR-RATIFIED / INTEGRATED
-T10 CLOSED / OPERATOR-RATIFIED / INTEGRATED
+no Product code/schema/OpenAPI implementation/runtime/deploy work
+no T12 work
+no framework/library allowed to redefine Product semantics
+no generic EventBus/broker/Redis without a named material trigger
+no frontend Authorization matrix
+no legacy implementation restoration by sunk cost
+no merge authorization implied
+```
+
+## T11 closure / implementation gate
+
+T11 remains open until the frontend planning method completes through assembled closure and all bounded upstream findings are durably reconciled.
+
+Implementation remains blocked until:
+
+```text
 T11 CLOSED / OPERATOR-RATIFIED
 T12 CLOSED / OPERATOR-RATIFIED
 Integrated Whole-R10 coherence = PASS
@@ -359,4 +233,4 @@ operator implementation authorization = explicit
 
 ## Reopen law
 
-Completed Product/R10 decisions reopen only on material evidence defined by the owning authority or the DevelopmentConexus Engineering Method. Preference, sunk cost, old implementation shape, hypothetical future capability or infrastructure fashion are not reopen triggers. The operator-required B03-F2 capability is material current-product evidence and is therefore a valid bounded reopen trigger.
+Accepted Product/R10 decisions reopen only on material evidence under the DevelopmentConexus Engineering Method. The operator-required Discussion/@Mention/Notification capability is valid new-consumer evidence. Preference, sunk cost, framework availability, hypothetical scale or infrastructure fashion are not reopen triggers.
