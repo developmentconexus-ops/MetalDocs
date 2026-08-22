@@ -109,12 +109,60 @@ Rationale:
 
 Commands must always recheck current authorization; frontend affordance presence is UX guidance only.
 
-## 5. Open decisions
+## 5. D2 — message / reply semantics — OPERATOR-RATIFIED
+
+**Decision:** Discussion is one chronological linear timeline over the stable Document. A message may optionally reference one prior message, but replies do not create a separate semantic Thread aggregate or an arbitrarily nested tree.
+
+Candidate semantic shape:
+
+```text
+DocumentDiscussionMessage
+  message_id
+  document_id
+  author_user_id
+  created_at
+  body
+  reply_to_message_id?       // optional reference to one prior message
+  official_revision_at_post? // contextual snapshot, not ownership
+```
+
+Binding laws:
+
+```text
+message belongs to stable Document identity
+reply remains an ordinary message in the same chronological timeline
+reply_to_message_id, when present, must reference a message in the same Document Discussion
+no separate Thread owner/lifecycle is introduced
+no semantic nesting depth exists; a reply to a reply is still one new message with one reference
+```
+
+The server also records the official Revision that existed when the message was accepted, when one exists:
+
+```text
+current official Revision exists
+→ official_revision_at_post = exact current official Revision identity
+
+no official Release exists
+→ official_revision_at_post absent
+```
+
+This contextual snapshot does not move Discussion ownership from Document to Revision and does not bind the message to WorkingContent/DRAFT. A later Release never rewrites the stored context of an older message.
+
+Rationale / global-maximum result:
+
+- preserves stable-Document conversation across Revision changes;
+- preserves historical conversational context without turning Discussion into Revision history;
+- supports direct message references, mentions and future notification routing;
+- avoids hidden thread state, deep reply trees and a Slack/forum domain that Launch does not need;
+- remains useful even if later visual presentation stops resembling a chat.
+
+Message edit/delete semantics remain deliberately open for D5. `@mention` parsing/identity belongs D3. Pagination/API mechanics belong D7.
+
+## 6. Open decisions
 
 Close one at a time before upstream consolidation:
 
 ```text
-D2 message / reply semantics
 D3 @mention candidate discovery + accepted-message validation
 D4 Notification identity / unread-read lifecycle / navigation
 D5 disclosure, offboarding, deletion/edit immutability behavior
