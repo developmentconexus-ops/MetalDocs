@@ -1,10 +1,11 @@
-# T11 — B01 rendered structural wireframe
+# T11 — B01 structural wireframe companion
 
 > **Status:** LOCKED / OPERATOR-RATIFIED on 2026-08-22.  
 > **Block:** B01 — App Shell + Global Information Architecture.  
-> **Selected direction:** Home A — Central operacional.
+> **Selected direction:** Home A — Central operacional.  
+> **Canonical rendered visual:** `docs/work/current/t11-b01-app-shell-wireframe.html`
 
-This file is the repository-safe rendered structural record of the B01 candidate the operator visually reviewed and approved. It preserves the locked information architecture, first-fold hierarchy, navigation grouping and responsive transformation without becoming production frontend code or final visual design.
+This Markdown file is the textual/accessibility companion to the canonical HTML artifact the operator visually reviewed and approved. It preserves the locked information architecture, first-fold hierarchy, navigation grouping and responsive transformation in a repository-readable form, but it does not replace the HTML as the P8 visual reference.
 
 ## Desktop structural frame
 
@@ -145,4 +146,4 @@ Fixed shortcuts are permitted because they navigate to already-admitted tasks. P
 
 ## Scope fence
 
-This rendered record freezes only B01. It does not pre-design Library, Document Official, Document Work/editor, Governance Case, History/Audit detail or Administration detail. Those remain owned by later blocks and must go through their own operator visual cycles.
+This companion record freezes only B01. It does not pre-design Library, Document Official, Document Work/editor, Governance Case, History/Audit detail or Administration detail. Those remain owned by later blocks and must go through their own operator visual cycles.
