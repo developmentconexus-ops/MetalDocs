@@ -11,10 +11,10 @@ T10 does **not** implement Product code, create migration tooling, add compatibi
 Fixed opening state:
 
 ```text
-opening main                         fc7030e98021bdb55fa806df68821cf19ed1a40c
-T1 → T9                              CLOSED / OPERATOR-RATIFIED / INTEGRATED
-T10                                  OPEN / ACTIVE candidate
-T11 → T12                            NOT OPEN
+opening main                          fc7030e98021bdb55fa806df68821cf19ed1a40c
+T1 → T9                               CLOSED / OPERATOR-RATIFIED / INTEGRATED
+T10                                   OPEN / ACTIVE candidate
+T11 → T12                             NOT OPEN
 Product implementation                BLOCKED
 legacy implementation in live tree    ABSENT
 application operations                78
@@ -26,10 +26,10 @@ operation 79                          ABSENT
 T7 already closed the historical-business-migration question:
 
 ```text
-current/pre-R10 MetalDocs business history      NONE
-required pre-R10 business corpus                 NONE
-historical business migration at Launch          NOT REQUIRED
-DEV/test state preservation                      REJECTED
+pre-R10 MetalDocs business history    NONE
+required pre-R10 business corpus      NONE
+historical business migration         NOT REQUIRED
+DEV/test state preservation           REJECTED
 ```
 
 Therefore T10 is a **technical activation/recovery contract**, not a business-history migration program.
@@ -38,42 +38,36 @@ Any real external DB/content/IdP/deploy estate discovered later is classified fi
 
 If concrete evidence instead proves that pre-R10 authoritative business history or a required pre-R10 corpus exists, T10 stops and routes a bounded reopen to T7/the smallest implicated owner before any migration design proceeds.
 
-## 3. Options considered
+## 3. Selected approach
 
-### A — One-way greenfield activation with explicit barriers — SELECTED
+Three transition shapes were considered:
 
 ```text
-prepare target privately
-→ prove target
-→ activate one canonical serving authority
-→ first authoritative R10 Product mutation
-→ destructive rollback becomes forbidden
+A  one-way greenfield activation with explicit barriers   SELECTED
+B  blue/green dual business authority                     REJECTED
+C  migration/compatibility bridge                         REJECTED
 ```
 
-This is the smallest model consistent with T7 and the clean-slate T8 baseline.
+B is rejected because no accepted continuity requirement justifies two systems capable of committing Product truth.
 
-### B — Blue/green dual business authority — REJECTED
+C is rejected because it would recreate import, schema-translation, legacy fallback or compatibility machinery that T7 found unnecessary for Launch.
 
-Rejected because no business-history continuity consumer requires dual serving or dual mutation authority. It would introduce synchronization/divergence failure classes without protecting an accepted requirement.
-
-### C — Migration/compatibility bridge — REJECTED
-
-Rejected because it would recreate import, schema-translation, legacy fallback or compatibility machinery that T7 explicitly found unnecessary for Launch.
-
-## 4. Selected transition law
+Selected law:
 
 ```text
 ONE-WAY GREENFIELD R10 ACTIVATION
 +
 PRIVATE PREPARATION
 +
-PROOF BEFORE NORMAL SERVING
+PROOF BEFORE AUTHORITATIVE BOOTSTRAP
++
+FIRST-AUTHORITATIVE-MUTATION = POINT OF NO RETURN
++
+SERVING ACTIVATION ONLY AFTER AUTHORITATIVE BASELINE EXISTS
 +
 ONE BUSINESS AUTHORITY AT A TIME
 +
-EXPLICIT FIRST-AUTHORITATIVE-MUTATION BARRIER
-+
-FAIL-CLOSED / R10 RECOVERY AFTER THAT BARRIER
+FAIL-CLOSED / R10 RECOVERY AFTER AUTHORITY BEGINS
 ```
 
 Explicitly absent:
@@ -90,9 +84,7 @@ old/new business reconciliation
 rollback by restoring disposable DEV/test state as Product authority
 ```
 
-## 5. Transition barriers
-
-T10 freezes five monotonic barriers.
+## 4. Five monotonic barriers
 
 ### B0 — Source truth classified
 
@@ -122,9 +114,7 @@ An item may be marked disposable only after proving it is non-authoritative DEV/
 
 ### B1 — Target privately prepared
 
-A future target realization may be provisioned privately with the accepted T8 runtime components and mechanisms, but it is not yet normal production authority.
-
-Target preparation may include only already-accepted consumers/mechanisms, for example:
+A future target realization may be provisioned privately with only the accepted T8 runtime components and mechanisms, including when actually required:
 
 ```text
 one PostgreSQL Product-state database
@@ -139,31 +129,62 @@ verified ephemeral exact-byte spool
 accepted config/secrets/observability/network controls
 ```
 
-B1 does not authorize Product implementation now; it defines what later implementation must prepare.
+B1 does not authorize Product implementation now; it defines the later transition requirement.
 
-No DEV/test Product rows, governed bytes, Audit history, Releases, approvals or sessions are imported merely to make the target look populated.
+No DEV/test Product rows, governed bytes, Audit history, Releases, approvals or sessions are imported merely to populate the target.
 
-### B2 — Target proven before normal serving
+### B2 — Target proven while still non-authoritative
 
-Normal serving cannot begin until target evidence satisfies all accepted claim-relevant gates, including:
+Before the first authoritative R10 Product mutation, the production candidate/profile must have sufficient evidence that the target realization is fit to become authority.
+
+Required evidence includes the accepted claim-relevant gates from T8/T9, such as:
 
 ```text
 schema/runtime compatibility
 startup/readiness/config/secret fail-closed behavior
 selected real-dependency proof lanes
 security/network boundaries
-backup/restore readiness
-T9 validation obligations against the real target subject/boundary when implementation exists
+backup/restore capability
+T9 proof coverage on production-equivalent real mechanisms/boundaries
 no hidden legacy-compatibility dependency
 ```
 
-T10 does not duplicate T9 proof definitions. It makes successful proof a cutover barrier.
+T10 does not duplicate T9 proof definitions. It makes their successful realization a transition barrier.
 
-A target that is only "deployed" is not cutover-ready.
+Proof fixtures used before authority begins are disposable and cannot be promoted as business history. The authoritative production Product database/content baseline is clean of DEV/test business state before B3.
 
-### B3 — Canonical serving authority activated
+A target that is merely deployed is not authority-ready.
 
-After B2, production ingress/origin may switch to the R10 target.
+### B3 — R10 business authority begins
+
+B3 is the **point of no return**. It occurs on the first committed authoritative R10 Product mutation, including non-serving bootstrap/administrative creation of the minimum Product truth required for Launch.
+
+Examples include any committed Product truth such as:
+
+```text
+Company/User/ProviderSubjectBinding bootstrap truth
+Organization/access configuration
+DocumentType/governance configuration
+Document/Revision/Submission state
+Audit-required semantic mutation
+Release/obsolescence state
+```
+
+B3 is not delayed until public traffic or the first controlled Document. Any authoritative Product mutation starts native R10 business history.
+
+After B3:
+
+```text
+destructive reset to pre-R10/DEV/test authority = FORBIDDEN
+discarding committed R10 business history       = FORBIDDEN
+restoring disposable pre-R10 state as truth     = FORBIDDEN
+```
+
+From B3 onward, incidents are R10 recovery events even if public serving has not started yet.
+
+### B4 — Canonical serving authority activated
+
+Only after B3 has established the required authoritative R10 baseline and the target remains ready may canonical production ingress/origin expose normal R10 serving.
 
 Activation law:
 
@@ -173,54 +194,28 @@ one canonical production ingress/origin
 → no ordinary fallback to a prior DEV/test implementation
 ```
 
-Parallel private deployment is allowed before activation; parallel **business authority** is not.
+Parallel private deployment is allowed before B4; parallel **business authority** is never allowed.
 
-At B3, traffic rollback remains possible only while B4 has not occurred and no authoritative Product mutation has committed.
+After B4, traffic may be stopped or failed closed during an incident, but it may not be redirected to disposable DEV/test Product authority.
 
-### B4 — Business authority begun
+## 5. Rollback / recovery law
 
-B4 occurs on the first committed authoritative R10 Product mutation.
+### Before B3 — reversible technical preparation window
 
-Examples include any committed Product truth such as:
-
-```text
-Organization/access configuration
-DocumentType/governance configuration
-Document/Revision/Submission state
-Audit-required semantic mutation
-Release/obsolescence state
-```
-
-B4 is not delayed until the first controlled Document exists. Any authoritative Product mutation starts native R10 business history.
-
-After B4:
+While no authoritative R10 Product mutation has committed, recovery may include:
 
 ```text
-destructive rollback to pre-R10/DEV/test authority = FORBIDDEN
-resetting/discarding committed R10 business history = FORBIDDEN
-restoring disposable pre-R10 state as Product truth = FORBIDDEN
-```
-
-Incidents after B4 are R10 recovery events, not cutover rollback.
-
-## 6. Rollback law
-
-### Before B4 — reversible activation window
-
-If B0→B3 were satisfied but no authoritative Product mutation has committed, recovery may include:
-
-```text
-remove/redirect production traffic
-invalidate target sessions
-reset or destroy the target Product database
-reclaim target managed content proven non-authoritative
+remove/redirect non-authoritative test traffic
+invalidate disposable target sessions
+reset/destroy the non-authoritative target Product database
+reclaim target content proven non-authoritative
 correct deployment/configuration
-repeat proof and activation
+repeat proof
 ```
 
-This is safe only because no R10 business history exists yet.
+This is safe only because R10 business history has not begun.
 
-### After B4 — forward recovery only
+### After B3 — forward recovery only
 
 Permitted response classes are:
 
@@ -232,11 +227,11 @@ apply a proven compatible R10 correction/deployment
 redrive accepted durable work under canonical Product truth
 ```
 
-The system must never "rollback" by making disposable DEV/test state authoritative again.
+Deployment rollback is permitted only when the older deployment is compatible with already-committed R10 data/wire/runtime truth. A binary rollback that cannot safely consume current R10 state is forbidden.
 
-Deployment rollback is permitted only when it is compatible with already-committed R10 data/wire/runtime truth. A binary rollback that cannot safely read/write the current R10 state is forbidden.
+A deployment rollback is never permission to roll business truth backward to DEV/test state.
 
-## 7. Data/content transition law
+## 6. Data/content transition law
 
 Because the historical-business-import branch is empty:
 
@@ -247,36 +242,36 @@ pre-R10 governed content imported             0
 legacy sessions preserved                     0
 ```
 
-Required target bootstrap data may be created only through explicit accepted bootstrap/administrative mechanisms defined by later implementation planning; T10 does not invent ordinary Product endpoints or maintenance bypasses for bootstrap.
+Required authoritative bootstrap data may be created only through explicit accepted non-serving bootstrap/administrative mechanisms defined by later implementation planning. T10 does not invent an ordinary Product endpoint, maintenance bypass, or synthetic Product state for bootstrap.
 
 Provider/object identity never becomes Product identity during technical setup.
 
-## 8. Identity transition law
+## 7. Identity transition law
 
 The accepted OIDC provider remains an external mechanism behind the Authentication anti-corruption seam.
 
-T10 permits target-side provider configuration needed for R10 login, but does not create a cross-system atomic cutover transaction.
+T10 permits provider configuration needed for R10 login but creates no cross-system atomic cutover transaction.
 
 ```text
-provider/config change
+provider configuration
 ≠ Product business commit
 ```
 
-Normal serving cannot rely on provider roles/groups/claims as Product Authorization truth.
+Provider roles/groups/claims never become Product Authorization truth.
 
-Pre-R10 application sessions are never imported. Any target sessions are R10 sessions and must obey current restore/session invalidation laws.
+Pre-R10 application sessions are never imported. R10 sessions exist only against R10 authoritative Product identity/session truth.
 
-## 9. Durable work and content boundary
+## 8. Durable work and content boundary
 
-At activation there may be no pre-R10 durable Product work to carry forward.
+There is no pre-R10 durable Product work to carry forward by default.
 
-R10 durable work begins only from accepted R10 Product commits/intents. River state never becomes a migration source or Product truth.
+R10 durable work begins only from accepted R10 Product commits/intents. River state never becomes migration source or Product truth.
 
-Any target managed content created before B4 but not bound to authoritative Product truth is disposable technical state and must be reclaimable under the accepted content-integrity/GC laws.
+Any managed content created before B3 but not bound to authoritative Product truth is disposable technical state and remains subject to accepted content-integrity/GC laws.
 
-After B4, governed exact content is R10 authoritative state and follows R10 backup/restore/recovery laws.
+After B3, governed exact content and required durable effects follow R10 backup/restore/recovery laws.
 
-## 10. Cleanup / legacy technical deletion map
+## 9. Cleanup / technical deletion map
 
 Cleanup is evidence-driven and monotonic.
 
@@ -284,8 +279,8 @@ A surviving external technical resource may be removed only after proving:
 
 ```text
 not current R10 authority
-not required for rollback before B4
-not required for recovery/audit/provenance
+not required for pre-B3 technical reversal
+not required for R10 recovery/audit/provenance
 contains no pre-R10 business truth requiring bounded reopen
 ```
 
@@ -299,13 +294,13 @@ obsolete test OIDC client/configuration
 obsolete ingress/DNS/config/secrets
 ```
 
-T10 does not require any of these classes to exist.
+T10 does not require any class to exist.
 
 No legacy compatibility code is preserved merely to make cleanup easier.
 
-## 11. Forward-obligation disposition
+## 10. Forward-obligation disposition
 
-T10 consumes the stage-relevant migration obligations as follows.
+T10 consumes the migration obligations as follows:
 
 ```text
 MIG-05 PRESERVE
@@ -321,54 +316,57 @@ MIG-10 REOPEN
   there are no imported target families to define.
 ```
 
-All deferred import/export/repository/portability platform ideas remain DEFERRED and cannot be activated by T10 convenience.
+All deferred import/export/repository/portability platform ideas remain DEFERRED and cannot be activated by transition convenience.
 
-## 12. T10 falsifiers
+## 11. T10 falsifiers
 
 The transition contract is false if any of these becomes true:
 
 ```text
 a real pre-R10 authoritative business corpus exists but T10 discards it
-normal serving begins before required target proof gates close
+B3 authoritative mutation occurs before the target has passed the required B2 proof barrier
 two systems can commit Product truth concurrently
+normal serving begins before the required authoritative R10 baseline exists
 an ordinary request can fall back to DEV/test authority
 first R10 Product mutation commits and the plan still permits destructive reset to pre-R10 truth
-a post-B4 rollback deploy cannot safely consume current R10 state
+a post-B3 rollback deploy cannot safely consume current R10 state
 pre-R10 sessions or DEV/test Audit/history are silently promoted into R10 business truth
 cleanup can delete a resource without proving it non-authoritative/non-required
 operation 79 or new Product semantics are introduced solely to support cutover
 ```
 
-Any such failure routes to the smallest owning authority rather than being patched with compatibility infrastructure by default.
+Any failure routes to the smallest owning authority rather than being patched with compatibility infrastructure by default.
 
-## 13. Verification / handoff to later stages
+## 12. Handoff to later stages
 
 T10 defines transition semantics and barriers only.
 
-T11 must later decompose implementation work so that the transition can be executed without weakening B0→B4.
+T11 must later decompose implementation work so that implementation, bootstrap, deployment and cutover can satisfy B0→B4 without weakening them.
 
 T12 must later attack implementation readiness, including whether the actual implementation has credible evidence for:
 
 ```text
 source-estate classification
-target proof before traffic
-single-authority activation
-first-authoritative-mutation detection/operational discipline
-post-B4 recovery compatibility
+production-equivalent target proof before authority begins
+single-authority bootstrap
+first-authoritative-mutation operational discipline
+serving activation after authoritative baseline
+post-B3 recovery compatibility
 cleanup safety
 ```
 
 T10 itself does not execute production cutover.
 
-## 14. Candidate exit criteria
+## 13. Candidate exit criteria
 
 The T10 candidate is ready for independent challenge only when:
 
 ```text
 historical-business-import branch remains empty unless concrete evidence reopens T7
 B0→B4 are explicit and monotonic
-pre-B4 rollback and post-B4 recovery are unambiguously different
-single Product authority is preserved throughout
+B3 is unambiguously the first authoritative R10 Product mutation / point of no return
+pre-B3 technical reversal and post-B3 R10 recovery are unambiguously different
+B4 serving activation cannot create a second Product authority or fallback path
 no compatibility/dual-write/import platform is introduced without a named consumer
 MIG-05/MIG-06 remain evidence-only and MIG-10 remains untriggered
 78-operation census remains unchanged and operation 79 absent
