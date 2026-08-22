@@ -1,14 +1,12 @@
 # T11 — Discussion / Mention / Notifications Global Coherence Review
 
-> **Status:** LEAD GCR — NOT CONVERGED / OPERATOR ADJUDICATION REQUIRED.  
-> **Scope:** the operator-ratified D0→D8 bounded reopen candidate only.  
+> **Status:** LEAD GCR ROUND 2 — CONVERGED / READY FOR FRESH INDEPENDENT CHALLENGE.  
+> **Scope:** operator-ratified D0→D8 bounded reopen candidate only.  
 > **Method:** DevelopmentConexus Engineering Method v1.0.0.  
 > **Implementation:** BLOCKED.  
-> **Independent review:** NOT YET PERFORMED; this Lead GCR is not independent challenge.
+> **Independent review:** NOT YET PERFORMED; this Lead GCR is not independent evidence.
 
-## 1. Inputs
-
-Candidate package:
+## 1. Candidate package
 
 ```text
 t11-b03-discussion-notification-mini-design.md
@@ -21,7 +19,7 @@ t11-b03-notification-technology-spike.md
 t11-notification-architecture-research.md
 ```
 
-Primary current authorities checked:
+Current authorities checked:
 
 ```text
 Product / journeys
@@ -42,7 +40,7 @@ The review attacks duplicate authority, owner placement, transaction direction, 
 
 ## 2. Preserved candidate conclusions
 
-No current GCR evidence invalidates:
+The corrected package preserves:
 
 ```text
 Document-level Discussion as Controlled Documents state
@@ -67,290 +65,251 @@ Lexical as replaceable Discussion-composer mechanism
 generic EventBus / broker / Redis absent at Launch
 ```
 
-No operation-count change is proposed by this GCR.
+## 3. Round 1 — NOT CONVERGED
 
-## 3. MATERIAL M1 — Authorization ownership was blurred inside D7
-
-### Finding
-
-D7 currently summarizes the transaction as if Controlled Documents validates Mention target admissibility. That is not authority-coherent.
-
-Current T8-C law is explicit:
-
-```text
-Organization authors current User/Group facts
-resource owner authors relationship/state predicate facts
-Authorization alone computes final ALLOW/default-DENY
-application maps/routes/co-ordinates facts
-```
-
-A Mention target being able to receive/read the exact Document Discussion is an Authorization/disclosure conclusion, not intrinsic Controlled Documents truth.
-
-### Required correction
-
-For create-message commit:
-
-```text
-application/documentofficial
-  → gather current author + unique target SecuritySubjects from Organization
-  → use protected in-Scope eligibility for author + Mention targets
-  → gather exact Controlled Documents access/predicate facts
-  → Authorization.DecideIn / DecideManyIn computes final current decisions
-  → only after ALLOW for author + every Mention target:
-       Controlled Documents validates intrinsic message/reply/content semantics and inserts Message/Mention
-       Notifications inserts one Notification per unique Mention target
-```
-
-No `document.read_discussion` Permission is added. D1 remains binding:
-
-```text
-Discussion read eligibility
-= exact current ability to receive the Document Official / Discussion lens
-```
-
-The canonical B03 disclosure composition is reused; Notification/Mention callers may not invent a parallel role matrix.
-
-### Offboarding concurrency
-
-Create DiscussionMessage now joins the T3 family whose correctness depends on ENABLED User truth.
-
-```text
-author
-+ every unique Mention target
-```
-
-must serialize eligibility with offboarding through the existing protected Organization subject mechanism while the local Scope remains open.
-
-When multiple Users need protected eligibility, acquire/resolve them in deterministic `user_id ASC` order (after uniqueness) so the new multi-User path does not introduce avoidable deadlock cycles.
-
-RoleAssignment/access drift after a valid current decision remains handled by D5 presentability/current reauthorization; Mention never preserves later access.
-
-### Classification
-
-```text
-MATERIAL — authority + security/concurrency boundary
-```
-
-The Product decision survives; D7 placement/enforcement requires correction.
-
-## 4. MATERIAL M2 — Notification disclosure must compose before public pagination/counts
-
-### Finding
-
-D5 requires a Notification to disappear completely from items/badge/counts when its source is no longer currently disclosable. Notifications itself does not own source disclosure. A naive implementation:
-
-```text
-Notifications pages rows
-→ application/frontend filters inaccessible sources
-```
-
-would break the current authority model and can produce sparse/incorrect pages, incorrect badge counts and source-existence/cardinality leakage.
-
-Persisting a copied `presentable`/ACL flag in Notifications would instead create duplicate Authorization authority.
-
-### Required correction
-
-`application/notifications` owns the cross-owner read choreography, not semantic truth.
-
-Conceptual current read:
-
-```text
-Notifications candidate scan for current recipient + engagement filter, in canonical order
-→ batch source identities
-→ Controlled Documents batch source/access facts
-→ Organization current subject facts
-→ Authorization exact Decide/DecideMany
-→ retain currently presentable candidates
-→ continue candidate scan until requested presentable page (+ lookahead for has_more) is satisfied or source candidates are exhausted
-→ compose source presentation only for presentable rows
-```
-
-Public cursor semantics are over the canonical Notification ordering and never expose hidden candidate identities. The response cannot rely on frontend post-filtering.
-
-The same current-disclosure composition owns exact first-page unseen/unread summary counts. Launch may evaluate these in bounded internal chunks; no durable copied counter or current-access projection becomes authority. A measured scale failure is an explicit reopen trigger for a rebuildable optimization that proves equivalence.
-
-`mention-candidates` follows the analogous pattern in bounded search form: Organization search is only a candidate source; current Document disclosure is applied server-side before results are returned.
-
-### Classification
-
-```text
-MATERIAL — disclosure + pagination/current-authority correctness
-```
-
-No new operation or owner is required.
-
-## 5. MATERIAL M3 — SSE/wake-up call graph must preserve the one semantic inbound door
-
-### Finding
-
-T8-B forbids `transport -> platform` and requires:
-
-```text
-transport -> application
-```
-
-for every semantic application route. A direct SSE handler subscribing to an in-process platform hub would violate that topology even though the hub is non-semantic.
-
-The realtime mechanism must also update multiple tabs after Notification engagement mutations, not only after creation.
-
-### Required correction
-
-```text
-GET /api/v1/notifications/events
-transport/http
-→ application/notifications stream choreography
-→ narrow consumer-owned subscription port
-→ platform realtime implementation
-```
-
-The platform mechanism owns only ephemeral connection/subscription mechanics.
-
-Wake-up law:
-
-```text
-successful Notification creation or engagement mutation commits
-→ after commit, relevant application leaf invokes narrow Notification-changed wake-up mechanism for that recipient
-```
-
-This includes:
-
-```text
-DOCUMENT_MENTION Notification creation
-mark seen
-mark read
-mark unread
-archive
-unarchive
-mark all read
-```
-
-Wake-up remains best-effort and non-durable. Semantic owners never invoke the realtime mechanism directly. A wake-up failure never rolls back committed Product state.
-
-Different application leaves may own narrow technical ports to the same platform implementation; do not create a generic application EventBus merely to share the mechanism.
-
-### Classification
-
-```text
-MATERIAL — accepted dependency-direction / runtime boundary
-```
-
-SSE and the in-process Launch mechanism remain selected.
-
-## 6. IMPORTANT I1 — batch seen must be race-safe without becoming a disclosure oracle
-
-`markNotificationsSeen(ids[])` is generated from Notifications that were visible to the client, but access may drift before the request arrives.
-
-Required law:
-
-```text
-unique bounded request ids
-→ intersect with current recipient's currently presentable Notifications
-→ set seen_at only on that intersection
-→ absent / foreign-recipient / now-non-presentable ids produce no mutation and no per-id status
-→ response discloses no existence/cardinality detail for skipped ids
-```
-
-A direct single-Notification engagement operation on an item that is no longer presentable returns the normal non-disclosing not-found behavior and the client refetches.
-
-## 7. IMPORTANT I2 — completed create-message replay must not re-run historical Mention eligibility
-
-The current global idempotency law rechecks current caller AuthZ/disclosure before completed replay, then returns the stored historical success without re-running historical lifecycle/preconditions.
-
-For `createDocumentDiscussionMessage`:
-
-```text
-current caller session / CSRF / current document.discuss + source disclosure
-→ completed replay recognition
-→ same stored message_id
-→ zero new Message
-→ zero new Notification
-```
-
-Do not re-evaluate the old Mention targets' current eligibility on completed replay. Their later access/offboarding state is governed by D5 presentability; replay is not a second Mention command.
-
-The semantic fingerprint includes the exact Document, optional reply target and ordered normalized Text/Mention content. ReplaySnapshot remains free of message text and stores only stable success identity.
-
-## 8. IMPORTANT I3 — Discussion and Notifications do not become duplicate Audit/History streams
-
-Launch baseline:
-
-```text
-DiscussionMessage
-  immutable trusted author/time/content authority
-  -> no duplicate semantic AuditEvent merely to copy the message
-  -> not inserted into Document lifecycle History timeline
-
-Notification creation/engagement/realtime
-  -> no mandatory semantic AuditEvent in Launch
-```
-
-This mirrors the existing SubmissionFeedback principle: an immutable owner record with its own actor/time/content does not need a second Audit copy solely because it exists.
-
-A future regulatory requirement for messaging/notification audit is a T3 reopen trigger.
-
-## 9. IMPORTANT I4 — persistence enforcement required by the new invariants
-
-Upstream T8-D consolidation must at minimum preserve:
-
-```text
-new notifications.* owner namespace
-identity-only cross-owner references only
-unique DOCUMENT_MENTION Notification per recipient + message
-read_at present -> seen_at present
-archived_at present -> seen_at present
-immutable DiscussionMessage/Mention accepted state by application privileges/structure
-reply reference cannot cross Document Discussion
-```
-
-Exact table decomposition remains T8-D/T11 realization, not this GCR.
-
-## 10. IMPORTANT I5 — runtime/OpenAPI proof remains a closure gate, not Product authority
-
-Operation 86 remains part of the candidate `/api/v1` application census only if the selected Go OpenAPI boundary can prove server-side `text/event-stream` realization without a manual parallel route/DTO registry.
-
-Until that proof exists:
-
-```text
-SSE = accepted Product/UX mechanism candidate
-manual contract escape hatch = forbidden
-```
-
-Failure of the chosen generator is a bounded mechanism/toolchain reopen; it does not justify silently dropping realtime or moving the route outside authority.
-
-T8-G consolidation must additionally own heartbeat/flush/proxy-timeout/shutdown/resource-limit behavior appropriate to a long-lived SSE response while preserving one application runtime baseline.
-
-## 11. IMPORTANT I6 — visual and upstream sequencing remains binding
-
-Even after semantic corrections converge:
-
-```text
-1. consolidate Product/T1/T3/T5/T6/T8-B→G/T9 candidate deltas coherently
-2. render the smallest B01 P8 notification-header/Quick-Inbox reopen
-3. operator re-LOCKs only the implicated B01 delta
-4. update B03 P8 with real Discussion semantics
-5. operator adjudicates/LOCKs B03
-```
-
-No B04+ baseline opens while this material dependency remains unresolved.
-
-## 12. Lead verdict
-
-Current candidate before adjudication:
+Round 1 found:
 
 ```text
 MATERIAL   3
 IMPORTANT  6
 ```
 
-No finding currently changes the candidate Product capability set or census:
+Operator adjudication approved all nine bounded corrections.
+
+### M1 — Authorization ownership / offboarding serialization
+
+Finding: D7 blurred final Mention-target admission into Controlled Documents.
+
+Correction applied:
+
+```text
+Organization authors current subject/eligibility facts
+Controlled Documents authors exact Document predicate facts
+Authorization alone computes ALLOW/default-DENY
+application coordinates
+```
+
+Author + all unique Mention targets now use protected Organization eligibility in one Scope, resolved in deterministic `user_id ASC` order. Controlled Documents validates only intrinsic message/reply/content structure after current decisions are ALLOW.
+
+**Round-2 result: CLOSED.** No parallel permission/disclosure authority remains.
+
+### M2 — current disclosure before pagination/counts
+
+Finding: paging Notifications then filtering inaccessible sources would break cursor/count semantics; copied presentability would duplicate AuthZ authority.
+
+Correction applied:
+
+```text
+Notifications candidate scan
+→ batch source facts
+→ current Organization/AuthZ composition
+→ retain presentable candidates
+→ bounded continued scan until requested presentable page + lookahead is filled or exhausted
+→ compose presentation only for retained items
+```
+
+The same current-disclosure composition owns unseen/unread summary counts. Frontend post-filtering is forbidden.
+
+**Round-2 result: CLOSED.** Pagination is now compatible with current disclosure without copied ACL truth.
+
+### M3 — SSE dependency direction / post-commit invalidation
+
+Finding: a direct `transport -> platform/realtime` SSE handler would violate the one semantic inbound door; wake-up also needs to cover engagement changes.
+
+Correction applied:
+
+```text
+transport/http
+→ application/notifications
+→ narrow consumer-owned subscription/wake-up port
+→ platform realtime mechanism
+```
+
+Recipient wake-up happens only after committed Notification creation or engagement change: creation, seen, read, unread, archive, unarchive, mark-all-read. Wake-up is best-effort, non-durable and never called by semantic owners.
+
+**Round-2 result: CLOSED.** T8-B/T8-C dependency laws remain intact.
+
+## 4. Round-1 IMPORTANT findings — closure
+
+### I1 — batch seen disclosure oracle
+
+Corrected law:
+
+```text
+bounded unique ids
+→ intersect current recipient + currently presentable
+→ mutate only intersection
+→ absent/foreign/non-presentable ids expose no per-id outcome/cardinality
+```
+
+Direct non-presentable engagement uses normal non-disclosing not-found behavior.
+
+**CLOSED.**
+
+### I2 — completed create-message replay
+
+Corrected replay:
+
+```text
+current caller AuthZ/disclosure recheck
+→ completed idempotency recognition
+→ stored message_id
+→ zero new Message/Mention/Notification
+```
+
+Historical Mention-target eligibility is not rerun. Fingerprint includes Document, reply reference and normalized ordered Text/Mention content; ReplaySnapshot excludes free text.
+
+**CLOSED.**
+
+### I3 — duplicate Audit/History streams
+
+Corrected disposition:
+
+```text
+DiscussionMessage own immutable author/time/content truth
+→ no duplicate Audit solely for creation
+→ not Document lifecycle History
+
+Notification creation/engagement/realtime
+→ no mandatory semantic Audit in Launch
+```
+
+Future regulatory messaging/notification audit remains a T3 reopen trigger.
+
+**CLOSED.**
+
+### I4 — persistence enforcement
+
+D7 now requires upstream T8-D consolidation to preserve at minimum:
+
+```text
+notifications.* owner namespace
+identity-only cross-owner FKs
+unique DOCUMENT_MENTION per recipient + message
+read_at -> seen_at
+archived_at -> seen_at
+immutable accepted DiscussionMessage/Mention
+reply cannot cross Document Discussion
+```
+
+**CLOSED at architecture level; exact DDL remains downstream consolidation/implementation proof.**
+
+### I5 — OpenAPI/SSE proof
+
+Operation 86 remains candidate only under a closure proof that the selected Go OpenAPI boundary represents server-side `text/event-stream` without a manual route/DTO authority. Toolchain failure reopens mechanism/tooling, not Product meaning.
+
+**CLOSED as an explicit proof gate.**
+
+### I6 — visual/upstream sequencing
+
+Sequence remains binding:
+
+```text
+converged candidate
+→ fresh independent challenge
+→ reviewer adjudication
+→ smallest upstream Product/T1→T9/T11 consolidation
+→ smallest B01 P8 Notification reopen
+→ operator re-LOCKs implicated B01 delta
+→ B03 P8 with real Discussion semantics
+→ operator B03 adjudication/LOCK
+```
+
+B04+ remains unopened.
+
+**CLOSED.**
+
+## 5. Round-2 adversarial sweep
+
+### Authority duplication
+
+No duplicate owner survives:
+
+```text
+Controlled Documents -> Discussion/Mention source facts
+Authorization        -> final current ALLOW/DENY
+Notifications        -> persistent attention/engagement
+Audit                -> separate evidence authority only
+application          -> choreography only
+realtime             -> mechanism only
+```
+
+**PASS.**
+
+### Transaction/cycle challenge
+
+Same-Scope Message + Notification creation has no owner→owner import and no event-bus cycle. Application is the sole orchestration class. Protected multi-User eligibility has deterministic acquisition order.
+
+**PASS.**
+
+### Disclosure challenge
+
+Mention autocomplete, Notification list/counts, batch seen and direct engagement all reapply current server-side disclosure. No client-side hide, copied ACL or notification-as-access-token remains.
+
+**PASS.**
+
+### Async/realtime challenge
+
+Persistent Notification truth is independent of wake-up. River remains reserved for required durable future work. SSE loss is recoverable by canonical GET. In-process hub is an admitted one-replica mechanism, replaceable by PostgreSQL LISTEN/NOTIFY if a multi-replica consumer later appears.
+
+**PASS.**
+
+### API/census challenge
+
+No material evidence found a smaller operation family without collapsing independent behaviors or creating generic `/actions` semantics. The candidate remains exactly:
+
+```text
+Discussion / Mention     +3
+Notification state       +4
+SSE invalidation         +1
+                         ---
+                         +8
+78 -> 86 operations
+10 -> 11 Idempotency-Key creations
+```
+
+**PASS pending independent challenge and later executable-wire consolidation.**
+
+### YAGNI / framework challenge
+
+No notification SaaS runtime, generic EventBus, broker, Redis or persistent Lexical format is introduced. Lexical is a replaceable UI mechanism only; Watermill/LISTEN-NOTIFY remain trigger-bound future candidates.
+
+**PASS.**
+
+## 6. Lead GCR Round-2 verdict
+
+```text
+VERDICT: CONVERGED
+MATERIAL: 0
+IMPORTANT: 0
+OPTIONAL: 0
+```
+
+No Lead finding changes the candidate result:
 
 ```text
 owners                4+2 candidate
 routes                 11 candidate
+PermissionCode         16 candidate
 operations             86 candidate
 Idempotency creations  11 candidate
 ETag domains           13/13
 exact-byte resources   4
 ```
 
-The three MATERIAL findings are bounded authority/enforcement corrections. If they are accepted and applied, rerun this Lead GCR over the corrected package. Only a converged corrected package may proceed to the METHOD-required fresh independent challenge and then upstream consolidation/visual reopens.
+This is still **candidate evidence**, not promoted Product/T1→T9 authority.
+
+## 7. Required next gate
+
+Because this package creates/moves a semantic authority and binds multiple architecture layers, METHOD requires a fresh independent challenge.
+
+```text
+exact corrected candidate HEAD + green CI
+→ isolated review/<gate>-fable branch
+→ delta = docs/work/current/ai-dialog.md only
+→ Fable reconstructs authority and attacks the whole coherent package
+→ reviewer output = Evidence only
+→ Lead adjudicates every material/important finding
+→ Round 2 only if a real contradiction survives
+→ only then upstream consolidation
+```
