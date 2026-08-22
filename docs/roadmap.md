@@ -23,30 +23,26 @@ LEGACY IMPLEMENTATION                 ABSENT FROM LIVE TREE
 
 ## Current gate
 
-T11 — Implementation Program & Execution Graph remains **OPEN / ACTIVE** on Draft PR #162.
+T11 remains **OPEN / ACTIVE** on Draft PR #162.
 
-Current branch-only T11 work:
-
-```text
-docs/work/current/t11-implementation-program.md
-docs/work/current/t11-frontend-blueprint.md
-docs/work/current/t11-wireframes.md
-docs/work/current/t11-interaction-ledger.md
-```
-
-Reusable frontend method:
+Reusable frontend planning method:
 
 ```text
 docs/development/functional-html-wireframe-method.md
+Frontend Product Experience Planning Method v2.1
+Fable Round 2: CONVERGED / MATERIAL=0
 ```
 
-Approved bounded precision:
+The prior all-at-once MetalDocs HTML prototype is **SUPERSEDED / NOT ACCEPTED** and is not an implementation baseline.
+
+The current frontend gate is:
 
 ```text
-decisions/responsible-owner-selection-read.md
+B01 — App Shell + Global Information Architecture
+status: CANDIDATE / NOT LOCKED
 ```
 
-The work pack is candidate Evidence, not durable T11 authority. T11 does not authorize Product implementation or T12.
+Only the operator may set `LOCKED`. No later material block may become baseline before B01 is operator-locked unless the operator explicitly authorizes parallel candidate work.
 
 ## T11 fixed system invariants
 
@@ -65,11 +61,9 @@ Product implementation                BLOCKED
 
 The operator-approved T8-E-RO precision remains binding and adds no operation, Permission, owner or route.
 
-## Frontend planning correction — 2026-08-22
+## Frontend planning correction
 
-The first T11 frontend pass proved backend/screen coverage but moved too quickly from semantic Screen Contracts to a whole-product HTML prototype.
-
-Operator feedback rejected that workflow as insufficient for implementation readiness because it skipped deliberate UX/product-design work for:
+The first T11 frontend pass proved backend/screen coverage but moved directly from semantic Screen Contracts to a whole-product HTML prototype. Operator review rejected that workflow because it skipped deliberate product/UX planning for:
 
 ```text
 user needs / jobs
@@ -79,100 +73,114 @@ reference study
 layout alternatives
 screen hierarchy
 relative size / density
-cards vs tables vs master-detail
+cards vs tables vs lists vs master-detail
 progressive disclosure
-screen-by-screen operator walkthrough
-pattern derivation after evidence of repetition
+screen-by-screen operator visual walkthrough
+pattern derivation after reviewed repetition
 ```
 
-Therefore the previously generated all-at-once HTML prototype is **SUPERSEDED / NOT ACCEPTED** and is not a T11 review candidate or implementation baseline.
+No Product/T1→T10 authority was reopened by this methodological correction.
 
-No Product/T1→T10 authority is reopened by this UX-method correction.
+## Frontend Product Experience Planning Method v2.1
 
-## Frontend Product Experience Planning Method v2
-
-The reusable method is now structured as:
+The converged process is:
 
 ```text
-P0  Recover accepted authority
- ↓
-P1  Actors / jobs / user needs
- ↓
-P2  End-to-end user flows
- ↓
-P3  Frontend Coverage Matrix
- ↓
-P4  Information Architecture
- ↓
-P5  Screen / material-surface inventory
- ↓
-P6  Reference Study — per functional block
- ↓
-P7  Competing Layout Hypotheses
- ↓
-P8  Structural Wireframe — block-by-block + operator adjudication
- ↓
+GLOBAL FOUNDATION
+P0  accepted authority
+P1  actors / jobs / user needs
+P2  end-to-end user flows
+P3  frontend coverage
+P4  candidate Information Architecture
+P5  screen / material-surface inventory
+
+PER-BLOCK LOOP
+P6  targeted reference study when triggered
+P7  competing layout hypotheses when ambiguity is real
+P8  rendered structural wireframe + operator visual adjudication
+    → only operator may LOCK
 P9  Screen Contract + bidirectional backend trace
- ↓
-P10 Derive reusable component/interaction patterns
- ↓
-P11 Interactive Low-Fidelity HTML
- ↓
-P12 Adversarial UX + Architecture Walkthrough
- ↓
-P13 Visual Design Handoff
- ↓
-P14 Frontend Implementation-Readiness Closure
+P10 bounded pattern consolidation after LOCK
+P11 interaction realization / low-fi prototype after structural lock
+
+ASSEMBLED CLOSURE
+P10 terminal pattern reconciliation
+P11 assembled interaction prototype when required
+P12 adversarial UX + architecture walkthrough
+P13 visual-design handoff + structural-conformance review
+P14 frontend implementation-readiness closure
 ```
 
-Hard method law:
+Hard laws include:
 
 ```text
 no whole-product wireframe generation in one pass
-no high-impact block advances past unresolved structural findings
-no layout pattern chosen merely from backend shape
-no component vocabulary frozen before reviewed repetition exists
+no assistant/reviewer/tool may set LOCKED
+P8 must be a rendered/viewable visual artifact; prose alone is insufficient
+no layout chosen merely from backend shape
+no shared pattern frozen before reviewed repetition exists
 no screen-shaped API for frontend convenience
-operator must see/discuss material screens block-by-block before lock
+accessibility + responsive behavior are structural
+material assumptions remain registered until probed/resolved
+visual design cannot silently change locked structure
 ```
 
-External products/design systems are reference Evidence only. Accepted Product/system authority + user evidence + explicit operator adjudication determine MetalDocs UX.
-
-## MetalDocs application order after method convergence
-
-After independent review of the method, MetalDocs frontend planning restarts from UX structure rather than editing the rejected all-at-once HTML.
-
-Candidate block order:
+### Methodology review proof
 
 ```text
-B01  App Shell + global Information Architecture
-B02  Library / discovery
-B03  Document Official
-B04  Document Work / authoring
-B05  My Work
-B06  Governance
-B07  History / Audit
-B08  Administration
+v2 candidate HEAD                     a9e6f3b3ae2b8e56c65d8114e1551e40ec1d7161
+candidate CI                          #1218 SUCCESS
+Round 1 Evidence PR                   #163 CLOSED / UNMERGED
+Round 1 verdict                       NOT CONVERGED
+Round 1 findings                      MATERIAL=2 / IMPORTANT=10
+corrected v2.1 HEAD                   4b0bf734e70e59e06008d401a0d3d12d9540310e
+corrected CI                          #1221 SUCCESS
+Round 2 Evidence PR                   #164 CLOSED / UNMERGED
+Round 2 valid Evidence HEAD           e2336bab468e04a56ed850cfa93a1fb6f53ca530
+Round 2 CI                            #1223 SUCCESS
+Round 2 verdict                       CONVERGED
+Round 2 findings                      MATERIAL=0 / IMPORTANT=0 / OPTIONAL=3
+Round 3                               NOT JUSTIFIED
 ```
 
-Block names/order remain planning candidates until B01 global IA proves the final grouping.
+Fable's original Round-2 response commit `f950ccabe1293926e481951ebda3cfebbccf91a1` was accidentally authored on the old Round-1 lineage. Its exact `ai-dialog.md` blob was re-anchored byte-identically onto the correct Round-2 branch rooted at `4b0bf734...`; CI #1223 verified Repository Standard isolation. The review text was not altered.
+
+The three Round-2 notes are non-blocking realization precision and do not justify a methodology change or Round 3.
+
+## MetalDocs UX block program
+
+Candidate block sequence:
+
+```text
+B01  App Shell + Global Information Architecture   CURRENT / CANDIDATE
+B02  Library / discovery                            NOT OPEN
+B03  Document Official                              NOT OPEN
+B04  Document Work / authoring                      NOT OPEN
+B05  My Work                                        NOT OPEN
+B06  Governance                                     NOT OPEN
+B07  History / Audit                                NOT OPEN
+B08  Administration                                 NOT OPEN
+```
+
+Names/order after B01 remain candidate because the global IA may refine grouping without changing Product authority.
 
 Each material block follows:
 
 ```text
-bounded accepted authority
-→ user goals / local flow
-→ reference study where material
-→ 2–3 layout hypotheses when genuine ambiguity exists
-→ structural candidate
-→ operator visual walkthrough
-→ finding/adjudication
-→ LOCK
-→ vertical Screen Contract / backend trace
-→ only then HTML realization
+bounded authority + user goals
+→ targeted reference study when triggered
+→ 2–3 structural hypotheses when real ambiguity exists
+→ lightweight backend/data feasibility check
+→ rendered visual structural candidate
+→ operator walkthrough: hierarchy / position / size / density / discoverability
+→ findings / revision
+→ OPERATOR LOCK
+→ Screen Contract + backend trace
+→ bounded pattern consolidation
+→ interaction realization only after lock
 ```
 
-The operator and assistant explicitly converse screen-by-screen/block-by-block; the next material block is not generated automatically.
+The assistant and operator converse block-by-block. Remaining screens are never generated automatically as baseline.
 
 ## Final implementation DAG candidate
 
@@ -208,7 +216,7 @@ T10 B2 → B3 → B4
 
 `33 + 10 + 22 + 9 + 4 = 78`.
 
-Frontend UX replanning may refine how accepted capability is presented but may not change this operation census or Product semantics without a material bounded reopen.
+UX replanning may refine presentation but may not change the operation census or Product semantics without a material bounded reopen.
 
 ## T8-E-RO — approved responsible-owner precision
 
@@ -248,20 +256,17 @@ No historical business migration, dual Product authority, legacy fallback, compa
 ## Exact next action
 
 ```text
-self-review Frontend Product Experience Planning Method v2
-→ run required CI on exact candidate HEAD
-→ freeze exact methodology HEAD for isolated adversarial review
-→ create review/t11-frontend-method-fable targeting arch/t11-implementation-program
-→ Fable reviews methodology only as Principal Product Designer + Information Architect + Senior Frontend Architect + adversarial architecture reviewer
-→ classify findings MATERIAL / IMPORTANT / OPTIONAL / UNSUPPORTED PREFERENCE
-→ adjudicate evidence; correct only justified findings
-→ bounded re-review until methodology MATERIAL=0
-→ then apply the converged method to MetalDocs from B01 App Shell + global IA
-→ research/reference study + layout hypotheses
-→ operator visual walkthrough and explicit block lock
-→ proceed block-by-block; never generate the remaining screens automatically
-→ after all blocks converge, reconcile complete frontend↔backend trace and T11 implementation graph
-→ only then perform whole-T11 independent review / ratification work
+OPEN B01 as CANDIDATE only
+→ recover smallest B01 authority + user-goal evidence
+→ derive candidate global IA/object-task grouping
+→ targeted reference study of comparable DMS/knowledge/SaaS shells and established design-system navigation patterns
+→ propose 2–3 global App Shell / IA hypotheses only where genuine ambiguity exists
+→ perform lightweight data/navigation feasibility check
+→ render bounded grayscale structural candidates that the operator can actually view
+→ operator + assistant discuss navigation, hierarchy, position, size, density, browse/search entry and future extension seams
+→ revise until operator explicitly LOCKS B01
+→ only after B01 LOCK complete its Screen Contract / trace and pattern consolidation
+→ do not open B02 as baseline before B01 LOCK
 → do not begin T12
 → do not implement Product code
 ```
@@ -276,7 +281,7 @@ self-review Frontend Product Experience Planning Method v2
 | T8-H | Whole-T8 coherence | CLOSED / INTEGRATED |
 | T9 | Golden Flows / validation baseline | CLOSED / INTEGRATED |
 | T10 | Transition / cutover | CLOSED / INTEGRATED |
-| T11 | Implementation graph + implementation-readiness | OPEN / frontend method adversarial-review gate |
+| T11 | Implementation graph + implementation-readiness | OPEN / B01 global IA candidate gate |
 | T12 | Adversarial implementation-readiness | NOT OPEN |
 
 ## Final implementation gate
