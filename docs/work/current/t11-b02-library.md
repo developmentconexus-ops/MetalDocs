@@ -86,7 +86,7 @@ References are evidence only.
 | Qualio Documents Library | Qualio explicitly warns an all-effective-document Library can be overwhelming and directs users to search/filter; later UX widened result tables after narrowing. | Do not make the unfiltered collection the only first impression. | Qualio has tags/full-text search that MetalDocs Launch does not. |
 | Veeva Vault search | Document Type can be selected as a search context before or while searching. | Document Type is a legitimate first-class discovery choice, not merely an advanced filter. | Veeva custom tabs/search collections are much broader than MetalDocs. |
 | M-Files Views | Objects can be categorized into views/grouping levels from metadata such as object type/class. | Metadata-led browse is valuable when the exact item is unknown. | Saved/configurable views and arbitrary metadata grouping exceed Launch authority. |
-| Carbon / enterprise collection patterns | Dense tables/lists remain useful after the user has narrowed a collection. | Preserve structured comparison in the result state rather than using preview-heavy cards for documents. | Generic sortable/faceted table features are not automatically admitted. |
+| Carbon / enterprise collection patterns | Dense tables/lists remain useful after the user has narrowed a collection; clickable/selectable tiles are appropriate for bounded navigation/options. | Preserve structured comparison in the result state; use simple whole-tile interaction for Document Type choice. | Generic sortable/faceted table/card features are not automatically admitted. |
 
 Product inference:
 
@@ -236,6 +236,8 @@ Technical lifecycle values remain server truth.
 
 ## 10. P8 disposition
 
-Current rendered candidate is **C2 — Discovery-first Library**. It is visually reviewable but cannot be LOCKED while B02-F1 or the material Document-Type-scale assumption remains unresolved.
+Current rendered candidate is **C2 — Discovery-first Library**. The operator-viewable HTML is being iterated as the visual reference for this block; the repository-canonical HTML is frozen only when the selected B02 candidate is operator-approved.
+
+B02 cannot be LOCKED while B02-F1 or the material Document-Type-scale assumption remains unresolved.
 
 Do not pre-design Document Official, Document Work, Governance, History/Audit detail or Administration from this block.
