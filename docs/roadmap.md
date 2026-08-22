@@ -31,13 +31,14 @@ Temporary branch-only T11 candidate pack:
 docs/work/current/t11-implementation-program.md
 docs/work/current/t11-node-completion-contracts.md
 docs/work/current/t11-frontend-readiness.md
+docs/work/current/t11-frontend-coverage.md
 ```
 
-The pack is Evidence/work product, not durable authority. The implementation-program Lead owns the candidate graph/closure; its two companions define mandatory node-exit and frontend implementation-readiness precision. All must be absorbed or removed before integration.
+The pack is Evidence/work product, not durable authority. The implementation-program Lead owns graph/closure; companions define mandatory node-exit and frontend implementation-readiness precision. All temporary files must be absorbed or removed before integration.
 
 T11 does not authorize Product implementation, does not begin T12 and does not reopen accepted Product/T1→T10 authority by preference.
 
-Opening / refinement proof:
+Opening / current precision proof:
 
 ```text
 opening integrated main               cae6ba48df5d611959c0390e0f2b9b8194d62a9d
@@ -47,7 +48,22 @@ operator T11 authorization             EXPLICIT / 2026-08-22
 operator node/frontend precision       EXPLICIT / 2026-08-22
 application operations                 78
 operation 79                           ABSENT
+F1 frontend coverage                   COMPLETE / 16 human goals / 78 operations
+F1 material T11 findings               5 found / 5 adjudicated / 0 unresolved
+Product/T8-F semantic reopen           NOT JUSTIFIED by current evidence
 Product implementation                 BLOCKED
+```
+
+F1 corrected the open T11 implementation graph without changing Product/T8 authority:
+
+```text
+S1  Identity + Organization + Access                              33
+S2  Document Governance configuration                            10
+S3  Library + Document core + template-role + History             9
+S4  Revision authoring + My Work authoring + content + Submission 13
+S5  Governance work + Governance Case + Release/rendition          9
+S6  Obsolescence + Audit                                           4
+TOTAL                                                             78
 ```
 
 Predecessor durable T10 authority:
@@ -99,9 +115,7 @@ T10 closeout required CI               #1168 SUCCESS / #1169 SUCCESS
 T10 closeout / current main            cae6ba48df5d611959c0390e0f2b9b8194d62a9d
 ```
 
-The T10 squash merge integrated the exact authorized closure tree: candidate `cc408964...` and integrated `main @ e8f415ec...` both resolve to tree `c3de41e73ee153278e0869ac80640cc945ae26b2`. PR #161 then recorded the completed integration and produced the current T11 opening base.
-
-Round-1 corrections remained bounded to T10. No T1→T9 authority reopened.
+The T10 squash merge integrated the exact authorized closure tree. PR #161 recorded completed integration and produced the current T11 opening base.
 
 ## Ratified T10 result
 
@@ -163,32 +177,31 @@ Redis / BFF / realtime / external Search / generic event bus absent
 Product implementation               BLOCKED
 ```
 
-T7 remains binding: Launch has no historical business corpus to migrate. Any contrary concrete evidence triggers the smallest bounded reopen rather than silent preservation or compatibility machinery.
+T7 remains binding: Launch has no historical business corpus to migrate. Contrary concrete evidence triggers the smallest bounded reopen rather than silent preservation/compatibility machinery.
 
 ## Exact next action
 
 ```text
-continue the T11 candidate on Draft PR #162
-→ derive the MetalDocs Frontend Coverage Matrix from accepted Product/T6/T8-E/T8-F authority; do not draw wireframes before coverage is reconciled
-→ derive the material interaction-surface inventory from that matrix
-→ derive a Screen Contract for every material surface
-→ derive the Navigation/Data Graph and prove every target identity/read path
-→ classify and resolve any material coverage finding; never invent operation 79 or a screen-shaped API
-→ only after those contracts are coherent, draw functional low/mid-fidelity wireframes for every material screen/safe-action state
-→ derive the Material Interaction Ledger and bidirectional frontend↔backend trace
-→ reconcile 78/78 frontend operation coverage with zero invented/orphaned operation
-→ feed the completed frontend pack back into the S1→S7 Node Completion Contracts
+continue T11 frontend implementation-readiness on Draft PR #162
+→ F2 derive the complete material interaction-surface/state inventory from the now-closed F1 Coverage Matrix
+→ prove every F2 surface is justified by an accepted human goal and backend contract; reject cosmetic over-fragmentation
+→ F3 derive a Screen Contract for every material surface
+→ F4 derive the Navigation/Data Graph and prove every target identity/read path
+→ classify any new material finding; never invent operation 79 or a screen-shaped API
+→ only after F2→F4 are coherent, F5 draw functional low/mid-fidelity wireframes for every material screen/safe-action state
+→ F6 derive Material Interaction Ledger
+→ F7 execute final bidirectional frontend↔backend trace and reconcile 78/78 coverage
+→ feed the completed frontend pack into S1→S6 Node Completion Contracts
 → run required CI on the exact completed T11 candidate HEAD
-→ present the exact completed Lead/candidate pack for explicit operator approval before independent review
-→ only then create isolated review/t11-fable from the exact approved candidate following Repository Standard v1
-→ adjudicate reviewer Evidence against current authority; correct only material defects
-→ require bounded re-review until MATERIAL=0 or route the smallest justified reopen
-→ only after convergence, prepare durable T11 authority + ratification evidence and remove temporary T11 work files
+→ present exact completed candidate for explicit operator approval before independent review
+→ only then create isolated review/t11-fable from the exact approved candidate
+→ adjudicate reviewer Evidence; re-review until MATERIAL=0 or smallest justified reopen
+→ after convergence prepare durable T11 authority + ratification and remove temporary work files
 → do not begin T12
-→ do not implement Product code while the roadmap implementation gate remains BLOCKED
+→ do not implement Product code while roadmap gate remains BLOCKED
 ```
 
-T11 is active only as an architecture/planning stage. T8-F remains closed unless the frontend readiness exercise produces material evidence requiring the smallest bounded reopen. T12 remains not open. Product implementation remains blocked.
+T11 is active only as architecture/planning. T8-F remains closed unless frontend-readiness evidence materially falsifies it. T12 remains not open. Product implementation remains blocked.
 
 ## Remaining architecture program
 
