@@ -1,6 +1,6 @@
 # T11 — Notification Technology / Reuse Spike
 
-> **Status:** OPERATOR-RATIFIED CANDIDATE / PENDING GLOBAL COHERENCE + INDEPENDENT CHALLENGE + UPSTREAM CONSOLIDATION.  
+> **Status:** OPERATOR-RATIFIED CANDIDATE / GCR-CORRECTED / PENDING INDEPENDENT CHALLENGE + UPSTREAM CONSOLIDATION.  
 > **Parent:** `t11-b03-discussion-notification-mini-design.md`.  
 > **Reasoning authority:** `developmentconexus-ops/conexus-methodology/METHOD.md` — DevelopmentConexus Engineering Method v1.0.0.  
 > **Implementation:** BLOCKED.
@@ -124,9 +124,29 @@ Use the browser's native `EventSource` mechanism. No SSE client library is requi
 
 Lost realtime signals never lose Notification truth; normal refetch/reconnect/focus recovery remains authoritative.
 
-## 6. Realtime server — narrow Go SSE adapter selected
+## 6. Realtime server — application-owned stream choreography + narrow Go SSE mechanism
 
-Use Go `net/http` streaming/flush primitives behind a narrow transport adapter rather than introducing a standalone SSE framework for the current one-event invalidation protocol.
+The accepted semantic inbound door remains:
+
+```text
+transport/http
+→ application/notifications
+→ narrow consumer-owned realtime subscription port
+→ platform realtime implementation
+```
+
+Do **not** wire the HTTP SSE route directly to `platform/realtime`.
+
+The application leaf owns current session/recipient stream choreography and may depend on a narrow mechanism port such as conceptually:
+
+```text
+Subscribe(ctx, recipient_user_id) -> signal stream / unsubscribe lifecycle
+Wake(recipient_user_id)
+```
+
+The exact Go signature is realization detail. The port must expose only ephemeral recipient-scoped invalidation mechanics; it must not expose Product Notification DTOs, document facts, permission decisions or generic EventBus messages.
+
+Use Go `net/http` streaming/flush primitives in the transport/platform realization rather than introducing a standalone SSE framework for the current one-event invalidation protocol.
 
 Required properties:
 
@@ -135,15 +155,16 @@ text/event-stream response
 bounded heartbeat where operationally required
 flush after event emission
 request-context cancellation closes subscriber
-no Product truth in connection/session state
+no Product truth in connection/subscription state
 no replay/event-history authority
+transport does not bypass application
 ```
 
 The OpenAPI/code-generation toolchain must prove server-side representation of the SSE operation. Operation 86 may not become a manually invented route outside the contract SSOT.
 
 ## 7. Launch wake-up mechanism — in-process coalescing hub selected
 
-Current T8-G baseline has one MetalDocs application replica. The smallest current wake-up mechanism is therefore an in-process recipient-scoped signal hub behind a narrow mechanism seam.
+Current T8-G baseline has one MetalDocs application replica. The smallest current wake-up mechanism is therefore an in-process recipient-scoped signal hub behind the narrow application-consumed mechanism seam.
 
 Conceptually:
 
@@ -156,12 +177,26 @@ Properties:
 
 ```text
 one or more active browser connections per User
-wake-up occurs only after successful semantic commit
-buffer/coalescing semantics reduce repeated pending invalidations to one signal
+wake-up only after successful Notification-state commit
+buffer/coalescing reduces repeated pending invalidations to one signal
 slow/disconnected subscribers never block or fail Product mutation
 wake-up failure never rolls back already-committed Notification truth
 no durable event queue
 ```
+
+Post-commit wake-up applies to every committed Notification change that can affect another open tab:
+
+```text
+DOCUMENT_MENTION Notification creation
+mark seen
+mark read
+mark unread
+archive
+unarchive
+mark all read
+```
+
+The relevant application leaf invokes the narrow mechanism only **after** commit. Semantic owners never call the hub directly.
 
 This mechanism is not a generic EventBus and owns no Notification state.
 
@@ -223,11 +258,13 @@ Lexical/HTML/JSON never becomes persistent authority
 mention autocomplete handles async stale-result/cancellation/keyboard/IME behavior safely
 same User mentioned repeatedly produces one Notification
 multiple tabs for one User receive invalidation
+creation + engagement mutations emit only post-commit wake-up
 multiple pending invalidations coalesce without losing canonical truth
 slow/disconnected SSE client cannot block a Product mutation
 request cancellation removes subscriber state
 lost SSE signal is recovered through canonical GET /notifications
 SSE payload contains zero source business truth
+transport -> application -> realtime mechanism direction is mechanically preserved
 selected OpenAPI Go generator supports the declared server-side text/event-stream operation
 no manual parallel route/DTO authority is introduced
 no generic EventBus/broker/Redis dependency appears without a reopen
