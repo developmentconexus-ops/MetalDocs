@@ -107,7 +107,7 @@ Product implementation               BLOCKED
 
 ```text
 operator authorization to open T10 — Transition / Cutover
-→ if authorized, start fresh from integrated main @ 29c0c87c3f659ce889b4210d487ee89a43d43d55
+→ if authorized, start fresh from the then-current integrated `main` containing this T9 closeout; revalidate its exact SHA before work
 → derive the smallest truthful current→target transition and rollback-barrier contract from accepted T1→T9 authority
 → do not begin T11 or T12
 → do not implement Product code
