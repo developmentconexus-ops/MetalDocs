@@ -48,12 +48,12 @@ The current Lead direction is one-way greenfield activation with five monotonic 
 ```text
 B0  source truth classified
 B1  target privately prepared
-B2  target proven before normal serving
-B3  canonical serving authority activated
-B4  first authoritative R10 Product mutation committed
+B2  target proven while still non-authoritative
+B3  first authoritative R10 Product mutation committed / point of no return
+B4  canonical serving authority activated
 ```
 
-Before B4, activation may be reversed only while no authoritative R10 Product mutation has committed. After B4, destructive return to disposable pre-R10/DEV/test state is forbidden; incidents become R10 recovery.
+Before B3, technical preparation may be reversed only while no authoritative R10 Product mutation has committed. After B3, destructive return to disposable pre-R10/DEV/test state is forbidden; incidents become R10 recovery. B4 may expose normal serving only after the authoritative R10 baseline exists and the target remains ready.
 
 ## Integrated T9 result preserved by T10
 
