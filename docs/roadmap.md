@@ -101,7 +101,15 @@ B03   Document Official / Ficha + Viewer + Discussion
        P9 Screen Contract                          COMPLETE
        P10 bounded pattern pass                    COMPLETE
 
-B04   Document Work / Authoring                    NEXT / NOT OPEN
+B04   Document Work / Authoring
+       CURRENT / CANDIDATE / NOT LOCKED
+       content-first workspace P7                  OPERATOR-APPROVED
+       DOCX → Eigenpal editable boundary           OPERATOR-APPROVED
+       PDF / SUBMITTED read-only boundary          OPERATOR-APPROVED
+       right operational rail                      OPERATOR-APPROVED
+       B04-F1 DOCX persistence UX                  OPEN / NEXT DECISION
+       functional low-fi P8                        NOT YET GENERATED
+
 B05   My Work / Work Queues                        NOT OPEN
 B06   Governance Case                              NOT OPEN
 B07   Document History                             NOT OPEN
@@ -212,19 +220,78 @@ B03-local semantic patterns retained        7
 false abstractions introduced               0
 ```
 
+## B04 current P7 baseline
+
+Current planning record:
+
+```text
+docs/work/current/t11-b04-document-work-r1.md
+```
+
+Operator-approved composition:
+
+```text
+/documents/:document_id/work
+= exact current open Revision Work lens
+
+MetalDocs minimal Work header
+↓
+CONTENT-FIRST WORKSPACE
+  main canvas
+    DOCX DRAFT     → Eigenpal toolbar/chrome + editable DOCX canvas
+    PDF DRAFT      → read-only viewer + source replacement path
+    SUBMITTED      → read-only exact submitted-content view
+
+  right rail
+    Trabalho atual
+    Fonte
+    Ações
+    Contexto do documento — collapsed by default
+```
+
+Legacy comparison disposition:
+
+```text
+preserve useful context density and visible save state
+reject legacy Work + Approval + History mode-adaptive collapse
+full revision history     -> B07
+approval timeline/actions -> B06
+full ficha                -> B03
+```
+
+Work truth laws remain:
+
+```text
+DocumentWorkView + DRAFT ETag = server truth
+local editor buffer            = FORM DRAFT only
+provider PUT success != READY
+READY != WorkingContent
+WorkingContent != Submission
+412 precondition.draft_changed preserves local input and requires explicit reconciliation
+```
+
+B04-F1 remains deliberately open:
+
+```text
+manual save
+vs
+autosave
+vs
+hybrid save
+```
+
+Legacy autosave behavior is Evidence only and does not freeze current semantics or timing.
+
 ## Exact next action
 
 ```text
-B04 Document Work / Authoring is NEXT / NOT OPEN.
-
-When B04 opens:
-  recover only the bounded current Work authority
-  execute P6/P7 only where triggered
-  build one functional low-fi P8 candidate
-  operator operates / iterates / LOCKs
-  then P9 / P10
-
-Do not generate B05+ as baseline early.
+1. Adjudicate B04-F1 — DOCX persistence UX.
+2. Consolidate the selected save-state/retry/reconciliation behavior into B04 planning.
+3. Generate one canonical functional low-fi P8 HTML for B04.
+4. Operator operates / iterates the P8.
+5. Operator-only B04 LOCK.
+6. Then P9 exact Screen Contract + P10 bounded pattern pass.
+7. B05+ remain NOT OPEN until normal progression permits them.
 ```
 
 ## Hard stops
