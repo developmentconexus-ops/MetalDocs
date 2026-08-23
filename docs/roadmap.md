@@ -97,11 +97,10 @@ B02   Library / Discovery                          LOCKED / OPERATOR-RATIFIED
 B03   Document Official / Ficha + Viewer + Discussion
        CURRENT / CANDIDATE / NOT LOCKED
        record/ficha-first semantics                 OPERATOR-APPROVED
-       historical C two-column dossier P7          OPERATOR-APPROVED VISUAL DIRECTION
+       historical C two-column dossier P7          OPERATOR-APPROVED
+       canonical functional P8 R2                  OPERATOR-APPROVED / P8 COMPLETE
        prior static storyboard                     REJECTED — WRONG REPRESENTATION MEDIUM
-       current R2 planning record                  READY
-       canonical functional P8 R2                  RENDERED / OPERATOR OPERATION+REVIEW
-       B03-F1 allowed_actions                       OPEN / MUST CLOSE BEFORE FINAL LOCK
+       B03-F1 allowed_actions                       CANDIDATE READY / OPERATOR ADJUDICATION
 
 B04   Document Work / Authoring                    NOT OPEN
 B05   My Work / Work Queues                        NOT OPEN
@@ -133,9 +132,9 @@ narrow/mobile accessible transformation
 stable /notifications full Inbox route
 ```
 
-## B03 current candidate
+## B03 operator-approved P8
 
-Current R2 record:
+Current planning record:
 
 ```text
 docs/work/current/t11-b03-document-official-r1.md
@@ -147,7 +146,7 @@ Canonical Method-v2.2 P8 R2:
 docs/work/current/t11-b03-document-official-functional-wireframe.html
 ```
 
-Selected structure:
+Operator-approved structure:
 
 ```text
 /documents/:document_id
@@ -195,43 +194,54 @@ Notification DOCUMENT_MENTION
 → anchor_message_id target
 ```
 
-Functional P8 R2 must be operated before any LOCK. Local fixture behavior is Evidence only; it does not become Product/server authority.
+The operator approved the P8 R2 content, interaction behavior, layout and proportions. Local fixture behavior remains Evidence only; it does not become Product/server authority.
 
-## B03-F1 — open finding before final LOCK
+## B03-F1 — current final pre-LOCK gate
 
-Candidate precision remains:
+Candidate analysis:
 
 ```text
-DocumentOfficialView.allowed_actions
+docs/work/current/t11-b03-f1-document-official-actions.md
+```
+
+Recommended precision:
+
+```text
+DocumentOfficialAction =
   create_revision
   replace_responsible_owner
   create_obsolescence_request
   withdraw_obsolescence_request
+
+DocumentOfficialView.allowed_actions: unique DocumentOfficialAction[]
 ```
 
-It is a server-derived UX hint only; commands always recheck current truth. B03 cannot receive final LOCK until the precision is durably reconciled or proven unnecessary.
+Candidate law:
+
+```text
+server-derived UX hints only
+same canonical Authorization + Controlled Documents predicates used by commands
+required array on a disclosed DocumentOfficialView; may be []
+canonical order fixed
+commands always recheck current truth
+no denial reasons / no frontend permission matrix
+no new operation / route / Permission / semantic owner / persistence / ETag domain
+```
+
+B03-F1 is not yet durable authority. Operator adjudication is required before promotion and before final B03 LOCK.
 
 ## Exact next action
 
 ```text
-1. Operator operates the canonical B03 functional P8 R2 in browser.
-2. Review only B03 layout/proportions/discoverability/local interaction:
-     two-column dossier balance
-     official preview size/position
-     ficha vs preview hierarchy
-     current-work separation
-     viewer open/back
-     management placement
-     Revisions full-width placement
-     Discussion full-width placement/density
-     reply / @mention composer
-     Notification -> exact message anchor
-     responsive dossier reflow
-3. Iterate only B03 until visual/interaction findings close.
-4. Resolve B03-F1 before final operator LOCK.
-5. Operator-only B03 LOCK.
-6. After LOCK, close P9 Screen Contract / bidirectional trace and bounded P10 pattern pass.
-7. Open B04 only after the B03 progression gate permits it.
+1. Operator adjudicates B03-F1 allowed_actions candidate.
+2. If approved:
+     promote bounded precision into current T6/T8-E/T8-F authority
+     reconcile executable DocumentOfficialView schema
+     mark B03-F1 CLOSED / OPERATOR-RATIFIED
+3. Operator-only final B03 LOCK.
+4. Close B03 P9 Screen Contract / bidirectional trace.
+5. Run bounded P10 pattern consolidation.
+6. Open B04 only after the B03 progression gate permits it.
 ```
 
 ## Hard stops
