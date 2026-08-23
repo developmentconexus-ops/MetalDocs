@@ -72,11 +72,16 @@ B04   Document Work / Authoring
 B05   My Work / Work Queues
        LOCKED / OPERATOR-RATIFIED · P8 R2/P9/P10 COMPLETE
 B06   Governance Case
-       LOCKED / OPERATOR-RATIFIED
+       LOCKED / OPERATOR-RATIFIED · P8/P9/P10 COMPLETE
        B06-F1 deadline projection                  CLOSED / OPERATOR-RATIFIED
        B06-F2 Governance Review Layer seam         CLOSED / OPERATOR-RATIFIED / FUTURE-SEAM
-       P8 R1 / P9 / P10                            COMPLETE
-B07   Document History                             NOT OPEN / NEXT ELIGIBLE
+B07   Document History
+       OPEN / ACTIVE
+       entry recovery                              COMPLETE
+       B07-F1 human-recognizable History read      CANDIDATE / AWAITING OPERATOR RATIFICATION
+       P6                                          COMPLETE
+       P7 H1 Revision Chapters                     LEADING / AWAITING OPERATOR APPROVAL
+       P8 / LOCK / P9 / P10                        NOT OPEN
 B08   Notifications Full Inbox                     NOT OPEN
 B09   Audit                                        NOT OPEN
 B10   Organization Administration                 NOT OPEN
@@ -100,32 +105,7 @@ Notifications remains transversal utility chrome, not `Minha Caixa` authority.
 
 ## B06 closure
 
-Canonical B06 records:
-
-```text
-docs/work/current/t11-b06-governance-case-r1.md
-docs/work/current/t11-b06-governance-case-functional-wireframe.html
-docs/work/current/t11-b06-f2-docx-review-layer.md
-docs/work/current/t11-b06-screen-contract.md
-docs/work/current/t11-b06-pattern-consolidation.md
-```
-
-Locked experience:
-
-```text
-Content-first Governance Workspace
-→ exact immutable governed content dominant
-→ exact Step/deadline context
-→ GovernanceFeedback separate from Decision
-→ deliberate ACCEPT / RETURN_FOR_CHANGES
-→ 409/403 authoritative reconciliation
-→ disclosure-neutral unavailable case
-→ no WorkingContent mutation / frontend Authorization authority
-```
-
-B06-F2 preserves only a future provider-neutral review seam. It adds no present inline-review controls, operation 87+, Permission, lifecycle state or B04 contract change.
-
-P10 reuses:
+B06 remains LOCKED. Its exact content, Step/deadline context, GovernanceFeedback/Decision separation, 403/409 reconciliation and future provider-neutral review seam are closed. P10 reused only:
 
 ```text
 Global App Shell
@@ -133,15 +113,103 @@ Notification Quick Inbox
 Exact Read-Only Content Viewer Shell
 ```
 
-No new shared semantic pattern graduates from B06.
+No B06 semantic rail/workspace abstraction was generalized.
+
+## B07 current gate
+
+Canonical work record:
+
+```text
+docs/work/current/t11-b07-document-history-r1.md
+```
+
+Current History boundary:
+
+```text
+/documents/:document_id/history
+→ op47 getDocument for current orientation only
+→ op53 getDocumentHistory for Controlled Documents history
+→ document.read_history
+→ read-only; no History mutation
+→ History != Audit
+```
+
+Current op53 remains cursor-paginated in server order:
+
+```text
+occurred_at ASC,
+kind,
+semantic id
+```
+
+P6 reference evidence supports a chronological origin-to-current History lens and exact historical read-only content, while compare/restore/delete remain outside current Launch scope.
+
+### B07-F1 candidate
+
+Current History facts are semantically correct but some variants are not independently human-recognizable without browser cross-page reconstruction.
+
+Selected candidate precision:
+
+```text
+all DocumentHistoryItem variants
+  -> exact revision: RevisionIdentity
+
+governance_decision
+  -> subject_kind
+  -> frozen step_label
+
+feedback_added
+  -> subject_kind
+
+release predecessor
+  predecessor_revision?: RevisionIdentity
+```
+
+Bare revision/target revision UUIDs are not retained as a second competing presentation identity when the exact `RevisionIdentity` replaces them.
+
+No new operation, route, Permission, owner, lifecycle state, Audit join, History filter DSL or fabricated title snapshot is introduced.
+
+### P7 leading hypothesis
+
+```text
+H1 Revision Chapters + chronological event spine
+
+History header
+  Document code + current official orientation
+  return to B03
+
+REV000
+  revision created
+  Submission(s)
+  governance feedback / Step Decisions
+  withdrawal / return when present
+  Release / rendition or cancellation
+
+REV001...
+  same controlled cycle structure
+
+obsolescence events remain attached to exact target Revision
+
+content-bearing event
+  -> existing Exact Read-Only Content Viewer Shell
+```
+
+Rejected as leading:
+
+```text
+flat audit-like event feed
+revision summary table requiring frontend aggregation
+compare/restore/delete controls without current Product authority
+```
 
 ## Exact next action
 
 ```text
-1. B07 Document History is the next eligible FP1 block and remains NOT OPEN.
-2. Open B07 only when the operator chooses to continue FP1.
-3. Do not open B08+ early.
-4. Implementation remains blocked.
+1. Operator adjudicates B07-F1 human-recognizable History projection.
+2. Operator adjudicates P7 H1 Revision Chapters.
+3. If approved, promote only the bounded op53 projection precision; current census stays 86.
+4. Then create/operate B07 functional P8 HTML.
+5. Do not open B08+ while B07 is active.
 ```
 
 ## Hard stops
@@ -150,10 +218,9 @@ No new shared semantic pattern graduates from B06.
 no Product code/schema/OpenAPI/runtime/deploy implementation
 no T12 work
 no production framework in P8
-no dormant inline-review UI
-no framework/vendor redefining Product semantics
-no automatic remapping of old review anchors onto changed DRAFT
-no generic ReviewAnnotation/EventBus/broker/Redis without a real consumer
+no frontend History graph as business authority
+no History/Audit semantic merge
+no compare/restore/delete without current Product authority
 no frontend Authorization matrix
 no unopened downstream block design
 no legacy restoration by sunk cost
