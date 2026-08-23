@@ -1,27 +1,42 @@
-# T11 — B07 Document History R1 — Method v2.2 candidate
+# T11 — B07 Document History R1 — Method v2.2 locked
 
-> **Status:** OPEN / ACTIVE / ENTRY RECOVERY COMPLETE / B07-F1 OPERATOR-RATIFIED / P6 COMPLETE / P7 H1 OPERATOR-APPROVED / P8 R1 READY FOR OPERATOR USE.  
+> **Status:** LOCKED / OPERATOR-RATIFIED / P9-P10 COMPLETE.  
 > **Block:** B07 — Document History.  
 > **Method:** Frontend Product Experience Planning Method v2.2 + DevelopmentConexus Engineering Method.  
 > **Predecessors:** B01 / B01N / B02 / B03 / B04 / B05 / B06 LOCKED.  
 > **Bounded authority:** `../../decisions/document-history-recognition-read.md`.  
-> **Canonical P8 R1:** `t11-b07-document-history-functional-wireframe.html`.  
+> **Canonical P8:** `t11-b07-document-history-functional-wireframe.html`.  
 > **Canonical HTML blob:** `20ec64d34085fbc9075b136a61e69c48c0cad981`.  
-> **Implementation:** BLOCKED.  
-> **LOCK:** NOT YET — operator must operate/iterate P8 first.
+> **Post-LOCK proof:** `t11-b07-screen-contract.md` + `t11-b07-pattern-consolidation.md`.  
+> **Implementation:** BLOCKED.
 
-## 1. Entry recovery outcome
+## 1. Lock basis
 
-Document History is a Controlled Documents lens, not Audit and not a lifecycle owner.
+The operator explicitly approved:
 
 ```text
-stable route
+B07-F1 human-recognizable History projection
+P7 H1 Revision Chapters + chronological event spine
+functional P8 R1 after browser operation
+final B07 LOCK authorization
+```
+
+No material current-Launch B07 finding remains open.
+
+The P8 hypothesis was accepted with the prototype: when later chronological events target an older Revision, authoritative server chronology remains primary and the Revision marker may repeat later rather than moving the event backward in time.
+
+## 2. Current Product boundary
+
+Document History is a Controlled Documents lens, not Audit and not lifecycle mutation authority.
+
+```text
+route
   /documents/:document_id/history
 
-orientation read
+orientation
   47 getDocument
 
-History read
+History
   53 getDocumentHistory
 
 access
@@ -31,7 +46,7 @@ writes
   none
 ```
 
-History answers the controlled story of one Document:
+History answers the controlled story of one Document across:
 
 ```text
 business Revision cycles
@@ -42,9 +57,9 @@ Release / official rendition
 obsolescence request / withdrawal / completion
 ```
 
-Audit remains separate action evidence across the product and is never B07 lifecycle reconstruction authority.
+Audit remains separate cross-product action evidence and is never queried to reconstruct B07 lifecycle meaning.
 
-## 2. B07-F1 — CLOSED / OPERATOR-RATIFIED
+## 3. B07-F1 — CLOSED / OPERATOR-RATIFIED
 
 Durable authority:
 
@@ -52,9 +67,9 @@ Durable authority:
 ../../decisions/document-history-recognition-read.md
 ```
 
-Current op53 remains operation 53 and gains only human-recognition projection precision.
+Operation 53 remains the sole History list read and the census stays 86 operations / 11 routes / 16 PermissionCode values.
 
-Every `DocumentHistoryItem` now carries:
+Every History event carries:
 
 ```text
 revision: RevisionIdentity
@@ -63,31 +78,27 @@ revision: RevisionIdentity
 Governance Decision additionally carries:
 
 ```text
-subject_kind: GovernanceSubjectKind
-step_label: ShortText
+subject_kind
+step_label  // frozen GovernanceAttemptStep.label_snapshot
 ```
 
-where `step_label` comes from immutable `GovernanceAttemptStep.label_snapshot`, never current route configuration.
-
-Governance feedback additionally carries:
+Governance feedback carries:
 
 ```text
-subject_kind: GovernanceSubjectKind
+subject_kind
 ```
 
-Release predecessor is projected as:
+Release predecessor is:
 
 ```text
 predecessor_revision?: RevisionIdentity
 ```
 
-The refinement creates no operation 87+, route, Permission, semantic owner, lifecycle state, Audit join, History sort/filter/search DSL, fabricated title-at-revision-creation snapshot or frontend historical relationship graph as authority.
+No browser cross-page relationship graph, Audit join, fabricated title snapshot, new route/operation/Permission/owner/lifecycle state or History query DSL was introduced.
 
-Current census remains 86 operations / 11 routes / 16 PermissionCode values.
+## 4. Ordering / pagination law
 
-## 3. Ordering / pagination law
-
-Operation 53 keeps its server-owned order:
+Operation 53 keeps the server-owned order:
 
 ```text
 occurred_at ASC,
@@ -97,67 +108,42 @@ semantic id
 
 B07 does not globally re-sort independently fetched cursor pages.
 
-Pagination stays:
+A later chronological event may target an older Revision. The locked UX preserves order and repeats the Revision marker when useful for recognition.
 
-```text
-first page -> optional limit
-next page  -> cursor + optional limit
-no total count
-no frozen multi-page snapshot
-current disclosure/AuthZ rechecked every page
-```
+Pagination remains cursor-based with current disclosure/AuthZ rechecked on every page, no total count and no frozen multi-page snapshot.
 
-Already loaded historical facts remain valid if continuation loading fails.
-
-## 4. Exact historical content
+## 5. Exact historical content
 
 B07 adds no content endpoint.
 
-Submission event:
-
 ```text
-submission_id
--> op63 getSubmission
--> op64 getSubmissionSource
--> exact immutable submitted bytes
+Submission event
+  submission_id
+  -> op63 getSubmission
+  -> op64 getSubmissionSource
+
+Release event
+  release_id
+  -> op72 getRelease
+  -> op73 getReleaseSource or op74 getOfficialRenditionContent as applicable
 ```
 
-Release event:
+Both use the shared Exact Read-Only Content Viewer Shell.
 
-```text
-release_id
--> existing Release/source/rendition reads
--> exact released official bytes
-```
-
-Both use the already-graduated Exact Read-Only Content Viewer Shell.
-
-Historical content failure must never substitute another/current version.
-
-## 5. Human jobs
-
-```text
-J1 reconstruct the controlled Document story from origin to current state
-J2 recognize which exact business Revision each event belongs to
-J3 inspect exact immutable historical content when evidence-bearing identity exists
-J4 understand governance feedback/Decision without entering a current Governance Case
-J5 keep Document History conceptually distinct from Audit
-```
+Historical content failure never substitutes another/current version.
 
 ## 6. P6 — COMPLETE
 
-External evidence saturated after Veeva Vault Timeline, M-Files Version History, SharePoint and Qualio.
-
-Accepted evidence:
+Reference evidence from Veeva Vault Timeline, M-Files Version History, SharePoint and Qualio supported:
 
 ```text
-Document-specific lifecycle/version history is a dedicated lens
-historical versions/content are read-only and deliberately inspectable
-oldest -> newest history is a credible storytelling order
-workflow/lifecycle history and broader Audit remain distinct
+dedicated Document lifecycle/version History
+historical exact content as read-only evidence
+oldest -> newest as credible storytelling order
+History distinct from broader Audit
 ```
 
-Rejected for current Launch:
+Current Launch still excludes:
 
 ```text
 restore historical version
@@ -167,7 +153,7 @@ workflow/task administration
 free-form History query platform
 ```
 
-## 7. P7 — H1 OPERATOR-APPROVED
+## 7. P7 / P8 — LOCKED
 
 Selected structure:
 
@@ -175,181 +161,90 @@ Selected structure:
 H1 Revision Chapters + chronological event spine
 ```
 
-Composition:
+Canonical P8:
 
 ```text
-minimal History header
-  return to Document Official
-  Document code
-  current official orientation from op47
-  explicit History identity
-
-chronological event spine
-  Revision marker
-  revision-created event
-  Submission(s)
-  governance feedback / Decisions
-  withdrawal / cancellation
-  Release / rendition
-  obsolescence facts when that Revision is target
-
-content-bearing event
-  -> exact read-only historical viewer
+t11-b07-document-history-functional-wireframe.html
 ```
 
-Rejected as leading:
+Material evidence exercised:
 
 ```text
-flat audit-like event feed
-revision summary table requiring browser aggregation
-compare/restore/delete controls without Product authority
+REV000 return/resubmit/release
+REV001 release
+REV002 withdrawal + cancellation
+later REV001 obsolescence request/withdrawal/retry/completion
+cursor continuation + retry
+exact Submission / Release viewer
+exact-content failure without substitution
+neutral 404
+responsive reflow
+B01N Quick Inbox inheritance
+viewer Escape/focus recovery
 ```
 
-## 8. P8 R1 — functional low-fidelity evidence
+The operator operated R1 and explicitly approved it on 2026-08-23.
 
-Canonical file:
+## 8. P9 — COMPLETE
+
+Post-LOCK proof:
 
 ```text
-docs/work/current/t11-b07-document-history-functional-wireframe.html
+t11-b07-screen-contract.md
 ```
 
-R1 is pure HTML/CSS/vanilla JavaScript with deterministic local fixtures only. It contains no production framework, API call, frontend Authorization evaluator or Product schema implementation.
-
-Local structural verification before repository write:
+Closure:
 
 ```text
-HTML parsed successfully
-static duplicate ids = 0
-JavaScript node --check = PASS
-local Git blob = 20ec64d34085fbc9075b136a61e69c48c0cad981
-repository blob = 20ec64d34085fbc9075b136a61e69c48c0cad981
+material regions/controls traced        20 / 20
+unbound material controls               0
+invented operations                     0
+operation 87+                           0
+screen-shaped APIs                      0
+frontend historical graph authority     0
+frontend Authorization evaluator        0
+History mutations                       0
+Audit reconstruction dependencies       0
+material findings                       0
 ```
 
-### Material regions / behavior exercised
+## 9. P10 — COMPLETE
+
+Post-LOCK proof:
 
 ```text
-R1  History orientation header + B03 return boundary
-R2  current official orientation from op47
-R3  chronological Revision markers
-R4  revision-created event without fabricated title snapshot
-R5  Submission event + exact historical Submission viewer
-R6  governance feedback + subject kind
-R7  Governance Decision + frozen human Step label
-R8  RETURN_FOR_CHANGES reason
-R9  Submission withdrawal
-R10 Revision cancellation
-R11 Release + predecessor Revision + exact official viewer
-R12 official-rendition completion
-R13 obsolescence request / withdrawal / completion
-R14 cursor continuation
-R15 continuation failure / retry preserving loaded facts
-R16 History unavailable / disclosure-neutral 404
-R17 exact historical-content failure / retry without substitution
-R18 global Notification Quick Inbox inherited from B01N
-R19 responsive chronological reflow
-R20 viewer Escape/focus return + aria-live recovery announcements
+t11-b07-pattern-consolidation.md
 ```
 
-### Deterministic timeline fixtures
-
-R1 deliberately includes:
+Shared patterns reused:
 
 ```text
-REV000
-  S1 -> feedback -> technical ACCEPT -> manager RETURN
-  S2 -> ACCEPTs -> rendition -> Release
-
-REV001
-  S3 -> feedback -> Decisions -> Release
-
-REV002
-  S4 withdrawal -> S5 -> Revision cancellation
-
-later chronology
-  REV001 becomes the target again
-  obsolescence request -> withdrawal
-  new obsolescence request -> Decisions/feedback -> completion
+Global App Shell
+Notification Quick Inbox
+Exact Read-Only Content Viewer Shell
 ```
 
-This proves the UI cannot assume that all events belonging to a Revision are one permanently contiguous lifetime block.
-
-## 9. P8-specific hypothesis under operator review
-
-The server's chronological order remains authoritative.
-
-When later chronological events target an older Revision after a newer Revision cycle has occurred, R1 does **not** move those events backward into the older visual block.
-
-Instead it renders another Revision marker:
+New shared patterns graduated:
 
 ```text
-REV001
-  original cycle / Release
-
-REV002
-  later cycle / cancellation
-
-REV001
-  Revision retomada mais tarde na cronologia
-  obsolescence events
+none
 ```
 
-This is a **P8 UX hypothesis**, not a new lifecycle/API rule.
+B07-local patterns remain local, including Revision Chapters, repeated Revision markers for later activity, human-recognizable History rows and History-specific chronological continuation.
 
-Operator use should decide whether repeating the Revision marker preserves chronology clearly enough or whether another bounded visual treatment is needed.
+No generic Timeline/Event/History abstraction was created merely from geometry.
 
-## 10. Responsive / accessibility structure
-
-Desktop:
+## 10. Closure
 
 ```text
-single dominant chronological reading column
-Revision marker remains prominent/sticky while reading a segment
-exact historical viewer opens as bounded read-only surface
+B07-F1              CLOSED / OPERATOR-RATIFIED
+P6                  COMPLETE
+P7 H1               OPERATOR-APPROVED
+P8 R1               LOCKED / OPERATOR-RATIFIED
+P9                  COMPLETE
+P10                 COMPLETE
+B07                  LOCKED / OPERATOR-RATIFIED
+B08+                 NOT OPEN
 ```
 
-Narrow:
-
-```text
-orientation
--> Revision marker
--> events in server chronological order
--> exact viewer only after deliberate open
-```
-
-Structural obligations represented:
-
-```text
-Revision boundaries are text headings, not color-only
-Event kind is explicit text
-actor / instant / outcome remain readable text
-RETURN reason is visible text
-Step label is human text, never UUID-only
-content viewer has close/Escape + focus return
-load-more failure preserves loaded reading position/truth
-```
-
-## 11. Current P8 gate
-
-```text
-entry recovery                         COMPLETE
-B07-F1                                 CLOSED / OPERATOR-RATIFIED
-P6                                     COMPLETE
-P7 H1                                  OPERATOR-APPROVED
-functional P8 R1                       EXISTS / READY FOR OPERATOR USE
-P8 UX hypothesis                       AWAITING OPERATOR ADJUDICATION
-B07 LOCK                               NOT YET
-P9 / P10                               NOT OPEN
-B08+                                   NOT OPEN
-```
-
-Verification checkpoint before operator delivery:
-
-```text
-HEAD before this metadata record       752a30669cb7534ac88504f40ae02911aa2cabe7
-CI on that HEAD                        #1402 SUCCESS
-required job                           97260190583 SUCCESS
-```
-
-Next gate:
-
-> Operator opens/operates B07 P8 R1, especially loading the second page where REV001 reappears after REV002 cancellation, opening historical Submission/Release content, forcing pagination/content failure and checking the 404 state. If friction exists, revise the same HTML. Only explicit B07 LOCK opens P9 then P10.
+B08 may become the next eligible FP1 block only after this closure is recorded in the repository roadmap. Implementation remains blocked.
