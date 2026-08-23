@@ -32,6 +32,12 @@ docs/decisions/governance-step-deadline.md
 docs/decisions/governance-case-step-deadline-read.md
 ```
 
+Current B06-F2 planning candidate is **not yet durable authority**:
+
+```text
+docs/work/current/t11-b06-f2-docx-review-layer.md
+```
+
 Current system census:
 
 ```text
@@ -88,7 +94,9 @@ B06   Governance Case
        B06-F1 case Step deadline projection        CLOSED / OPERATOR-RATIFIED
        P6                                          COMPLETE
        P7 H1 Content-first Governance Workspace    OPERATOR-APPROVED
-       P8 R1 functional HTML                       READY / AWAITING OPERATOR USE
+       P8 R1 functional HTML                       OPERATOR-APPROVED
+       B06-F2 DOCX Review Layer seam               WRITTEN RATIFICATION PENDING
+       P8 R2 inline review                         NOT OPEN
        LOCK / P9 / P10                             NOT YET
 B07   Document History                             NOT OPEN
 B08   Notifications Full Inbox                     NOT OPEN
@@ -170,6 +178,12 @@ Canonical functional P8 R1:
 docs/work/current/t11-b06-governance-case-functional-wireframe.html
 ```
 
+Current F2 planning candidate:
+
+```text
+docs/work/current/t11-b06-f2-docx-review-layer.md
+```
+
 B06 owns the exact Governance Case lens only:
 
 ```text
@@ -197,9 +211,11 @@ Binding authority:
 docs/decisions/governance-case-step-deadline-read.md
 ```
 
-The deadline remains attention/context truth only. B06 owns no deadline mutation, SLA engine, lifecycle breach effect, manual priority or frontend Authorization.
+Deadline remains attention/context truth only. B06 owns no deadline mutation, SLA engine, lifecycle breach effect, manual priority or frontend Authorization.
 
-P7 operator-approved structure:
+## B06 P7 / P8 R1 disposition
+
+Operator-approved structure:
 
 ```text
 Content-first Governance Workspace
@@ -218,7 +234,9 @@ dossier-first separate-viewer structure as leading choice
 three-column generic workflow cockpit
 ```
 
-P8 R1 exercises:
+The operator opened/operated P8 R1 and approved the current visual/functional experience on 2026-08-23.
+
+R1 exercises:
 
 ```text
 Submission + obsolescence exact-subject cases
@@ -235,16 +253,75 @@ clock crossing due_at without lifecycle effect
 responsive/accessibility structure
 ```
 
-One explicit P8 UX hypothesis is under operator review: while exact governed bytes are unavailable, the R1 Decision zone is unavailable so the prototype does not imply successful content review. This is not Product/AuthZ authority and may be revised during P8 iteration.
+The R1 exact-content-failure treatment remains presentation evidence only: when exact bytes are unavailable the prototype does not offer Decision controls until content is restored. It creates no Product/AuthZ lifecycle law.
+
+## B06-F2 — DOCX Review Layer planning gate
+
+During P8 review the operator raised a real future requirement for Word-like DOCX review:
+
+```text
+select content range
+→ comment/review against that exact range
+→ potentially suggest a change
+→ never mutate the governed Submission
+```
+
+High-level direction was approved in chat; the written candidate now awaits explicit ratification.
+
+Selected candidate principles:
+
+```text
+exact governed Submission remains immutable
+stable Document Discussion != inline governance review
+DRAFT EditorialComment remains separately deferred
+future anchored comment binds to exact immutable reviewed snapshot
+current unanchored GovernanceFeedback remains valid
+tracked changes/suggestions require a separate semantic promotion
+vendor/editor ids never become MetalDocs semantic authority
+RETURN leaves review context with old immutable Submission
+old anchors never blindly move onto changed DRAFT bytes
+future B04 remediation needs explicit server-authored review-context identity
+```
+
+Technology posture is intentionally mechanism-only:
+
+```text
+EigenPal Apache core       acceptable current free DOCX baseline
+EigenPal Pro               possible future commercial review mechanism
+SuperDoc Community         not admitted under AGPLv3 for proprietary baseline
+SuperDoc commercial        possible future commercial mechanism
+other mechanisms           may compete behind the same seam
+```
+
+### Current no-dormant-capability law
+
+B06-F2 does not promote inline review into current Launch.
+
+Therefore current authority stays unchanged:
+
+```text
+GovernanceFeedback wire         unchanged
+allowed_actions                 accept | return_for_changes | add_feedback
+application operations          86
+stable SPA routes               11
+PermissionCode values           16
+semantic owners                 4 business + 2 supporting
+B04 contract                    unchanged
+P8 R1 current controls          unchanged
+P8 R2 inline-review controls    absent
+```
+
+Do not add disabled/coming-soon comment/reply/resolve/suggestion controls merely to reserve UI space.
 
 ## Exact next action
 
 ```text
-1. Operator opens and operates B06 functional P8 R1.
-2. Exercise Submission, obsolescence, deadline crossing, feedback, Decision, 409/403, 404 and content-failure states.
-3. If friction/finding exists -> revise the same B06 HTML as R2; do not open B07.
-4. If operator explicitly LOCKS B06 -> execute P9 Screen Contract then P10 pattern consolidation.
-5. Only after B06 P10 closure may B07 become eligible to open.
+1. Operator reviews/ratifies docs/work/current/t11-b06-f2-docx-review-layer.md.
+2. If ratified, promote only the durable seam/reopen obligations needed to prevent future architectural dead-end.
+3. Keep current Launch census/API/P8 controls unchanged unless the operator explicitly promotes inline review as present-tense capability.
+4. Re-evaluate B06 LOCK on R1 after F2 closure; create P8 R2 only if the ratified result changes current visible Launch behavior.
+5. After explicit B06 LOCK, execute P9 Screen Contract then P10 pattern consolidation.
+6. Only after B06 P10 closure may B07 become eligible to open.
 ```
 
 ## Hard stops
@@ -255,6 +332,9 @@ no T12 work
 no production frontend framework in P8
 no static storyboard accepted as P8 lock evidence
 no framework/library redefines Product semantics
+no dormant inline-review UI for a deferred capability
+no generic ReviewAnnotation platform without a real cross-format consumer
+no automatic remapping of old review anchors onto changed DRAFT bytes
 no generic EventBus/broker/Redis without a named material trigger
 no frontend Authorization matrix
 no unopened downstream block design
