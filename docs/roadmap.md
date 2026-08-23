@@ -20,7 +20,7 @@ branch                 arch/t11-implementation-program
 opening main           cae6ba48df5d611959c0390e0f2b9b8194d62a9d
 ```
 
-Current Product/architecture authority lives in `docs/product/**`, `docs/architecture/**`, and `docs/decisions/**`. Discussion / `@mention` / Notifications is current under `docs/decisions/discussion-notifications-launch.md`. Document Official management action-hint precision is current under `docs/decisions/document-official-actions-read.md`. My Work governance-row identification precision is current under `docs/decisions/my-work-governance-identification-read.md`.
+Current Product/architecture authority lives in `docs/product/**`, `docs/architecture/**`, and `docs/decisions/**`. Discussion / `@mention` / Notifications is current under `docs/decisions/discussion-notifications-launch.md`. Document Official management action-hint precision is current under `docs/decisions/document-official-actions-read.md`. My Work governance read precision is current under `docs/decisions/my-work-governance-identification-read.md`.
 
 Current system census:
 
@@ -116,8 +116,8 @@ B05   My Work / Work Queues
        CURRENT / CANDIDATE / NOT LOCKED
        authority + legacy ergonomics recovery      COMPLETE
        B05-F1 governance row RevisionReference     CLOSED / OPERATOR-RATIFIED
-       B05-F2 governance queue ordering            OPEN / NEXT DECISION
-       P7 queue composition                        BLOCKED ON F2
+       B05-F2 governance queue ordering            CLOSED / OPERATOR-RATIFIED
+       P7 queue composition                        LEADING A / OPERATOR REVIEW
        functional low-fi P8                        NOT OPEN
 
 B06   Governance Case                              NOT OPEN
@@ -324,9 +324,8 @@ The pattern is planning vocabulary only; it does not create a generic resolver, 
 ## Exact next action
 
 ```text
-B05-F2 — adjudicate fixed governance-work ordering.
-Leading candidate: document.code ASC, governance_attempt_id ASC.
-If closed, resume B05 P7 queue-composition comparison.
+B05 P7 — operator adjudicates focused queue direction A.
+If approved, build one functional low-fi P8 candidate for B05.
 B06+ remain NOT OPEN.
 ```
 
