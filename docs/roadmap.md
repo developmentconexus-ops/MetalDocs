@@ -34,12 +34,12 @@ Frontend Product Experience Planning Method v2.1
 Current block state:
 
 ```text
-B01  App Shell + Global IA       LOCKED / OPERATOR-RATIFIED baseline
-      notification delta         P8 CURRENT / NOT YET RE-LOCKED
+B01  App Shell + Global IA       LOCKED / OPERATOR-RATIFIED
+      notification delta         LOCKED / OPERATOR-RATIFIED
 
 B02  Library / discovery         LOCKED / OPERATOR-RATIFIED
 
-B03  Document Official           OPEN / CANDIDATE / NOT LOCKED
+B03  Document Official           OPEN / CANDIDATE / P8 CURRENT / NOT LOCKED
       Discussion/Notifications   CURRENT / OPERATOR-RATIFIED / GCR+FABLE+PROMOTION COHERENT
 
 B04+                             NOT OPEN
@@ -55,7 +55,7 @@ Gestão       = system configuration
 Evidência    = audit/evidence
 ```
 
-The current Notifications amendment keeps the sidebar unchanged and adds only:
+The locked Notifications delta keeps the sidebar unchanged and adds only:
 
 ```text
 utility-header bell + unseen badge
@@ -64,7 +64,11 @@ narrow/mobile accessible transformation
 stable /notifications full Inbox route
 ```
 
-Only the implicated B01 structural scope is reopened. A rendered P8 delta + explicit operator adjudication are required before it may be re-LOCKED.
+Canonical rendered evidence for the bounded B01 delta:
+
+```text
+docs/work/current/t11-b01-notifications-wireframe.html
+```
 
 B03 remains record/ficha-first with a deliberate distinct read-only official-content viewer and stable-Document Discussion. B03-F1 remains open for server-derived Document Official `allowed_actions`. B04+, T12 and Product implementation remain blocked.
 
@@ -143,21 +147,32 @@ Post-promotion evidence:
 docs/work/current/t11-discussion-notifications-promotion-coherence.md
 ```
 
+## B01 notification re-LOCK proof
+
+```text
+architecture/ownership amendment       CURRENT
+B01 Notification P8                    RENDERED
+operator visual adjudication           APPROVED
+Notification P8 delta                  LOCKED / OPERATOR-RATIFIED
+original B01 baseline                  PRESERVED / LOCKED
+sidebar                                UNCHANGED
+```
+
+The re-LOCK changes only utility-header Notification chrome, Quick Inbox and responsive transformation. It does not reopen Home, My Work or primary sidebar IA.
+
 ## Exact next action
 
 ```text
-1. B01 Notifications P8 — render the smallest structural delta only:
-     utility-header bell + unseen badge
-     desktop Quick Inbox
-     narrow/mobile transformation
-     transition to /notifications
-     sidebar unchanged
-2. Operator visually adjudicates hierarchy/size/position/discoverability/accessibility/responsive behavior.
-3. Iterate only the implicated B01 delta until operator re-LOCK.
-4. Resume B03 P8 with current Discussion/Notification semantics.
-5. Resolve B03-F1 before any B03 LOCK.
-6. Only operator may LOCK B03.
-7. Do not open B04+, T12, or Product implementation before their normal gates.
+1. Resume B03 Document Official P8 using current authority:
+     record/ficha first
+     explicit distinct read-only official-content viewer
+     stable-Document Discussion
+     exact current management context
+2. Reconcile B03 candidate layout with current Discussion semantics and the now-locked global Notification chrome.
+3. Resolve B03-F1 server-derived `DocumentOfficialView.allowed_actions` before any B03 LOCK.
+4. Render/adjudicate B03 structural candidate; iterate only B03 until explicit operator LOCK.
+5. After B03 LOCK, complete P9 Screen Contract / bidirectional trace and bounded P10 consolidation.
+6. Do not open B04+, T12, or Product implementation before their normal gates.
 ```
 
 ## Hard stops
