@@ -107,8 +107,8 @@ B04   Document Work / Authoring
        DOCX → Eigenpal editable boundary           OPERATOR-APPROVED
        PDF / SUBMITTED read-only boundary          OPERATOR-APPROVED
        right operational rail                      OPERATOR-APPROVED
-       B04-F1 DOCX persistence UX                  OPEN / NEXT DECISION
-       functional low-fi P8                        NOT YET GENERATED
+       B04-F1 hybrid persistence UX                CLOSED / OPERATOR-RATIFIED
+       functional low-fi P8 R1                     RENDERED / OPERATOR OPERATION+REVIEW
 
 B05   My Work / Work Queues                        NOT OPEN
 B06   Governance Case                              NOT OPEN
@@ -220,15 +220,21 @@ B03-local semantic patterns retained        7
 false abstractions introduced               0
 ```
 
-## B04 current P7 baseline
+## B04 current P8 candidate
 
-Current planning record:
+Planning record:
 
 ```text
 docs/work/current/t11-b04-document-work-r1.md
 ```
 
-Operator-approved composition:
+Canonical Method-v2.2 functional evidence:
+
+```text
+docs/work/current/t11-b04-document-work-functional-wireframe.html
+```
+
+Operator-approved P7 structure:
 
 ```text
 /documents/:document_id/work
@@ -259,6 +265,22 @@ approval timeline/actions -> B06
 full ficha                -> B03
 ```
 
+B04-F1 hybrid persistence law:
+
+```text
+local Eigenpal changes become DIRTY immediately
+background autosave coalesces after an implementation-appropriate quiet period
+at most one save pipeline in flight
+Salvar agora / Ctrl+S force the same pipeline
+save accepts new DocumentWorkView + strong DRAFT ETag
+save failure preserves local buffer
+412 stops stale autosave and requires explicit human reconciliation
+no automatic merge / silent LWW
+submit waits for in-flight save and force-flushes remaining local changes
+submit proceeds only against the exact accepted DRAFT ETag
+no IndexedDB/localStorage/offline durable client DRAFT baseline
+```
+
 Work truth laws remain:
 
 ```text
@@ -267,31 +289,46 @@ local editor buffer            = FORM DRAFT only
 provider PUT success != READY
 READY != WorkingContent
 WorkingContent != Submission
-412 precondition.draft_changed preserves local input and requires explicit reconciliation
 ```
 
-B04-F1 remains deliberately open:
+P8 R1 exercises locally:
 
 ```text
-manual save
-vs
-autosave
-vs
-hybrid save
+DOCX edit → dirty → autosave/save-now → new ETag
+coalesced edits while save is in flight
+save failure + retry path
+412 conflict + preserved local input + explicit reconciliation
+PDF read-only Work
+source replacement allocation → PUT → READY → attach
+expired upload → same local bytes + new allocation
+submit force-flush → SUBMITTED read-only
+withdraw Submission → same Revision DRAFT
+cancel Revision reason → no-current-work state
+return to B03; no History fallback
+responsive rail reflow
 ```
 
-Legacy autosave behavior is Evidence only and does not freeze current semantics or timing.
+Review-only controls that force failure/conflict/expiry are Evidence only, not Product UI.
 
 ## Exact next action
 
 ```text
-1. Adjudicate B04-F1 — DOCX persistence UX.
-2. Consolidate the selected save-state/retry/reconciliation behavior into B04 planning.
-3. Generate one canonical functional low-fi P8 HTML for B04.
-4. Operator operates / iterates the P8.
-5. Operator-only B04 LOCK.
-6. Then P9 exact Screen Contract + P10 bounded pattern pass.
-7. B05+ remain NOT OPEN until normal progression permits them.
+1. Operator operates B04 functional P8 R1 in browser.
+2. Review only B04 layout / discoverability / persistence / recovery behavior:
+     Eigenpal canvas vs rail balance
+     save-state visibility
+     autosave + Salvar agora feel
+     submit force-flush understanding
+     source replacement progression
+     expired-upload recovery
+     412 reconciliation clarity
+     DRAFT vs SUBMITTED separation
+     withdraw/cancel behavior
+     narrow/mobile reflow
+3. Iterate only B04 material findings.
+4. Operator-only B04 LOCK.
+5. Then P9 exact Screen Contract + P10 bounded pattern pass.
+6. B05+ remain NOT OPEN until normal progression permits them.
 ```
 
 ## Hard stops
