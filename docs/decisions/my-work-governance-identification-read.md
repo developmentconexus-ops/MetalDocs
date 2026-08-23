@@ -2,20 +2,19 @@
 id: my-work-governance-identification-read
 kind: authority
 owner: architecture
-summary: Operator-ratified My Work governance recognition precision; its former neutral queue ordering is explicitly reopened after governance Step deadline semantics became current.
+summary: Operator-ratified My Work governance projection authority for human recognition, active-Step deadline triage, bounded deadline filters, and one server-owned cursor order.
 ---
 
 # My Work governance read precision
 
 > **Status:** OPERATOR-RATIFIED / CURRENT BOUNDED AUTHORITY  
 > **Ratified F1/F2:** 2026-08-23  
-> **F2 bounded reopen:** 2026-08-23 by `governance-step-deadline.md`  
-> **Impacts:** T6 canonical journeys/read-model meaning, T8-E executable wire shape/order, T8-F frontend consumption.  
+> **F2 reopened by F3 / superseded by F4:** 2026-08-23  
+> **Ratified F4:** 2026-08-23  
+> **Impacts:** T6 canonical journeys/read-model meaning, T8-E executable wire shape/filter/order, T8-F frontend consumption.  
 > **Implementation:** BLOCKED.
 
-## 1. Current disposition
-
-F1 remains fully current:
+## 1. Current projection
 
 ```text
 WorkGovernanceItem {
@@ -24,177 +23,314 @@ WorkGovernanceItem {
   document:DocumentReference,
   revision:RevisionReference,
   created_at:UtcInstant,
-  due_at?:UtcInstant              // promoted by governance-step-deadline.md
+  due_at?:UtcInstant
 }
 ```
 
-`revision` gives exact governed-subject identity for human recognition without a per-row Governance Case fetch.
-
-F2's former fixed order:
+Semantic source:
 
 ```text
+submission
+  revision = exact immutable Submission governed Revision/title snapshot
+
+obsolescence
+  revision = exact immutable target RevisionReference
+
+due_at
+  = exact persisted due_at of the current admitted GovernanceAttempt active Step
+  = absent/null when that active Step has no configured deadline
+```
+
+`revision` and `due_at` are recognition/triage truth only. B06 remains Governance Case authority.
+
+## 2. Decision outcome
+
+DevelopmentConexus Method outcome:
+
+```text
+CURRENT STRUCTURE CONFIRMED
++ BOUNDED DUE-AWARE QUEUE CORRECTION
+```
+
+F1 remains current. F3 promoted real Step deadline truth through `governance-step-deadline.md`, which deliberately fired F2's prior reopen trigger. F4 now supersedes only F2's former neutral `document.code`-first target order.
+
+Lasting F2 negative laws remain binding:
+
+```text
+opaque governance_attempt_id alone is not a human ordering model
+frontend sorting of loaded cursor pages cannot become a second global collection order
+```
+
+## 3. Target invariants
+
+### Recognition
+
+Every My Work governance row is sufficiently human-recognizable to distinguish the governed subject before owner-lens entry, without per-row Governance Case fan-out.
+
+### Temporal triage
+
+A governance work queue with real deadlines presents time-critical work first through one deterministic server-owned order. Deadline absence remains truthful and visible; it never becomes synthetic priority.
+
+### Cursor truth
+
+Deadline filtering and ordering remain globally coherent across cursor pages. Relative-time filters use one server-trusted anchor for the entire cursor traversal rather than reinterpreting the time window on every page.
+
+My Work remains a read-only projection and owns no lifecycle, deadline mutation, Authorization or Governance Case decision.
+
+## 4. Canonical server order — F4
+
+`listGovernanceWork` default order is:
+
+```text
+due_at ASC NULLS LAST,
 document.code ASC,
 governance_attempt_id ASC
 ```
 
-was operator-ratified under the then-current invariant that no real urgency/deadline semantics existed. That premise is no longer true.
-
-The F2 reopen trigger explicitly named:
+Meaning:
 
 ```text
-real SLA/due/priority Product semantics are promoted
+oldest overdue deadline first
+→ later overdue deadline
+→ nearest future deadline
+→ later future deadline
+→ no-deadline work
 ```
 
-That trigger fired when B05 operator use proved the need for approval deadlines and `governance-step-deadline.md` promoted real Step `due_at` truth.
+No `now()` bucket participates in ordering; `due_at` is frozen Step truth. Therefore an item crossing from future to overdue does not require collection reordering merely because the clock advanced.
 
-Therefore:
+`document.code` and `governance_attempt_id` are deterministic tie-breaks only.
+
+There is no Launch user-selectable sort control.
+
+## 5. Bounded deadline filter
+
+First-page `listGovernanceWork` may accept exactly one optional filter:
 
 ```text
-F1 recognition                  CURRENT / CLOSED
-F2 neutral code ordering        REOPENED / NOT FINAL TARGET ORDER
-B05-F4 due-aware queue behavior OPEN / owns final filter/order decision
+deadline_filter = overdue | next_24h | next_7d | no_deadline
 ```
 
-The old F2 order remains provenance for why client-side sorting and opaque UUID ordering were rejected; it is not the final target order after F3.
+Omission means all admitted work.
 
-## 2. Recognition invariant — unchanged
-
-Every My Work row must be sufficiently human-recognizable for the actor to distinguish the work and choose its destination without opening the owner lens merely to identify the subject, while the queue itself remains a non-authoritative projection.
-
-Governance recognition identity is:
+For relative filters, let `A` be one server-trusted UTC instant captured for that first-page traversal:
 
 ```text
-Document code
-+ exact governed Revision ordinal
-+ governed human title
-+ governance subject kind
-+ queue-entry time
-+ optional current active-Step due_at
-+ governance_attempt_id for navigation
+overdue
+  due_at <= A
+
+next_24h
+  due_at > A
+  AND due_at <= A + 24 elapsed hours
+
+next_7d
+  due_at > A
+  AND due_at <= A + 168 elapsed hours
+
+no_deadline
+  due_at IS NULL
 ```
 
-Deadline truth does not make My Work a Governance Case summary or lifecycle authority.
+`next_7d` intentionally includes the `next_24h` subset. These are usability presets, not mutually exclusive lifecycle classes.
 
-## 3. Exact semantic sources
-
-`revision` never derives from current Document state and never performs a frontend join.
+There is no baseline:
 
 ```text
-subject_kind=submission
-  revision = exact immutable Submission governed Revision/title snapshot
-
-subject_kind=obsolescence
-  revision = exact immutable target RevisionReference
+arbitrary from/to date range
+today / this-week calendar buckets
+generic filter DSL
+saved filter
+manual High/Medium/Low priority
+priority score
+total-count KPI
 ```
 
-`due_at` is likewise not computed from current route configuration by the frontend:
+## 6. Relative-time cursor anchoring
+
+Current global cursor law remains:
 
 ```text
-WorkGovernanceItem.due_at
-= current admitted GovernanceAttempt's active Step persisted due_at
-= null when the active Step has no configured deadline
+first page: operation filters + optional limit
+next page: cursor + optional limit only
 ```
 
-Deadline lifecycle/provenance is owned by `governance-step-deadline.md`.
-
-B06 will continue to load `GovernanceCaseView` as exact case authority.
-
-## 4. Disclosure / authorization law
-
-Read-shape enrichment never changes row admission.
+For `overdue | next_24h | next_7d`, the first page captures `A` from trusted server time. The opaque integrity-protected cursor binds at minimum:
 
 ```text
-listGovernanceWork canonical admission/filtering
-→ determines whether a row exists for the actor
-→ only then may subject-aligned RevisionReference and active-Step due_at be returned
+operationId
+normalized deadline_filter
+filter_anchor A
+canonical F4 ordering
+seek position
 ```
 
-The row:
+Continuation pages reuse the same `A`; they do not recalculate the relative filter window.
+
+This freezes only filter interpretation, not authorization or collection membership:
+
+```text
+current disclosure/AuthZ rechecked every page
+rows may legitimately disappear if no longer admitted
+no frozen multi-page snapshot is created
+no server cursor state is created
+```
+
+A fresh first-page request/refresh obtains a fresh anchor.
+
+`no_deadline` and unfiltered traversal need no temporal anchor.
+
+## 7. Disclosure / authority boundary
+
+```text
+listGovernanceWork canonical admission
+→ determines whether a governance row exists for the actor
+→ admitted row may disclose its exact subject recognition fields + active-Step due_at
+→ server applies F4 filter/order
+```
+
+The row/filter/order:
 
 ```text
 does not grant access
-does not reveal hidden Steps/decisions/feedback
-does not own deadline mutation
-does not replace Governance Case authorization
+does not expose hidden Steps/decisions/feedback
+does not mutate due_at
+does not create manual priority
+does not change lifecycle when overdue
+does not replace getGovernanceAttempt authorization
 ```
 
-Destination navigation remains:
+Destination remains:
 
 ```text
 governance_attempt_id
 → /work/governance/:attempt_id
 → getGovernanceAttempt
-→ current disclosure/Authorization rechecked
+→ current truth/disclosure rechecked
 ```
 
-A stale queue row is never case authority.
+## 8. Global Maximum analysis
 
-## 5. F1 Global Maximum — still confirmed
-
-Rejected alternatives remain rejected:
+Rejected:
 
 ```text
-NO CONTRACT CHANGE
-  preserves recognition defect
+KEEP CODE-FIRST ORDER
+  real deadline exists but queue ignores the exact fact that answers what is time-critical
 
-PER-ROW getGovernanceAttempt FAN-OUT
-  N+1 reads + B05/B06 coupling + partial loading/failure
+CLIENT-SIDE DUE SORT
+  creates false global order over cursor pages
 
-RICH GOVERNANCE CASE SUMMARY IN QUEUE
-  pre-designs B06 and moves owner truth into My Work
+MANUAL PRIORITY
+  duplicates/competes with the proven deadline need
 
-GENERIC UNIFIED WorkItem PLATFORM
-  invents cross-lane lifecycle/state semantics
+DYNAMIC overdue/today/tomorrow ORDER BUCKETS
+  unnecessarily makes ordering depend on moving now/calendar semantics
+
+GENERIC SORT/FILTER PLATFORM
+  Camunda/Flowable/ProcessMaker breadth has no current MetalDocs consumer
+
+TODAY / THIS WEEK PRESETS
+  import timezone/calendar authority not present at Launch
 ```
 
-Selected structure remains the existing governance projection plus existing semantic references and now the exact active-Step deadline required by a real consumer.
-
-## 6. F2 provenance and reopen
-
-F2 correctly established two lasting negative laws:
+Selected:
 
 ```text
-opaque governance_attempt_id alone is not a human ordering model
-frontend sorting of loaded cursor pages cannot pretend to own global collection order
+persisted due_at
++ fixed due_at ASC NULLS LAST server order
++ four bounded deadline presets
++ one cursor-stable server time anchor for relative presets
 ```
 
-Its previous `document.code ASC` selection was intentionally neutral because no priority fact existed. Deadline promotion invalidates only that premise/selection, not the two negative laws.
+Structural Inversion survives: even if the implementation were already code-first, priority-first or generic-query-driven, the current MetalDocs consumer would still require one deadline-owned queue order and bounded triage filters rather than duplicate priority or a generic task-query platform.
 
-B05-F4 must now compare due-aware server ordering and bounded deadline filters while preserving cursor truth.
+## 9. T6 / T8-E / T8-F binding
 
-Until F4 is closed, no new final governance-work order may be inferred from this record.
+### T6
 
-## 7. Boundary impact
+`Para aprovação` is actor work that may have current active-Step deadline truth. The Product default is deadline-first attention, with bounded deadline presets; `Em edição` has no artificial deadline symmetry.
+
+### T8-E
+
+Existing operation `listGovernanceWork` remains operation 55 and gains only:
+
+```text
+WorkGovernanceItem.due_at?
+first-page optional deadline_filter
+F4 canonical server order
+cursor temporal-anchor binding for relative deadline_filter values
+```
+
+No operation 87 is created.
+
+### T8-F
+
+B05 may:
+
+```text
+show exact due_at
+show relative labels derived for presentation
+show OVERDUE as presentation when current time >= due_at
+offer the four bounded filter presets
+```
+
+B05 must not:
+
+```text
+re-sort loaded cursor pages
+invent/store manual urgency
+construct arbitrary date ranges
+interpret deadline breach as a lifecycle state
+apply deadline filters to authoring work
+```
+
+## 10. Census / boundary impact
 
 ```text
 new application operation       0
 new stable SPA route            0
 new Permission                  0
 new semantic owner              0
+new lifecycle state             0
+new ETag domain                 0
+new Idempotency-Key creation    0
+new async worker                0
+manual priority state           0
 frontend per-row case fan-out   0
-frontend global re-sort         forbidden
-manual priority state           absent
 ```
 
-Current census remains 86 operations / 11 routes / 16 PermissionCode values.
+Current accepted census remains 86 operations / 11 routes / 16 PermissionCode values.
 
-## 8. Proof obligations
+## 11. Proof obligations
 
-F1/F3/F4 combined later proof must falsify at least:
+Later executable-contract/implementation proof must falsify at least:
 
 ```text
 row RevisionReference differs from exact governed subject
 row due_at differs from exact active GovernanceAttemptStep due_at
-row becomes visible solely because enrichment exists
-B05 performs per-row Governance Case enrichment
-frontend reorders cursor pages into a second global order
-frontend creates manual urgency independent of due_at
+unfiltered rows violate due_at ASC NULLS LAST + tie-break order
+no-deadline item appears before timed work in default traversal
+frontend reorders loaded cursor pages
+relative filter continuation uses a different anchor than its first page
+cursor allows repeated/changed first-page deadline_filter on continuation
+fresh refresh incorrectly preserves an old filter anchor
+passing due_at changes Step lifecycle automatically
+frontend creates manual priority independent of due_at
 ```
 
-Final queue ordering/filter proof belongs B05-F4.
+P8 must verify that due-first ordering and the four filters materially improve triage without making the queue feel like a generic workflow product.
 
-## 9. Reopen triggers
+## 12. Reopen triggers
 
-F1 recognition reopens only if users still cannot reliably distinguish work or exact subject identity cannot be projected safely.
+Reopen only the implicated F4 decision if evidence proves one of:
 
-F4, once ratified, will own later queue-order/filter reopen triggers. `governance-step-deadline.md` separately owns temporal-governance reopen triggers such as business calendars, extensions or breach effects.
+```text
+real users need a different default queue order
+a user-selectable sort becomes materially necessary
+arbitrary deadline range is required beyond the four presets
+business-calendar/timezone semantics are promoted
+deadline-less work is operationally starved despite its explicit filter
+queue scale/performance invalidates the sustainable indexed order/filter shape
+parallel active governance introduces multiple candidate due_at values per work row
+```
+
+Deadline extension/escalation/breach effects belong to `governance-step-deadline.md` reopen triggers, not this queue projection authority.
