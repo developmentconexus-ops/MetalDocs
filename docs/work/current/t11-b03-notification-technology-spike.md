@@ -1,6 +1,6 @@
 # T11 — Notification Technology / Reuse Spike
 
-> **Status:** OPERATOR-RATIFIED CANDIDATE / GCR-CORRECTED / PENDING INDEPENDENT CHALLENGE + UPSTREAM CONSOLIDATION.  
+> **Status:** OPERATOR-RATIFIED CANDIDATE / FABLE-CONVERGED / PENDING UPSTREAM CONSOLIDATION.  
 > **Parent:** `t11-b03-discussion-notification-mini-design.md`.  
 > **Reasoning authority:** `developmentconexus-ops/conexus-methodology/METHOD.md` — DevelopmentConexus Engineering Method v1.0.0.  
 > **Implementation:** BLOCKED.
@@ -124,29 +124,20 @@ Use the browser's native `EventSource` mechanism. No SSE client library is requi
 
 Lost realtime signals never lose Notification truth; normal refetch/reconnect/focus recovery remains authoritative.
 
-## 6. Realtime server — application-owned stream choreography + narrow Go SSE mechanism
+## 6. Realtime server — narrow Go SSE adapter selected
 
-The accepted semantic inbound door remains:
+Use Go `net/http` streaming/flush primitives behind a narrow application-mediated transport adapter rather than introducing a standalone SSE framework for the current one-event invalidation protocol.
+
+Accepted dependency direction:
 
 ```text
 transport/http
 → application/notifications
-→ narrow consumer-owned realtime subscription port
-→ platform realtime implementation
+→ narrow application-owned subscription port
+→ platform realtime mechanism
 ```
 
-Do **not** wire the HTTP SSE route directly to `platform/realtime`.
-
-The application leaf owns current session/recipient stream choreography and may depend on a narrow mechanism port such as conceptually:
-
-```text
-Subscribe(ctx, recipient_user_id) -> signal stream / unsubscribe lifecycle
-Wake(recipient_user_id)
-```
-
-The exact Go signature is realization detail. The port must expose only ephemeral recipient-scoped invalidation mechanics; it must not expose Product Notification DTOs, document facts, permission decisions or generic EventBus messages.
-
-Use Go `net/http` streaming/flush primitives in the transport/platform realization rather than introducing a standalone SSE framework for the current one-event invalidation protocol.
+`transport -> platform` remains forbidden. The platform implementation owns only connection/subscription mechanics and carries no Product state, source data or access decision.
 
 Required properties:
 
@@ -155,16 +146,15 @@ text/event-stream response
 bounded heartbeat where operationally required
 flush after event emission
 request-context cancellation closes subscriber
-no Product truth in connection/subscription state
+no Product truth in connection/session state
 no replay/event-history authority
-transport does not bypass application
 ```
 
 The OpenAPI/code-generation toolchain must prove server-side representation of the SSE operation. Operation 86 may not become a manually invented route outside the contract SSOT.
 
 ## 7. Launch wake-up mechanism — in-process coalescing hub selected
 
-Current T8-G baseline has one MetalDocs application replica. The smallest current wake-up mechanism is therefore an in-process recipient-scoped signal hub behind the narrow application-consumed mechanism seam.
+Current T8-G baseline has one MetalDocs application replica. The smallest current wake-up mechanism is therefore an in-process recipient-scoped signal hub behind the narrow mechanism seam.
 
 Conceptually:
 
@@ -177,17 +167,17 @@ Properties:
 
 ```text
 one or more active browser connections per User
-wake-up only after successful Notification-state commit
-buffer/coalescing reduces repeated pending invalidations to one signal
+wake-up occurs only after successful semantic commit
+buffer/coalescing semantics reduce repeated pending invalidations to one signal
 slow/disconnected subscribers never block or fail Product mutation
 wake-up failure never rolls back already-committed Notification truth
 no durable event queue
 ```
 
-Post-commit wake-up applies to every committed Notification change that can affect another open tab:
+All Notification changes that can affect another tab invoke the wake-up after commit through the application layer:
 
 ```text
-DOCUMENT_MENTION Notification creation
+DOCUMENT_MENTION creation
 mark seen
 mark read
 mark unread
@@ -196,7 +186,9 @@ unarchive
 mark all read
 ```
 
-The relevant application leaf invokes the narrow mechanism only **after** commit. Semantic owners never call the hub directly.
+Semantic owners never call realtime directly.
+
+Transient deploy/restart overlap may briefly leave clients connected to different process instances and therefore miss an in-process wake. This is explicitly tolerated because the wake is not Product truth: reconnect/focus/ordinary canonical `GET /notifications` reconciles persisted Notification state. T8-G consolidation must preserve this tolerance rather than invent cross-process delivery guarantees in the one-replica baseline.
 
 This mechanism is not a generic EventBus and owns no Notification state.
 
@@ -258,13 +250,12 @@ Lexical/HTML/JSON never becomes persistent authority
 mention autocomplete handles async stale-result/cancellation/keyboard/IME behavior safely
 same User mentioned repeatedly produces one Notification
 multiple tabs for one User receive invalidation
-creation + engagement mutations emit only post-commit wake-up
 multiple pending invalidations coalesce without losing canonical truth
 slow/disconnected SSE client cannot block a Product mutation
 request cancellation removes subscriber state
 lost SSE signal is recovered through canonical GET /notifications
+transient deploy-overlap wake loss does not affect Product correctness
 SSE payload contains zero source business truth
-transport -> application -> realtime mechanism direction is mechanically preserved
 selected OpenAPI Go generator supports the declared server-side text/event-stream operation
 no manual parallel route/DTO authority is introduced
 no generic EventBus/broker/Redis dependency appears without a reopen
@@ -272,7 +263,22 @@ no generic EventBus/broker/Redis dependency appears without a reopen
 
 Accessibility proof must cover keyboard operation, focus management and screen-reader recognition for mention typeahead and Notification surfaces.
 
-## 12. METHOD outcome
+## 12. Independent challenge result
+
+Fresh Fable Evidence PR #165 independently challenged Lexical, native Inbox, EventSource/SSE, same-Scope Notification creation, in-process wake-up, River and the absence of EventBus/broker/Redis.
+
+```text
+VERDICT: CONVERGED
+MATERIAL: 0
+IMPORTANT: 1
+OPTIONAL: 3
+```
+
+No technology/mechanism finding survived. Fable explicitly marked Lexical, SSE + in-process wake-up, River as sole durable async and the absence of generic EventBus/broker/Redis as surviving the challenge.
+
+The operator accepted the one IMPORTANT consolidation-completeness finding and all three OPTIONAL precisions. No second Fable round is justified.
+
+## 13. METHOD outcome
 
 ```text
 CURRENT STRUCTURE CONFIRMED
@@ -281,7 +287,7 @@ CURRENT STRUCTURE CONFIRMED
 
 The new Product requirements justify Lexical mention composition and an ephemeral Notification realtime seam, but do not justify a second backend platform, notification SaaS runtime, external broker, generic EventBus or Redis.
 
-## 13. Reopen triggers
+## 14. Reopen triggers
 
 Reopen this mechanism decision only when material evidence shows one of:
 
