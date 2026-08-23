@@ -75,12 +75,12 @@ B04   Document Work / Authoring
 B05   My Work / Work Queues
        CURRENT / CANDIDATE / NOT LOCKED
        B05-F1 governance row recognition           CLOSED / OPERATOR-RATIFIED
-       B05-F2 neutral governance ordering          REOPENED BY F3
+       B05-F2 neutral governance ordering          SUPERSEDED BY F4
        B05-F3 governance Step deadline             CLOSED / OPERATOR-RATIFIED
+       B05-F4 due-aware governance queue           CLOSED / OPERATOR-RATIFIED
        P7 focused queue A                          APPROVED
        P8 R1 base structure                        OPERATOR-APPROVED
-       B05-F4 due-aware filter/order behavior      OPEN / NEXT DECISION
-       P8 R2                                       NOT OPEN
+       P8 R2 due-aware candidate                   RENDERED / OPERATOR OPERATION+REVIEW
 
 B06   Governance Case                              NOT OPEN
 B07   Document History                             NOT OPEN
@@ -107,48 +107,61 @@ Notifications remains transversal utility chrome, not `Minha Caixa` authority.
 
 ## B05 current bounded truth
 
-Planning record:
+Planning / P8 evidence:
 
 ```text
 docs/work/current/t11-b05-my-work-r1.md
+docs/work/current/t11-b05-my-work-functional-wireframe.html
 ```
 
-Governance work now has two distinct current precisions:
-
-```text
-recognition
-  exact governed RevisionReference
-
-temporal attention
-  optional active-Step due_at
-```
-
-Deadline law:
+Governance deadline law:
 
 ```text
 GovernanceRouteStep.due_in_days?
 → immutable attempt snapshot
-→ activation freezes activated_at + due_at
+→ activation freezes activated_at + persisted due_at
 → 1 day = 24 elapsed hours
 → no hidden default
 → overdue has no automatic lifecycle effect
 ```
 
-The prior neutral code-first governance order was valid before deadline truth existed; its explicit reopen trigger fired. B05-F4 now owns final server ordering and bounded deadline filters.
+Governance queue law:
 
-P8 R1 validated the focused-queue composition, lane switching, density, keyboard traversal, cursor load-more, stale/error/empty recovery and owner-lens handoffs. B05 remains unlocked because the operator identified the material deadline-triage need after operating R1.
+```text
+WorkGovernanceItem.due_at?
+
+default order
+  due_at ASC NULLS LAST
+  document.code ASC
+  governance_attempt_id ASC
+
+optional first-page deadline_filter
+  overdue | next_24h | next_7d | no_deadline
+  omitted = all
+
+relative filters
+  one server-trusted first-page anchor
+  cursor authenticates/reuses that anchor
+  fresh first-page request gets a fresh anchor
+```
+
+No manual priority state, generic sort/filter DSL, business-calendar buckets or client-side global re-sort is introduced.
+
+P8 R1 validated the focused-queue composition. P8 R2 now validates deadline-first triage, four bounded filters, no-deadline discoverability, cursor-anchor stability and intentional asymmetry with `Em edição`.
 
 ## Exact next action
 
 ```text
-1. Adjudicate B05-F4 — due-aware governance queue behavior.
-2. Decide default server order, bounded deadline filters, null/no-deadline placement and cursor binding.
-3. Preserve no manual priority state and no frontend page re-sort.
-4. Generate B05 P8 R2 with the approved F4 behavior.
-5. Operator operates R2.
-6. Operator-only B05 LOCK.
-7. Then P9 exact Screen Contract + P10 bounded pattern consolidation.
-8. B06+ remain NOT OPEN.
+1. Operator operates B05 P8 R2.
+2. Test due-first scanability and no-deadline discoverability.
+3. Test Todos / Atrasados / Próximas 24h / Próximos 7 dias / Sem prazo.
+4. Advance fixture server time, then Carregar mais: cursor anchor must stay fixed.
+5. Fresh first-page must renew the anchor.
+6. Confirm Em edição remains free of deadline controls.
+7. Iterate only material findings.
+8. Operator-only B05 LOCK.
+9. Then P9 exact Screen Contract + P10 bounded pattern consolidation.
+10. B06+ remain NOT OPEN.
 ```
 
 ## Hard stops
