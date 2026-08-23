@@ -116,7 +116,8 @@ B05   My Work / Work Queues
        CURRENT / CANDIDATE / NOT LOCKED
        authority + legacy ergonomics recovery      COMPLETE
        B05-F1 governance row RevisionReference     CLOSED / OPERATOR-RATIFIED
-       P7 queue composition                        NEXT / OPEN
+       B05-F2 governance queue ordering            OPEN / NEXT DECISION
+       P7 queue composition                        BLOCKED ON F2
        functional low-fi P8                        NOT OPEN
 
 B06   Governance Case                              NOT OPEN
@@ -323,12 +324,9 @@ The pattern is planning vocabulary only; it does not create a generic resolver, 
 ## Exact next action
 
 ```text
-B05 P7 — compare only the real queue-composition alternatives:
-A. focused lane / full-width queue
-B. two-lane detailed overview
-C. legacy-inspired master/selection queue
-
-Select one leading hypothesis before P8.
+B05-F2 — adjudicate fixed governance-work ordering.
+Leading candidate: document.code ASC, governance_attempt_id ASC.
+If closed, resume B05 P7 queue-composition comparison.
 B06+ remain NOT OPEN.
 ```
 
