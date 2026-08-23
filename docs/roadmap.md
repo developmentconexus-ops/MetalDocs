@@ -48,14 +48,14 @@ Frontend Product Experience Planning Method v2.2
 Program mapping:
 
 ```text
-FP0  Frontend Foundation                         ACTIVE / BOUNDED REBASELINE
+FP0  Frontend Foundation                         CLOSED / R1 86/11 REBASELINED
 FP1  Block-by-block Product Experience           ACTIVE
 FP2  Integrated Low-Fidelity Product / P11       NOT OPEN
 FP3  Whole-Product Adversarial Review / P12      NOT OPEN
 FP4  Visual Handoff + Readiness / P13-P14        NOT OPEN
 ```
 
-The v2.2 rebaseline changes the planning method, not Product semantics:
+Method meaning:
 
 ```text
 P8  = canonical functional low-fidelity HTML/CSS/JS per interactive block
@@ -64,25 +64,28 @@ P11 = assembled integration of already-LOCKED block prototypes
 
 Static storyboard/mockup HTML may support P7 exploration but cannot receive P8 LOCK for an interactive block.
 
-## FP0 bounded rebaseline
+## FP0-R1 closure
 
-Current Product authority changed during T11 from the prior frontend foundation (`10 routes / 78 operations`) to current `11 / 86` through the independently challenged Discussion/Notifications amendment.
-
-FP0 therefore has one bounded rebaseline obligation:
+Current bounded frontend foundation:
 
 ```text
-update frontend flow/coverage/surface/program maps for:
-  stable Document Discussion
-  semantic @Mention
-  in-app Notifications
-  /notifications
-  document.discuss
-  operations 79–86
-
-preserve valid prior frontend LOCKS unless actually falsified
+docs/work/current/t11-frontend-foundation-r1.md
 ```
 
-This does not reopen Product/architecture authority.
+R1 reconciles the pre-reopen frontend map to current authority without reopening existing LOCKs:
+
+```text
+20 accepted human goals mapped
+11 stable Product routes represented
+operations mapped           86 / 86
+operations 79–81            B03 Discussion/Mention
+operations 82–86            B01N + B08 Notifications
+unassigned operations       0
+invented operations         0
+frontend Authorization      absent
+```
+
+Older `t11-frontend-blueprint.md` and `t11-wireframes.md` remain pre-reopen/pre-v2.2 planning evidence; their 78/10 snapshots do not override R1/current authority.
 
 ## FP1 block roadmap
 
@@ -94,9 +97,10 @@ B02   Library / Discovery                          LOCKED / OPERATOR-RATIFIED
 B03   Document Official / Ficha + Viewer + Discussion
        CURRENT / CANDIDATE / NOT LOCKED
        leading structure A                         OPERATOR-APPROVED DIRECTION
-       prior static HTML P8                        REJECTED — WRONG REPRESENTATION MEDIUM
-       canonical functional P8                     PENDING
-       B03-F1 allowed_actions                       OPEN / MUST CLOSE BEFORE LOCK
+       prior static HTML                           REJECTED — WRONG REPRESENTATION MEDIUM
+       current R1 planning record                  READY
+       canonical functional P8                     RENDERED / OPERATOR OPERATION+REVIEW
+       B03-F1 allowed_actions                       OPEN / MUST CLOSE BEFORE FINAL LOCK
 
 B04   Document Work / Authoring                    NOT OPEN
 B05   My Work / Work Queues                        NOT OPEN
@@ -104,9 +108,9 @@ B06   Governance Case                              NOT OPEN
 B07   Document History                             NOT OPEN
 B08   Notifications Full Inbox                     NOT OPEN
 B09   Audit                                        NOT OPEN
-B10   Organization Administration                  NOT OPEN
-B11   Access Administration                        NOT OPEN
-B12   Document Governance Administration           NOT OPEN
+B10   Organization Administration                 NOT OPEN
+B11   Access Administration                       NOT OPEN
+B12   Document Governance Administration          NOT OPEN
 ```
 
 ## Locked global IA preserved
@@ -128,9 +132,21 @@ narrow/mobile accessible transformation
 stable /notifications full Inbox route
 ```
 
-## B03 current direction
+## B03 current candidate
 
-Preserved operator-approved direction:
+Current R1 record:
+
+```text
+docs/work/current/t11-b03-document-official-r1.md
+```
+
+Canonical Method-v2.2 P8:
+
+```text
+docs/work/current/t11-b03-document-official-functional-wireframe.html
+```
+
+Preserved operator-approved structure:
 
 ```text
 /documents/:document_id
@@ -139,6 +155,7 @@ Preserved operator-approved direction:
 Ficha
 → deliberate Visualizar documento
 → distinct B03 read-only official-content viewer
+→ Voltar para ficha
 
 Ficha
 → bounded current work context
@@ -146,29 +163,46 @@ Ficha
 → stable-Document Discussion
 
 Notification DOCUMENT_MENTION
-→ same ficha
+→ Quick Inbox
+→ same B03 Document
 → Discussion
 → anchor_message_id target
 ```
 
-The rejected B03 artifact does not reject this structure. It was rejected because it rendered static storyboard states instead of the v2.2 canonical functional low-fi block experience.
+Functional P8 must be operated before any LOCK. Local fixture behavior is Evidence only; it does not become Product/server authority.
+
+## B03-F1 — open finding before final LOCK
+
+Candidate precision remains:
+
+```text
+DocumentOfficialView.allowed_actions
+  create_revision
+  replace_responsible_owner
+  create_obsolescence_request
+  withdraw_obsolescence_request
+```
+
+It is a server-derived UX hint only; commands always recheck current truth. B03 cannot receive final LOCK until the precision is durably reconciled or proven unnecessary.
 
 ## Exact next action
 
 ```text
-1. Complete FP0 bounded 86/11 frontend rebaseline only where mappings are stale.
-2. Update B03 planning record to v2.2 semantics.
-3. Build canonical B03 functional low-fi HTML/CSS/JS:
-     ficha normal
-     Visualizar documento -> viewer -> voltar
-     Notification/mention -> Discussion anchor
-     local Discussion interactions material to layout
-     explicit boundaries for unopened B04/B07
-4. Operator operates/reviews B03 P8.
-5. Iterate B03 only until operator LOCK.
-6. Resolve B03-F1 before final B03 LOCK if still open.
-7. After LOCK, close P9 Screen Contract / bidirectional trace and bounded P10 pattern pass.
-8. Open B04 only after B03 progression gate permits it.
+1. Operator operates the canonical B03 functional P8 in browser.
+2. Review only B03 hierarchy, proportions, discoverability and local interaction:
+     ficha-first reading order
+     current-work separation
+     viewer open/back
+     management placement
+     Discussion placement/density
+     reply / @mention composer
+     Notification -> exact message anchor
+     responsive behavior
+3. Iterate only B03 until visual/interaction findings close.
+4. Resolve B03-F1 before final operator LOCK.
+5. Operator-only B03 LOCK.
+6. After LOCK, close P9 Screen Contract / bidirectional trace and bounded P10 pattern pass.
+7. Open B04 only after the B03 progression gate permits it.
 ```
 
 ## Hard stops
