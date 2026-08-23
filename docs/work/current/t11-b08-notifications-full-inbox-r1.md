@@ -1,22 +1,48 @@
-# T11 — B08 Notifications Full Inbox R1 — Method v2.2 candidate
+# T11 — B08 Notifications Full Inbox R1 — Method v2.2 ratified
 
-> **Status:** OPEN / ACTIVE / ENTRY RECOVERY COMPLETE / P6 COMPLETE / B08-F1 + P7 H1 DESIGN APPROVED IN CHAT / WRITTEN OPERATOR RATIFICATION PENDING.  
+> **Status:** OPEN / ACTIVE / B08-F1 OPERATOR-RATIFIED / P6 COMPLETE / P7 H1 OPERATOR-RATIFIED / P8 OPEN.  
 > **Block:** B08 — Notifications Full Inbox.  
 > **Method:** Frontend Product Experience Planning Method v2.2 + DevelopmentConexus Engineering Method.  
 > **Predecessors:** B01 / B01N / B02 / B03 / B04 / B05 / B06 / B07 LOCKED.  
-> **Current bounded authority:** `../../decisions/discussion-notifications-launch.md`.  
+> **Bounded authorities:** `../../decisions/discussion-notifications-launch.md` + `../../decisions/notification-inbox-recognition-read.md`.  
 > **Implementation:** BLOCKED.  
-> **P8:** NOT OPEN until written design ratification.
+> **P8:** OPEN / functional low-fidelity HTML is the next evidence gate.
 
-## 1. Entry recovery
+## 1. Ratification basis
 
-B08 is the full persistent Notification Inbox already admitted by the current Launch Notification authority. It does not create a new Product space, semantic owner or task system.
+The operator approved in sequence:
+
+```text
+B08 entry direction / continue FP1
+B08-F1 + P7 H1 design in chat
+written B08 candidate exactly as recorded
+```
+
+The written candidate self-review had:
+
+```text
+TBD / TODO / undecided semantic field = 0
+new operation = 0
+new route = 0
+new Permission = 0
+new semantic owner = 0
+```
+
+B08-F1 is now promoted to durable authority:
+
+```text
+../../decisions/notification-inbox-recognition-read.md
+```
+
+## 2. Product/owner boundary
+
+B08 is the full persistent Notification Inbox already admitted by Launch.
 
 ```text
 stable route
   /notifications
 
-primary reads
+reads
   82 listNotifications
   86 streamNotificationEvents
 
@@ -29,213 +55,38 @@ semantic owner
   Notifications
 
 source owner
-  Controlled Documents for current DOCUMENT_MENTION source context
-
-sidebar
-  no permanent Notifications item
-
-global entry
-  B01N Notification bell + Quick Inbox
+  Controlled Documents for DOCUMENT_MENTION context
 ```
 
-Mental-model boundary remains:
+B01N remains the global bell + Quick Inbox.
+
+Mental model:
 
 ```text
 Notifications = personal attention / triage
 Minha Caixa   = assigned authoring/governance work
 ```
 
-Quick Inbox and B08 are two presentations of the same Notifications owner/read family. They are never separate stores or engagement authorities.
+Quick Inbox and B08 consume one owner/read family and never become separate engagement stores or counters.
 
-## 2. Current Notification law preserved
+## 3. B08-F1 — CLOSED / OPERATOR-RATIFIED
 
-Persistent engagement state:
+Every currently presentable `DOCUMENT_MENTION` row returned by op82 is independently human-recognizable after server-side current disclosure.
 
-```text
-created_at
-seen_at?
-read_at?
-archived_at?
-```
-
-Meaning:
-
-```text
-unseen -> seen_at absent
-seen   -> seen_at present
-unread -> read_at absent
-read   -> read_at present
-archive -> archived_at present
-```
-
-Binding laws:
-
-```text
-READ => SEEN
-mark unread clears read_at only; it never makes an item unseen
-archive/unarchive preserves read/seen
-any deliberate per-item engagement implies seen if absent
-archive != delete
-read != source acknowledgement
-read != Document read
-read != Read & Acknowledge
-Notification != access grant
-Notification != assigned work
-```
-
-Presentability remains server-side and current:
-
-```text
-recipient == current User
-+ current User ENABLED
-+ current Document Discussion source disclosable
-```
-
-A non-presentable Notification is omitted before public paging/counts/source composition. React never receives prohibited source metadata and never post-filters Notification disclosure.
-
-## 3. Human jobs
-
-### J1 — see what is new versus merely unread
-
-```text
-When I open Notifications,
-I need to distinguish genuinely new/unseen attention from older items I intentionally marked unread,
-so that novelty does not become another name for unread.
-```
-
-### J2 — triage attention without losing history
-
-```text
-When an item no longer needs active attention,
-I need to archive it without deleting it or rewriting its read/seen state,
-and later recover it from Archived when needed.
-```
-
-### J3 — return to the exact source context
-
-```text
-When a Notification came from an accepted @Mention,
-I need to recognize who mentioned me and in which controlled Document,
-then enter the exact source Discussion message rather than a generic Document home.
-```
-
-### J4 — handle long-lived Inbox truth
-
-```text
-When the Inbox spans many items or changes in another tab,
-I need cursor continuation and realtime refresh without client-side reordering, copied counters or SSE payload authority.
-```
-
-### J5 — remain safe under access drift
-
-```text
-When source disclosure disappears between list rendering and engagement/navigation,
-I need the Inbox to reconcile neutrally without leaking why the source vanished.
-```
-
-## 4. P6 bounded reference study — COMPLETE
-
-### GitHub Notifications Inbox
-
-Useful evidence:
-
-```text
-read/unread is distinct from removing an item from the active Inbox
-Done-style triage preserves a separate historical surface
-single-item and bounded bulk triage are recognizable Inbox mechanics
-```
-
-Accepted lesson:
-
-> Notification engagement and Inbox membership are separate concepts. MetalDocs `read_at` and `archived_at` should stay separate.
-
-Rejected breadth:
-
-```text
-rich reason/repository filters
-saved/custom filters
-arbitrary bulk selection platform
-subscription/watch administration
-```
-
-### Linear Inbox
-
-Useful evidence:
-
-```text
-Inbox is an attention center, not the user's assigned-work database
-read/unread and removal/triage are separate interactions
-source object remains the place where business work occurs
-```
-
-Rejected breadth:
-
-```text
-snooze
-reminders
-notification preferences
-search/filter platform
-```
-
-### Slack Activity
-
-Useful evidence:
-
-```text
-attention surface leads back to source context
-compact scanning is more useful than rebuilding the source workspace inside the Inbox
-```
-
-Rejected breadth:
-
-```text
-DM/thread/activity multiplexing
-channel-specific filtering
-reminder/task semantics
-```
-
-P6 saturated because additional products stopped changing the bounded MetalDocs decision space.
-
-## 5. B08-F1 — human-recognizable Notification read projection — WRITTEN CANDIDATE
-
-### 5.1 Root cause
-
-Current Notification authority closes persistence, presentability, paging, counts and engagement but deliberately leaves source presentation broad:
-
-```text
-read-time presentation may compose currently disclosable source enrichment
-such as actor UserReference, DocumentReference and bounded message preview
-```
-
-That is sufficient architecture posture but not sufficiently closed for a full Inbox Screen Contract. B08 must not invent actor names, Document titles or message previews from client-side fan-out or copied Notification persistence.
-
-### 5.2 Target invariant
-
-> Every presentable DOCUMENT_MENTION Inbox item is independently human-recognizable from one server-authored op82 row after current source disclosure. The row carries enough bounded source context to identify the mention and navigate to the exact Discussion message, while Notifications persistence continues to own only Notification/source identities and engagement state.
-
-### 5.3 Bounded op82 projection refinement
-
-No new operation is created. Operation 82 remains:
-
-```text
-GET /api/v1/notifications
-listNotifications
-```
-
-Conceptual current item shape becomes:
+Current semantic item projection:
 
 ```text
 NotificationInboxItem {
-  notification_id: Uuid
-  kind: DOCUMENT_MENTION
-  created_at: UtcInstant
-  seen_at?: UtcInstant
-  read_at?: UtcInstant
-  archived_at?: UtcInstant
+  notification_id
+  kind=DOCUMENT_MENTION
+  created_at
+  seen_at?
+  read_at?
+  archived_at?
 
-  source: {
+  source {
     document: DocumentReference
-    message_id: Uuid
+    message_id
     author: UserReference
     official_revision_at_post?: RevisionReference
     message_preview: ShortText
@@ -243,74 +94,67 @@ NotificationInboxItem {
 }
 ```
 
-This is a read projection, not a new semantic owner or persistence shape.
-
-### 5.4 Source law
+Source laws:
 
 ```text
 document
-  = current-disclosable stable DocumentReference for source document_id
-
-author
-  = immutable DiscussionMessage.author_user_id
-    enriched to currently admissible bounded UserReference
-    display_name may be absent after lawful profile erasure
+  current-disclosable stable DocumentReference
 
 message_id
-  = exact immutable DiscussionMessage source identity
+  exact immutable DiscussionMessage identity
+  navigation authority for B03 anchor
+
+author
+  immutable author_user_id + current admissible bounded UserReference enrichment
+  display_name may be absent after lawful profile erasure
 
 official_revision_at_post
-  = present only when the immutable DiscussionMessage recorded an official Revision identity at post time
-  = server resolves that exact Revision to RevisionReference
-  = absent before first Release
-  = never replaced by whichever Revision is official now
+  exact Revision recorded by the immutable DiscussionMessage when one existed
+  never silently replaced by whichever Revision is official now
 
 message_preview
-  = server-composed bounded plain-text preview derived from the immutable MessageContentSegment sequence
-  = generated only after current disclosure succeeds
-  = may use current admissible Mention display enrichment
-  = bounded by ShortText (<=256)
-  = presentation only; never persisted Notification authority
-  = never used for navigation, equality, deduplication or Authorization
+  server-composed after disclosure from immutable MessageContentSegment[]
+  <= ShortText
+  presentation only
+  not persistence / navigation / dedupe / AuthZ authority
 ```
 
-If a current display name is unavailable, presentation must degrade neutrally while stable source/User identities remain truthful. The preview may truncate with an ellipsis; exact typography/truncation mechanism is presentation detail so long as it does not fabricate semantic content.
-
-### 5.5 Persistence boundary unchanged
-
-Notifications persistence remains identity + engagement only:
+Notifications persistence remains only:
 
 ```text
-notification_id
-recipient_user_id
+Notification identity
+recipient
 kind
-source document_id
-source message_id
+source document_id + message_id
 created_at
 seen_at?
 read_at?
 archived_at?
 ```
 
-Do not copy into Notifications persistence merely for rendering:
+No source message/title/profile/ACL copy is promoted.
+
+Current census remains:
 
 ```text
-Document title/code snapshots
-message text/preview
-author display name
-Revision title
-source ACL/presentability truth
+86 operations / 11 routes / 16 PermissionCode values
 ```
 
-### 5.6 View semantics closed
-
-First-page filter remains exactly:
+## 4. Engagement law preserved
 
 ```text
-view = active | unread | archived
+READ => SEEN
+mark unread clears read_at only
+mark unread never makes unseen
+archive/unarchive preserves read/seen
+per-item deliberate engagement implies seen if absent
+archive != delete
+read != Document read
+read != Read & Acknowledge
+Notification != access grant
 ```
 
-Meaning after current presentability filtering:
+Fixed op82 views after presentability:
 
 ```text
 active
@@ -324,42 +168,47 @@ archived
   archived_at present
 ```
 
-`unread` is a subset of active. There is no `unseen` list view.
+`unread` is a subset of active. There is no unseen list lens.
 
-Every first page continues to expose derived current presentable non-archived:
+First-page summaries remain presentable non-archived:
 
 ```text
 unseen_count
 unread_count
 ```
 
-These summaries describe the active Inbox population even when the current displayed lens is `archived`; they are not total-count pagination metadata.
+## 5. P6 — COMPLETE
 
-### 5.7 Census impact
+Reference study saturated after GitHub Notifications, Linear Inbox and Slack Activity.
+
+Accepted lessons:
 
 ```text
-new application operation       0
-new stable SPA route            0
-new Permission                  0
-new semantic owner              0
-new lifecycle state             0
-new ETag domain                 0
-new Idempotency-Key creation    0
-new exact-byte resource         0
-new async worker                0
+Inbox = attention triage, not assigned-work authority
+read/unread is distinct from removing/archiving active attention
+source work remains in the source owner lens
+compact recognition + source entry beats rebuilding source work inside Inbox
 ```
 
-Current accepted census remains 86 operations / 11 routes / 16 PermissionCode values.
-
-## 6. P7 approaches
-
-### H1 — Focused Triage Inbox — SELECTED / DESIGN APPROVED IN CHAT
+Rejected breadth:
 
 ```text
-minimal Inbox header
+search/filter platform
+saved/custom views
+snooze/reminders/priority
+preferences/subscriptions
+arbitrary bulk selection
+```
+
+## 6. P7 — H1 Focused Triage Inbox — OPERATOR-RATIFIED
+
+Selected structure:
+
+```text
+minimal Full Inbox header
   Notificações
   unseen/unread summary
-  Mark all read
+  Marcar todas como lidas
 
 three fixed lenses
   Caixa de entrada = active
@@ -368,185 +217,99 @@ three fixed lenses
 
 single dominant list
   Notification recognition
-  novelty/read state
+  unseen novelty distinct from unread
   bounded source preview
   exact created time
-  source-open affordance
-  per-item engagement actions
+  primary source-open affordance
+  per-item read/unread
+  per-item archive/unarchive
 
 continuation
-  Load more / cursor failure recovery
+  cursor + retry preserving loaded items
 ```
 
-Why selected:
+Rejected as leading:
 
 ```text
-matches the owner wire directly
-keeps attention distinct from assigned work
-keeps source business work in B03
-preserves one global chronological Notification order
-supports reversible read/archive engagement without a filter platform
-scales to long Inbox via current cursor law
+master/detail Inbox that rebuilds B03
+Document-grouped Inbox that replaces canonical recency order
 ```
 
-### H2 — two-column master/detail Inbox — REJECTED AS LEADING
+No B08 viewer, Discussion composer or governance action zone exists.
+
+## 7. Source-open interaction
+
+Exact identity:
 
 ```text
-notification list | source preview/detail pane
-```
-
-Rejected because the detail pane quickly reconstructs Discussion/Document Official semantics inside Notifications and creates pressure for reply/viewer/source business actions in the wrong owner lens.
-
-### H3 — grouped-by-Document Inbox — REJECTED AS LEADING
-
-Rejected because it replaces the canonical Notification order:
-
-```text
-created_at DESC,
-notification_id DESC
-```
-
-with a browser-authored aggregation axis, making recency harder to scan and encouraging a second source relationship model in the client.
-
-## 7. Selected H1 region model
-
-```text
-R1  global App Shell inherited from B01
-R2  Notification bell / Quick Inbox inherited from B01N
-R3  Full Inbox heading
-R4  unseen + unread summary
-R5  Mark all read
-R6  active / unread / archived fixed lenses
-R7  Notification row human recognition
-R8  unseen novelty marker distinct from unread treatment
-R9  read / unread action
-R10 archive / unarchive action
-R11 exact source open to B03 Discussion anchor
-R12 cursor continuation
-R13 continuation failure preserving loaded items
-R14 per-item engagement failure/reconciliation
-R15 mark-all-read failure/reconciliation
-R16 access-drift item disappearance after neutral 404/refetch
-R17 empty active state
-R18 empty unread state
-R19 empty archived state
-R20 SSE invalidation/refetch state
-R21 responsive narrow/mobile list/action treatment
-R22 accessibility/focus/live reconciliation
-```
-
-No B08 Document viewer, Discussion composer or Governance action zone exists.
-
-## 8. Interaction law
-
-### 8.1 Open source
-
-Deliberate source activation targets the exact stable Document + immutable message identity returned by op82:
-
-```text
-NotificationInboxItem.source.document.document_id
+source.document.document_id
 + source.message_id
 ```
 
-Sequence:
+Flow:
 
 ```text
-user activates source
--> op83 set read=true (therefore seen as required by owner law)
--> on admitted success, navigate to B03 Document Official
--> B03 uses the exact message_id as Discussion anchor intent
--> op79 listDocumentDiscussionMessages(anchor_message_id=...)
--> current B03 disclosure rechecked
+activate source
+-> op83 read=true
+-> on admitted success navigate to B03 Document Official
+-> B03 uses exact source.message_id as Discussion anchor intent
+-> op79 anchored read
+-> B03/current disclosure rechecked
 ```
-
-Exact router/query-state encoding of the anchor is not a new stable Product route and remains implementation choice. The identity reaching op79 must be the exact server-returned `message_id`, never parsed preview text.
 
 If op83 returns non-disclosing 404 because presentability drifted:
 
 ```text
-refetch current Inbox
+refetch Inbox
 item may disappear
-no source navigation from stale leaked metadata
-no explanation of whether source was deleted/foreign/inaccessible
+no navigation from stale source presentation
+no disclosure reason leaked
 ```
 
-If B03 source disclosure changes after successful engagement but before destination read, B03 owns its normal unavailable/non-disclosing state. A Notification being read does not prove the source was viewed.
+If B03 becomes unavailable after engagement but before destination read, B03 owns its own neutral unavailable state. Notification read never proves source view.
 
-### 8.2 Read / unread
+## 8. Seen presentation
+
+There is no manual mark-seen/unseen command.
 
 ```text
-unread -> op83 read=true
-read   -> op83 read=false
+fetch/cache row != present row
+
+actually present unseen row to recipient
+-> candidate id for bounded op84 batch
+-> server intersects with current recipient + presentability
+-> 204 exposes no per-id cardinality
 ```
 
-Mark unread preserves seen. No action may set `seen=false`.
+P8 must visibly prove that loaded-but-off-screen rows are not blindly marked seen merely because they were fetched.
 
-### 8.3 Archive / unarchive
+Exact viewport threshold/debounce/batching mechanism is not Product authority.
 
-```text
-active item   -> op83 archived=true
-archived item -> op83 archived=false
-```
+## 9. Ordering / pagination
 
-Archive/unarchive preserves read and seen. Archive is not delete.
-
-### 8.4 Mark all read
-
-Header command maps only to op85:
-
-```text
-presentable + non-archived + unread at operation point
--> read + seen
-```
-
-It does not include archived or currently non-presentable Notifications and does not create a mark-all-unread opposite command.
-
-### 8.5 Seen presentation
-
-B08 exposes no manual "mark seen" action.
-
-Only Notifications that are actually presented to the user may become seen candidates. Fetching/caching a cursor page does not by itself prove presentation.
-
-Conceptual behavior:
-
-```text
-loaded row becomes materially presented in the Inbox viewport
--> collect its notification_id when still unseen
--> bounded batch op84
--> server intersects with current recipient + current presentability
--> 204 reveals no per-id cardinality
-```
-
-Exact viewport threshold, debounce and batching implementation are not Product authority. P8 must prove at least that hidden/off-screen loaded rows are not blindly marked seen merely because a page was fetched.
-
-## 9. Ordering / pagination law
-
-Operation 82 keeps server order:
+Server order remains:
 
 ```text
 created_at DESC,
 notification_id DESC
 ```
 
-B08 never re-sorts loaded cursor pages by Document, author, seen/read or archive state.
-
-First page:
+B08 never globally re-sorts cursor pages.
 
 ```text
-view + optional limit
+first page
+  view + optional limit
+
+continuation
+  cursor + optional limit only
+
+change lens
+  fresh first-page traversal
 ```
 
-Continuation:
+No total count, page number, generic sort, search or saved filter.
 
-```text
-cursor + optional limit only
-```
-
-Changing a lens starts a fresh first-page traversal. Already loaded items remain readable if continuation fails; retry continues the same lens traversal.
-
-No total count, page number, generic sort, search or saved filter is introduced.
-
-## 10. Realtime law
+## 10. Realtime
 
 Operation 86 remains invalidation only:
 
@@ -555,94 +318,102 @@ event: notifications.changed
 data: {}
 ```
 
-B08 behavior:
-
 ```text
 signal
 -> invalidate/refetch current Notification summaries/lens
--> canonical op82 restores truth
+-> op82 restores canonical truth
 ```
 
-No Notification row is inserted, updated or removed from SSE payload data because there is no business payload.
+SSE never carries a Notification/source business row. Disconnect is freshness degradation, not Product-state loss.
 
-Stream disconnect/failure is a freshness degradation, not Product-state failure. Reconnect/focus/refetch restores canonical truth.
-
-## 11. Failure / reconciliation law
+## 11. Failure / reconciliation targets
 
 ```text
 initial op82 failure
-  -> Inbox unavailable state + retry; shell remains truthful
+  Inbox unavailable + retry; shell stays available
 
 continuation failure
-  -> preserve already loaded items + current lens + retry continuation
+  preserve loaded rows + current lens + retry cursor
 
 op83 404/non-presentable
-  -> refetch; item may disappear; no disclosure explanation
+  refetch; row may disappear; neutral explanation
 
-op83 generic/transport failure
-  -> preserve visible current server state; action remains retryable
+op83 ambiguous/transport failure
+  do not fabricate changed engagement state
 
 op84 failure
-  -> novelty remains conservative until canonical refetch succeeds
+  novelty stays conservative until refetch
 
 op85 failure
-  -> do not locally declare all read; preserve current rows/counts + retry/refetch
+  do not locally declare all read
 
 SSE disconnect
-  -> no Product truth lost; reconnect/focus/refetch path
+  reconnect/focus/refetch restores truth
 ```
 
-Frontend does not fabricate engagement truth optimistically when the mutation outcome is unknown.
-
-## 12. Responsive / accessibility direction
-
-Desktop:
+## 12. P8 region inventory
 
 ```text
-one dominant Inbox column
-fixed lens controls near heading
-row source/content recognition dominates; secondary engagement actions trail
-Quick Inbox remains header utility and does not duplicate full-page controls while page is open
+R1  Global App Shell inherited from B01
+R2  Notification bell / Quick Inbox inherited from B01N
+R3  Full Inbox heading
+R4  unseen + unread summary
+R5  Mark all read
+R6  active / unread / archived lenses
+R7  human-recognizable Notification row
+R8  unseen novelty distinct from unread treatment
+R9  read / unread
+R10 archive / unarchive
+R11 exact source open to B03 Discussion anchor
+R12 cursor continuation
+R13 continuation failure/retry preserving rows
+R14 per-item engagement failure/reconciliation
+R15 mark-all-read failure/reconciliation
+R16 access-drift disappearance after neutral 404/refetch
+R17 empty active
+R18 empty unread
+R19 empty archived
+R20 SSE invalidation/refetch
+R21 narrow/mobile row/action treatment
+R22 accessibility/focus/live reconciliation
 ```
 
-Narrow/mobile:
+## 13. P8 R1 proof targets
+
+Functional HTML must exercise at least:
 
 ```text
-heading + counts
-fixed lenses remain touch-operable
-one-column Notification rows
-secondary actions may move to bounded row menu/sheet
-source-open remains a clear primary row action
+active / unread / archived fixed lenses
+unseen + unread item
+seen + intentionally unread item
+read item
+archive preserving read state
+archived unread item + unarchive
+mark-all-read affects active unread only
+loaded-but-not-presented rows not blindly seen
+bounded seen batching evidence
+exact source-open boundary to B03 anchor
+source engagement 404/access-drift disappearance
+cursor continuation + failure/retry
+mark-all-read failure
+per-item engagement failure
+empty states for all three lenses
+SSE invalidation/refetch
+Quick Inbox coherence with Full Inbox
+responsive row/actions
+keyboard/focus/live-region recovery
 ```
 
-Accessibility obligations:
-
-```text
-unseen novelty is announced in text/semantics, not color alone
-unread/read is distinguishable independently of unseen
-row action labels identify the specific action
-source-open target has a clear accessible name
-lens selection uses real tab/navigation semantics appropriate to implementation
-focus is preserved after engagement removes a row from the current lens
-load-more and realtime reconciliation announce meaningful list changes without stealing focus
-```
-
-## 13. Explicit non-goals / YAGNI
-
-B08 current Launch does not add:
+## 14. Explicit non-goals
 
 ```text
 search
-free-form filters
-filter by author or Document
-custom/saved views
-bulk row selection
-bulk archive/unarchive
-mark-all-unread
-mark-unseen
-snooze
-priority
-reminders
+free-form/custom filters
+filter by author/Document
+saved views
+bulk selection/archive
+mark-all-unread / mark-unseen
+snooze / priority / reminders
 Notification preferences
 email/push settings
 Notification deletion
@@ -650,84 +421,18 @@ Notification-kind selector
 source reply/editor/viewer inside Inbox
 ```
 
-Current Notification kind remains only `DOCUMENT_MENTION`. A richer Notification taxonomy is a separate Product reopen, not a reason to pre-build generic Inbox infrastructure.
-
-## 14. P8 proof targets after written ratification
-
-P8 R1 must exercise at least:
+## 15. Current gate
 
 ```text
-active / unread / archived fixed lenses
-unseen item that is also unread
-seen item intentionally marked unread
-read item
-archive preserving read state
-archived unread item + unarchive
-mark-all-read affecting active unread only
-loaded-but-not-presented rows not blindly marked seen
-bounded seen batching fixture
-exact source open to B03 anchor
-source engagement 404/access-drift disappearance
-cursor continuation + failure/retry
-mark-all-read failure
-per-item engagement failure
-empty states for all three lenses
-SSE invalidation/refetch
-Quick Inbox state coherence with full Inbox
-responsive row/action treatment
-keyboard/focus/live-region recovery
+entry recovery                         COMPLETE
+P6                                     COMPLETE
+B08-F1                                 CLOSED / OPERATOR-RATIFIED
+P7 H1 Focused Triage Inbox             OPERATOR-RATIFIED
+P8                                     OPEN / NEXT
+B08 LOCK / P9 / P10                    NOT OPEN
+B09+                                   NOT OPEN
 ```
 
-## 15. Self-review
+Next action:
 
-Placeholder scan:
-
-```text
-TBD / TODO / undecided semantic field = 0
-```
-
-Consistency check:
-
-```text
-B01N remains global entry / glance surface
-B08 remains full triage surface
-op82 remains sole Inbox list authority
-op83–85 remain sole engagement writes
-op86 remains invalidation only
-B03 remains exact source Discussion owner lens
-Notifications persistence remains identity + engagement only
-```
-
-Scope check:
-
-```text
-no second Notification capability introduced
-no generic filtering/preferences/delivery platform
-no new API operation or route
-```
-
-Ambiguity check closed by this candidate:
-
-```text
-exact human-recognition source projection
-active/unread/archived meanings
-source-open engagement/navigation boundary
-seen presentation rule
-SSE invalidation behavior
-```
-
-## 16. Current gate
-
-```text
-B08 entry recovery                         COMPLETE
-P6                                         COMPLETE
-B08-F1 recognition projection              DESIGN APPROVED IN CHAT / WRITTEN RATIFICATION PENDING
-P7 H1 Focused Triage Inbox                  DESIGN APPROVED IN CHAT / WRITTEN RATIFICATION PENDING
-P8                                         NOT OPEN
-B08 LOCK / P9 / P10                        NOT OPEN
-B09+                                       NOT OPEN
-```
-
-Next gate:
-
-> Operator reviews and ratifies this written B08 design. Only after written ratification may B08-F1 be promoted to durable bounded authority and P8 functional HTML open.
+> Write the temporary P8 realization plan, create the functional low-fidelity B08 HTML with deterministic local fixtures, verify structural behavior, deliver the exact HTML to the operator, and remain in B08 until explicit LOCK.
