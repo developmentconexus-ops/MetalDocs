@@ -39,7 +39,7 @@ B01  App Shell + Global IA       LOCKED / OPERATOR-RATIFIED
 
 B02  Library / discovery         LOCKED / OPERATOR-RATIFIED
 
-B03  Document Official           OPEN / CANDIDATE / P8 CURRENT / NOT LOCKED
+B03  Document Official           OPEN / CANDIDATE / P8 RENDERED / OPERATOR ADJUDICATION / NOT LOCKED
       Discussion/Notifications   CURRENT / OPERATOR-RATIFIED / GCR+FABLE+PROMOTION COHERENT
 
 B04+                             NOT OPEN
@@ -70,7 +70,21 @@ Canonical rendered evidence for the bounded B01 delta:
 docs/work/current/t11-b01-notifications-wireframe.html
 ```
 
-B03 remains record/ficha-first with a deliberate distinct read-only official-content viewer and stable-Document Discussion. B03-F1 remains open for server-derived Document Official `allowed_actions`. B04+, T12 and Product implementation remain blocked.
+B03 is record/ficha-first with a deliberate distinct read-only official-content viewer and stable-Document Discussion. Current rendered P8 evidence:
+
+```text
+docs/work/current/t11-b03-document-official-wireframe.html
+```
+
+The B03 P8 candidate renders exactly three structural states for adjudication:
+
+```text
+1. normal Library entry -> hierarchical Document ficha
+2. Notification/@mention deep-link -> same ficha, Discussion revealed at anchor_message_id
+3. explicit Visualizar documento -> separate B03 read-only content surface
+```
+
+B03-F1 remains open for server-derived Document Official `allowed_actions` and must resolve before any B03 LOCK. B04+, T12 and Product implementation remain blocked.
 
 ## Current accepted system invariants
 
@@ -163,14 +177,18 @@ The re-LOCK changes only utility-header Notification chrome, Quick Inbox and res
 ## Exact next action
 
 ```text
-1. Resume B03 Document Official P8 using current authority:
-     record/ficha first
-     explicit distinct read-only official-content viewer
-     stable-Document Discussion
-     exact current management context
-2. Reconcile B03 candidate layout with current Discussion semantics and the now-locked global Notification chrome.
+1. Operator visually adjudicates the rendered B03 P8 candidate:
+     hierarchical ficha
+     current-work context placement
+     metadata density
+     revisions section
+     management section
+     Discussion placement/density
+     Notification deep-link behavior
+     separate official-content viewer
+2. Iterate only B03 structure if any hierarchy/position/size/discoverability issue is found.
 3. Resolve B03-F1 server-derived `DocumentOfficialView.allowed_actions` before any B03 LOCK.
-4. Render/adjudicate B03 structural candidate; iterate only B03 until explicit operator LOCK.
+4. Only operator may LOCK B03.
 5. After B03 LOCK, complete P9 Screen Contract / bidirectional trace and bounded P10 consolidation.
 6. Do not open B04+, T12, or Product implementation before their normal gates.
 ```
