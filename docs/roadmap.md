@@ -29,6 +29,7 @@ docs/decisions/discussion-notifications-launch.md
 docs/decisions/document-official-actions-read.md
 docs/decisions/my-work-governance-identification-read.md
 docs/decisions/governance-step-deadline.md
+docs/decisions/governance-case-step-deadline-read.md
 ```
 
 Current system census:
@@ -81,7 +82,13 @@ B05   My Work / Work Queues
        P8 R2                                       APPROVED / COMPLETE
        P9 / P10                                    COMPLETE
 
-B06   Governance Case                              NEXT / NOT OPEN
+B06   Governance Case
+       OPEN / ACTIVE
+       entry recovery                              CLOSED
+       B06-F1 case Step deadline projection        CLOSED / OPERATOR-RATIFIED
+       P6                                          COMPLETE
+       P7                                          CANDIDATE / AWAITING OPERATOR ADJUDICATION
+       P8                                          NOT OPEN
 B07   Document History                             NOT OPEN
 B08   Notifications Full Inbox                     NOT OPEN
 B09   Audit                                        NOT OPEN
@@ -148,18 +155,66 @@ No manual priority state, generic sort/filter DSL, business-calendar buckets or 
 
 B05 P9 proves 19/19 material regions/controls with operations 54/55 only and zero invented write/API authority. P10 graduates no new shared pattern; B05 queue/deadline/cursor semantics remain local.
 
+## B06 current entry authority
+
+Canonical current work record:
+
+```text
+docs/work/current/t11-b06-governance-case-r1.md
+```
+
+B06 owns the exact Governance Case lens only:
+
+```text
+/work/governance/:attempt_id
+→ getGovernanceAttempt
+→ exact immutable governed Submission / obsolescence subject
+→ ordered Steps + bounded decisions/feedback
+→ live server-derived allowed_actions
+```
+
+B06-F1 is now operator-ratified:
+
+```text
+GovernanceStepView pending
+  due_at forbidden
+
+GovernanceStepView active | decided
+  timed Step   -> exact persisted due_at present
+  untimed Step -> due_at absent
+```
+
+Binding authority:
+
+```text
+docs/decisions/governance-case-step-deadline-read.md
+```
+
+The deadline remains attention/context truth only. B06 owns no deadline mutation, SLA engine, lifecycle breach effect, manual priority or frontend Authorization.
+
+Current P7 leading candidate:
+
+```text
+Content-first Governance Workspace
+  exact governed content dominant
+  + B06-local governance rail
+    subject summary
+    ordered Steps / active deadline / prior Decisions
+    governance feedback
+    deliberate ACCEPT / RETURN_FOR_CHANGES decision zone
+```
+
+The dossier-first separate-viewer structure is not leading; the three-column workflow cockpit is rejected. P7 remains CANDIDATE until operator adjudication. No P8 HTML has been created.
+
 ## Exact next action
 
 ```text
-1. Revalidate exact current HEAD / PR / CI before B06 entry work.
-2. Recover B06 current Governance Case Product/T2/T3/T6/T8-E/T8-F authority.
-3. Recover useful legacy Governance Case ergonomics only as Evidence.
-4. Identify human needs, current read/write/action boundaries and material authority gaps.
-5. Resolve any blocking B06 finding before P7 composition.
-6. Do not design B07+ early.
+1. Operator adjudicates B06 P7 H1 Content-first Governance Workspace.
+2. If approved, create B06 functional P8 HTML with deterministic local fixtures/state simulation.
+3. Operate / iterate the same B06 block until explicit operator LOCK.
+4. Only after LOCK execute B06 P9 Screen Contract then P10 pattern consolidation.
+5. Do not design or open B07+ early.
 ```
-
-B06 remains `NEXT / NOT OPEN` until its entry evidence is coherent; B05 closure does not implicitly open it.
 
 ## Hard stops
 
