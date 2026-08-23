@@ -5,11 +5,12 @@
 > **Method:** Frontend Product Experience Planning Method v2.2.  
 > **Predecessors:** B01 / B01N / B02 / B03 / B04 LOCKED.  
 > **Current bounded authorities:** `../../decisions/my-work-governance-identification-read.md` + `../../decisions/governance-step-deadline.md`.  
+> **Canonical P8:** `t11-b05-my-work-functional-wireframe.html`.  
 > **Implementation:** BLOCKED.
 
-## 1. Current Product/architecture boundary
+## 1. Product / architecture boundary
 
-Stable route:
+Stable route remains:
 
 ```text
 /work
@@ -19,14 +20,14 @@ B01 LOCKED mental model remains:
 
 ```text
 Início
-  default /work operational-home presentation
+  default operational-home presentation
 
 Minha Caixa
-  Para aprovação -> /work governance presentation
-  Em edição      -> /work authoring presentation
+  Para aprovação
+  Em edição
 ```
 
-B05 is read-only projection/navigation only:
+B05 remains read-only projection/navigation:
 
 ```text
 READ       listAuthoringWork + listGovernanceWork
@@ -34,7 +35,7 @@ WRITE      none
 AUTHORITY  owner lenses re-read exact current truth
 ```
 
-Destinations remain:
+Destinations:
 
 ```text
 Authoring row  -> B04 LOCKED
@@ -63,32 +64,35 @@ WorkGovernanceItem {
 }
 ```
 
-Governance `revision` is exact governed-subject recognition. Governance `due_at` is exact persisted deadline of the currently active Step and may be absent when that Step has no configured deadline.
+Governance `revision` is exact governed-subject recognition. `due_at` is exact persisted deadline of the currently active Governance Step and is absent when that Step has no configured deadline.
 
-## 3. Legacy and external evidence disposition
+## 3. Evidence disposition
 
-Useful queue ergonomics retained:
+Legacy/current comparative work preserves only useful proven queue properties:
 
 ```text
-high-density work list
+high-density list
 human code + title prominence
 selected row / keyboard traversal
 empty / error / stale recovery
 owner-destination continuation
+real active-task due date triage
 ```
 
-Legacy SLA machinery is not restored wholesale.
+External evidence from Camunda, Flowable, ProcessMaker and ServiceNow informed F3/F4 but is not Product authority.
 
-External evidence from Camunda, Flowable, ProcessMaker and ServiceNow confirmed a narrower common pattern:
+Not restored:
 
 ```text
-active human task/step owns a due date
-sequential next-step deadline begins only when that step activates
-queues may filter/order by due date
-manual priority / escalation / business calendar are separate optional capabilities
+peer Approval owner/workspace
+quick approve/reject inside queue
+manual High/Medium/Low priority
+SLA extension / escalation
+reassignment / overseer
+generic task query/filter platform
+business-day calendar
+saved searches
 ```
-
-MetalDocs adopts only the proven temporal core in `governance-step-deadline.md`.
 
 ## 4. Human needs
 
@@ -100,14 +104,15 @@ Is it authoring or governance work?
 Which exact Document / Revision is it?
 For governance work, what is the active Step deadline when one exists?
 Which governance work needs attention first?
+Can I narrow the queue to the relevant deadline horizon?
 Where should I continue it?
 Did a stale row change/disappear?
 Is there more work beyond the current cursor page?
 ```
 
-It must not answer owner-lens detail questions belonging B04/B06/B07/B03.
+Owner-lens details remain outside B05.
 
-## 5. B05-F1 — governance row recognition — CLOSED / OPERATOR-RATIFIED
+## 5. B05-F1 — recognition — CLOSED / OPERATOR-RATIFIED
 
 Selected:
 
@@ -117,35 +122,19 @@ WorkGovernanceItem.revision: RevisionReference
 
 No per-row `getGovernanceAttempt` fan-out; no generic Work entity; no B06 summary moved into B05.
 
-Binding authority:
+## 6. B05-F2 — neutral order — SUPERSEDED BY F4
+
+F2 correctly rejected opaque UUID order and frontend re-sort. Its former code-first target was valid only before real deadline semantics existed.
+
+F3 fired F2's explicit reopen trigger. F4 now owns final governance-work order.
+
+Lasting law:
 
 ```text
-../../decisions/my-work-governance-identification-read.md
+frontend never re-sorts loaded cursor pages into a second global order
 ```
 
-## 6. B05-F2 — neutral governance ordering — REOPENED BY F3
-
-Former accepted order:
-
-```text
-document.code ASC,
-governance_attempt_id ASC
-```
-
-was correct under the then-current assumption that no due/priority Product truth existed.
-
-Operator P8 use promoted a real approval-deadline need. The exact F2 reopen trigger therefore fired.
-
-Lasting F2 laws remain:
-
-```text
-opaque UUID ordering is not a human ordering model
-frontend must never re-sort loaded cursor pages into a fake global order
-```
-
-Final server order is now owned by B05-F4.
-
-## 7. B05-F3 — governance Step deadline — CLOSED / OPERATOR-RATIFIED
+## 7. B05-F3 — Governance Step deadline — CLOSED / OPERATOR-RATIFIED
 
 Method outcome:
 
@@ -154,29 +143,17 @@ CURRENT STRUCTURE CONFIRMED
 + BOUNDED TEMPORAL GOVERNANCE CORRECTION
 ```
 
-Selected Product semantics:
+Selected:
 
 ```text
 GovernanceRouteStep.due_in_days?
 → immutable GovernanceAttemptStep.due_in_days_snapshot?
-→ Step activation freezes activated_at
-→ timed Step activation freezes persisted due_at
+→ activation freezes activated_at
+→ timed activation freezes persisted due_at
 → 1 configured day = 24 elapsed hours
 → no hidden default
-→ overdue is attention truth only
+→ overdue = attention truth only
 → no automatic lifecycle effect
-```
-
-Rejected from Launch baseline:
-
-```text
-manual High/Medium/Low priority
-SLA extension
-escalation worker
-reassignment/overseer
-business-day/holiday calendar
-breach notification
-automatic governance consequence
 ```
 
 Binding authority:
@@ -185,9 +162,57 @@ Binding authority:
 ../../decisions/governance-step-deadline.md
 ```
 
+## 8. B05-F4 — due-aware queue — CLOSED / OPERATOR-RATIFIED
+
+Method outcome:
+
+```text
+CURRENT STRUCTURE CONFIRMED
++ BOUNDED DUE-AWARE QUEUE CORRECTION
+```
+
+Default server order:
+
+```text
+due_at ASC NULLS LAST,
+document.code ASC,
+governance_attempt_id ASC
+```
+
+Bounded first-page filter:
+
+```text
+deadline_filter? =
+  overdue
+  | next_24h
+  | next_7d
+  | no_deadline
+
+omitted = all
+```
+
+Relative filters use one server-trusted first-page anchor carried/authenticated by the opaque cursor. Continuation pages reuse that anchor. A fresh first-page request receives a fresh anchor.
+
+No baseline:
+
+```text
+user-selectable sort
+arbitrary date range
+today / this-week calendar semantics
+manual priority
+saved filters
+total-count KPI
+```
+
+Binding authority:
+
+```text
+../../decisions/my-work-governance-identification-read.md
+```
+
 Current census remains 86 operations / 11 routes / 16 permissions.
 
-## 8. P7 — focused queue per selected intent — OPERATOR-APPROVED
+## 9. P7 — focused queue per selected intent — OPERATOR-APPROVED
 
 Selected structure remains:
 
@@ -204,86 +229,82 @@ selected intent
   empty / error / stale recovery
 ```
 
-Two-lane detailed view remains rejected as redundant with B01 Home. Legacy master/detail remains rejected because B05 owns no legitimate case-detail/decision surface.
+Lane asymmetry is intentional: only governance has deadline triage.
 
-## 9. P8 R1 — BASE STRUCTURE OPERATOR-APPROVED / MATERIAL POST-OPERATION FINDING
+## 10. P8 R1 disposition
 
-Operator approved the P8 R1 structure/ergonomics and then identified a material usability requirement:
+R1 base structure/ergonomics was operator-approved. Operation then exposed the missing deadline-triage Product need, which correctly blocked the overall B05 LOCK and produced F3/F4.
 
-```text
-Para aprovação has real approval deadlines
-→ actor needs filters / due-aware prioritization
-Em edição has no equivalent deadline requirement
-```
+No B01 terminology reopen was requested from the explicit `SUBMITTED`-under-`Em edição` test.
 
-Disposition:
+## 11. P8 R2 — RENDERED / OPERATOR OPERATION+REVIEW
+
+Canonical functional evidence:
 
 ```text
-P8 R1 structural direction        APPROVED
-B05 overall LOCK                  NO
-B05-F3 temporal domain semantics  CLOSED / OPERATOR-RATIFIED
-B05-F4 queue filter/order UX      OPEN / NEXT DECISION
-P8 R2                             BLOCKED ON F4
+docs/work/current/t11-b05-my-work-functional-wireframe.html
 ```
 
-The lane asymmetry is intentional: governance may have deadline controls while authoring does not.
-
-## 10. B05-F4 — due-aware governance queue behavior — OPEN / NEXT
-
-F4 must apply the DevelopmentConexus Method to decide only:
+R2 exercises:
 
 ```text
-what deadline information is visible in each governance row
-what the default server-owned order is
-which bounded deadline filters exist
-whether user-selectable ordering is justified
-how null/no-deadline items interleave
-how cursor continuation binds filters/order
-what presentation labels are derived from due_at
+Para aprovação <-> Em edição
+F4 due_at ASC NULLS LAST ordering
+exact + relative due presentation
+overdue presentation without lifecycle state invention
+Todos / Atrasados / Próximas 24h / Próximos 7 dias / Sem prazo
+no deadline controls in Em edição
+cursor/load-more
+fixed relative-filter cursor anchor
+fixture server clock advance without cursor-anchor drift
+fresh first-page anchor renewal
+keyboard selection + Enter
+stale destination + refresh
+list failure + retry
+B04 handoff
+explicit B06 unopened boundary
+responsive reflow
 ```
 
-Constraints already fixed:
+Review-only fixture controls are Evidence only, not Product UI.
+
+## 12. P8 R2 operator checks
+
+Operator should specifically test:
 
 ```text
-server owns global cursor order
-frontend never re-sorts pages
-manual business priority state absent
-no generic filter/sort DSL
-no SLA/escalation semantics hidden in the queue
-no B06 per-row enrichment
+Does due-first default order feel natural?
+Do no-deadline rows remain discoverable?
+Are four deadline presets enough without generic filtering?
+Does Para aprovação remain simple rather than becoming a workflow cockpit?
+Does Em edição correctly remain free of deadline controls?
+Does advancing fixture server time preserve the current cursor anchor?
+Does Fresh first-page correctly obtain a new anchor?
 ```
 
-External systems are evidence only; MetalDocs will not copy generic task-platform breadth by default.
-
-## 11. IA tension still under observation
-
-Current Authoring projection admits:
-
-```text
-DRAFT | SUBMITTED
-```
-
-under the B01 LOCKED label:
-
-```text
-Em edição
-```
-
-P8 R1 did not produce an operator-requested terminology reopen. Preserve the current B01 label unless later material evidence changes that.
-
-## 12. Current gate
+## 13. Current gate
 
 ```text
 B05 authority recovery                       COMPLETE
 legacy/external queue evidence               COMPLETE
 B05-F1 recognition                           CLOSED / OPERATOR-RATIFIED
-B05-F2 neutral order                         REOPENED BY F3
+B05-F2 neutral order                         SUPERSEDED BY F4
 B05-F3 Step deadline                         CLOSED / OPERATOR-RATIFIED
+B05-F4 due-aware queue                       CLOSED / OPERATOR-RATIFIED
 P7 focused queue A                           APPROVED
 P8 R1 base structure                         OPERATOR-APPROVED
-B05-F4 due-aware queue behavior              OPEN / NEXT DECISION
-P8 R2                                        NOT OPEN
+P8 R2 due-aware candidate                    RENDERED / OPERATOR OPERATION+REVIEW
 B05 LOCK                                     NO
+```
+
+Next:
+
+```text
+operator operates P8 R2
+→ iterate only material findings
+→ operator-only B05 LOCK
+→ P9 exact Screen Contract
+→ P10 bounded pattern consolidation
 ```
 
 B06+ remain NOT OPEN.
