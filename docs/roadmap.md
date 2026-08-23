@@ -28,6 +28,7 @@ Current bounded T11 authorities include:
 docs/decisions/discussion-notifications-launch.md
 docs/decisions/document-official-actions-read.md
 docs/decisions/my-work-governance-identification-read.md
+docs/decisions/governance-step-deadline.md
 ```
 
 Current system census:
@@ -46,13 +47,6 @@ exact-byte resources             4
 
 ## Frontend Product Experience Program
 
-Method:
-
-```text
-docs/development/functional-html-wireframe-method.md
-Frontend Product Experience Planning Method v2.2
-```
-
 ```text
 FP0  Frontend Foundation                         CLOSED / R1 86/11 REBASELINED
 FP1  Block-by-block Product Experience           ACTIVE
@@ -61,7 +55,7 @@ FP3  Whole-Product Adversarial Review / P12      NOT OPEN
 FP4  Visual Handoff + Readiness / P13-P14        NOT OPEN
 ```
 
-P8 means browser-operable functional low-fidelity evidence. P11 assembles already-LOCKED blocks; it is not the first functionalization.
+Method: `docs/development/functional-html-wireframe-method.md` — Frontend Product Experience Planning Method v2.2.
 
 ## FP1 block roadmap
 
@@ -80,11 +74,13 @@ B04   Document Work / Authoring
 
 B05   My Work / Work Queues
        CURRENT / CANDIDATE / NOT LOCKED
-       authority + legacy ergonomics recovery      COMPLETE
-       B05-F1 governance row RevisionReference     CLOSED / OPERATOR-RATIFIED
-       B05-F2 governance queue ordering            CLOSED / OPERATOR-RATIFIED
+       B05-F1 governance row recognition           CLOSED / OPERATOR-RATIFIED
+       B05-F2 neutral governance ordering          REOPENED BY F3
+       B05-F3 governance Step deadline             CLOSED / OPERATOR-RATIFIED
        P7 focused queue A                          APPROVED
-       functional low-fi P8 R1                     RENDERED / OPERATOR OPERATION+REVIEW
+       P8 R1 base structure                        OPERATOR-APPROVED
+       B05-F4 due-aware filter/order behavior      OPEN / NEXT DECISION
+       P8 R2                                       NOT OPEN
 
 B06   Governance Case                              NOT OPEN
 B07   Document History                             NOT OPEN
@@ -109,25 +105,7 @@ Evidência    = audit/evidence
 
 Notifications remains transversal utility chrome, not `Minha Caixa` authority.
 
-## B03 / B04 locked references
-
-```text
-B03
-  docs/work/current/t11-b03-document-official-r1.md
-  docs/work/current/t11-b03-document-official-functional-wireframe.html
-  docs/work/current/t11-b03-screen-contract.md
-  docs/work/current/t11-b03-pattern-consolidation.md
-
-B04
-  docs/work/current/t11-b04-document-work-r1.md
-  docs/work/current/t11-b04-document-work-functional-wireframe.html
-  docs/work/current/t11-b04-screen-contract.md
-  docs/work/current/t11-b04-pattern-consolidation.md
-```
-
-B04 remains the exact current open-Revision Work lens; B03 remains the stable Document official/management lens.
-
-## B05 current candidate
+## B05 current bounded truth
 
 Planning record:
 
@@ -135,64 +113,42 @@ Planning record:
 docs/work/current/t11-b05-my-work-r1.md
 ```
 
-Current governance-work read precision:
+Governance work now has two distinct current precisions:
 
 ```text
-WorkGovernanceItem {
-  governance_attempt_id
-  subject_kind
-  document
-  revision: RevisionReference
-  created_at
-}
+recognition
+  exact governed RevisionReference
 
-listGovernanceWork fixed order
-  document.code ASC,
-  governance_attempt_id ASC
+temporal attention
+  optional active-Step due_at
 ```
 
-The projection remains read-only recognition/navigation truth. B06 remains authority for Governance Case state, Steps, feedback, governed content, allowed actions and decisions.
-
-Operator-approved P7 structure:
+Deadline law:
 
 ```text
-Minha Caixa
-→ intent switch
-    Para aprovação | Em edição
-→ one focused full-width queue for the selected intent
-→ dense human-recognizable rows
-→ server cursor order preserved
-→ owner-lens continuation
-→ load-more cursor continuation
+GovernanceRouteStep.due_in_days?
+→ immutable attempt snapshot
+→ activation freezes activated_at + due_at
+→ 1 day = 24 elapsed hours
+→ no hidden default
+→ overdue has no automatic lifecycle effect
 ```
 
-P8 R1 exercises:
+The prior neutral code-first governance order was valid before deadline truth existed; its explicit reopen trigger fired. B05-F4 now owns final server ordering and bounded deadline filters.
 
-```text
-intent switching
-row selection + keyboard navigation
-cursor/load-more behavior
-stale destination + refresh
-load failure + retry
-empty lane
-B04 handoff boundary
-B06 unopened boundary
-B01N Quick Inbox reuse
-responsive reflow
-```
-
-P8 R1 deliberately renders `SUBMITTED` under the currently LOCKED `Em edição` label. This is a test, not a B01 reopen. Reopen B01 terminology only if operator use proves material confusion.
+P8 R1 validated the focused-queue composition, lane switching, density, keyboard traversal, cursor load-more, stale/error/empty recovery and owner-lens handoffs. B05 remains unlocked because the operator identified the material deadline-triage need after operating R1.
 
 ## Exact next action
 
 ```text
-1. Operator operates B05 functional P8 R1.
-2. Review only B05 scanability / density / lane switching / pagination / stale recovery / responsive behavior.
-3. Explicitly judge whether SUBMITTED under "Em edição" is understandable.
-4. Iterate only material B05 findings.
-5. Operator-only B05 LOCK.
-6. Then P9 exact Screen Contract + P10 bounded pattern consolidation.
-7. B06+ remain NOT OPEN until normal progression permits them.
+1. Adjudicate B05-F4 — due-aware governance queue behavior.
+2. Decide default server order, bounded deadline filters, null/no-deadline placement and cursor binding.
+3. Preserve no manual priority state and no frontend page re-sort.
+4. Generate B05 P8 R2 with the approved F4 behavior.
+5. Operator operates R2.
+6. Operator-only B05 LOCK.
+7. Then P9 exact Screen Contract + P10 bounded pattern consolidation.
+8. B06+ remain NOT OPEN.
 ```
 
 ## Hard stops
