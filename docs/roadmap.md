@@ -31,7 +31,10 @@ docs/decisions/my-work-governance-identification-read.md
 docs/decisions/governance-step-deadline.md
 docs/decisions/governance-case-step-deadline-read.md
 docs/decisions/governance-review-layer-seam.md
+docs/decisions/document-history-recognition-read.md
 ```
+
+B07-F1 authority: [Document History human-recognition read precision](decisions/document-history-recognition-read.md).
 
 Current system census:
 
@@ -78,10 +81,11 @@ B06   Governance Case
 B07   Document History
        OPEN / ACTIVE
        entry recovery                              COMPLETE
-       B07-F1 human-recognizable History read      CANDIDATE / AWAITING OPERATOR RATIFICATION
+       B07-F1 human-recognizable History read      CLOSED / OPERATOR-RATIFIED
        P6                                          COMPLETE
-       P7 H1 Revision Chapters                     LEADING / AWAITING OPERATOR APPROVAL
-       P8 / LOCK / P9 / P10                        NOT OPEN
+       P7 H1 Revision Chapters                     OPERATOR-APPROVED
+       P8 R1 functional HTML                       NEXT / IN PROGRESS
+       LOCK / P9 / P10                             NOT OPEN
 B08   Notifications Full Inbox                     NOT OPEN
 B09   Audit                                        NOT OPEN
 B10   Organization Administration                 NOT OPEN
@@ -144,32 +148,39 @@ semantic id
 
 P6 reference evidence supports a chronological origin-to-current History lens and exact historical read-only content, while compare/restore/delete remain outside current Launch scope.
 
-### B07-F1 candidate
+### B07-F1 — CLOSED / OPERATOR-RATIFIED
 
-Current History facts are semantically correct but some variants are not independently human-recognizable without browser cross-page reconstruction.
+Operation 53 remains the sole History list read and the 86-operation census is unchanged.
 
-Selected candidate precision:
+Every `DocumentHistoryItem` now projects exact human-recognition context:
 
 ```text
-all DocumentHistoryItem variants
-  -> exact revision: RevisionIdentity
+all variants
+  revision: RevisionIdentity
 
 governance_decision
-  -> subject_kind
-  -> frozen step_label
+  subject_kind
+  frozen step_label
 
 feedback_added
-  -> subject_kind
+  subject_kind
 
 release predecessor
   predecessor_revision?: RevisionIdentity
 ```
 
-Bare revision/target revision UUIDs are not retained as a second competing presentation identity when the exact `RevisionIdentity` replaces them.
+The exact law is owned by `docs/decisions/document-history-recognition-read.md`.
 
-No new operation, route, Permission, owner, lifecycle state, Audit join, History filter DSL or fabricated title snapshot is introduced.
+This remains derived Controlled Documents read truth only:
 
-### P7 leading hypothesis
+```text
+no Audit join
+no browser cross-page relationship graph as authority
+no fabricated title-at-revision-creation snapshot
+no new operation / route / Permission / owner / lifecycle state
+```
+
+### P7 — OPERATOR-APPROVED
 
 ```text
 H1 Revision Chapters + chronological event spine
@@ -186,7 +197,7 @@ REV000
   Release / rendition or cancellation
 
 REV001...
-  same controlled cycle structure
+  same controlled-cycle structure
 
 obsolescence events remain attached to exact target Revision
 
@@ -205,10 +216,10 @@ compare/restore/delete controls without current Product authority
 ## Exact next action
 
 ```text
-1. Operator adjudicates B07-F1 human-recognizable History projection.
-2. Operator adjudicates P7 H1 Revision Chapters.
-3. If approved, promote only the bounded op53 projection precision; current census stays 86.
-4. Then create/operate B07 functional P8 HTML.
+1. Create B07 functional P8 R1 using the ratified H1 + B07-F1 authority.
+2. Operator opens/operates the HTML in chat.
+3. If friction/finding exists -> revise the same B07 HTML; do not open B08.
+4. If operator explicitly LOCKS B07 -> P9 Screen Contract -> P10 pattern consolidation.
 5. Do not open B08+ while B07 is active.
 ```
 
