@@ -182,15 +182,33 @@ Discussion
 
 Exact production styling, component library, focus implementation and final visual design are not locked by B03.
 
-## 8. Post-LOCK obligations
+## 8. Post-LOCK closure
 
-Per Method v2.2:
+Completed:
 
 ```text
 P9  exact Screen Contract + bidirectional backend trace
+    -> t11-b03-screen-contract.md
+
 P10 bounded pattern consolidation
+    -> t11-b03-pattern-consolidation.md
 ```
 
-Only after those close may B04 become the normal next block.
+Closure result:
+
+```text
+P9 material regions/controls traced        15 / 15
+P9 unbound material controls               0
+P9 invented operations                     0
+P9 screen-shaped APIs                      0
+P9 frontend Authorization evaluator        0
+
+P10 existing shared patterns reused        2
+P10 new shared abstractions created        0
+P10 B03-local semantic patterns retained   7
+P10 false abstractions introduced          0
+```
+
+B04 is now eligible to become the next planning block but remains `NEXT / NOT OPEN` until its own cycle begins.
 
 A later material finding reopens only the smallest affected B03 decision under the Method; preference or visual polish alone does not reopen this LOCK.
