@@ -1,10 +1,9 @@
 # T11 — Discussion / Mention / Notifications Global Coherence Review
 
-> **Status:** LEAD GCR ROUND 2 — CONVERGED / READY FOR FRESH INDEPENDENT CHALLENGE.  
+> **Status:** LEAD GCR + FRESH FABLE — CONVERGED / READY FOR UPSTREAM CONSOLIDATION.  
 > **Scope:** operator-ratified D0→D8 bounded reopen candidate only.  
 > **Method:** DevelopmentConexus Engineering Method v1.0.0.  
-> **Implementation:** BLOCKED.  
-> **Independent review:** NOT YET PERFORMED; this Lead GCR is not independent evidence.
+> **Implementation:** BLOCKED.
 
 ## 1. Candidate package
 
@@ -65,7 +64,7 @@ Lexical as replaceable Discussion-composer mechanism
 generic EventBus / broker / Redis absent at Launch
 ```
 
-## 3. Round 1 — NOT CONVERGED
+## 3. Lead GCR Round 1 — NOT CONVERGED
 
 Round 1 found:
 
@@ -91,7 +90,7 @@ application coordinates
 
 Author + all unique Mention targets now use protected Organization eligibility in one Scope, resolved in deterministic `user_id ASC` order. Controlled Documents validates only intrinsic message/reply/content structure after current decisions are ALLOW.
 
-**Round-2 result: CLOSED.** No parallel permission/disclosure authority remains.
+**CLOSED.**
 
 ### M2 — current disclosure before pagination/counts
 
@@ -110,7 +109,7 @@ Notifications candidate scan
 
 The same current-disclosure composition owns unseen/unread summary counts. Frontend post-filtering is forbidden.
 
-**Round-2 result: CLOSED.** Pagination is now compatible with current disclosure without copied ACL truth.
+**CLOSED.**
 
 ### M3 — SSE dependency direction / post-commit invalidation
 
@@ -127,9 +126,9 @@ transport/http
 
 Recipient wake-up happens only after committed Notification creation or engagement change: creation, seen, read, unread, archive, unarchive, mark-all-read. Wake-up is best-effort, non-durable and never called by semantic owners.
 
-**Round-2 result: CLOSED.** T8-B/T8-C dependency laws remain intact.
+**CLOSED.**
 
-## 4. Round-1 IMPORTANT findings — closure
+## 4. Lead GCR Round-1 IMPORTANT findings — closure
 
 ### I1 — batch seen disclosure oracle
 
@@ -141,8 +140,6 @@ bounded unique ids
 → mutate only intersection
 → absent/foreign/non-presentable ids expose no per-id outcome/cardinality
 ```
-
-Direct non-presentable engagement uses normal non-disclosing not-found behavior.
 
 **CLOSED.**
 
@@ -157,7 +154,7 @@ current caller AuthZ/disclosure recheck
 → zero new Message/Mention/Notification
 ```
 
-Historical Mention-target eligibility is not rerun. Fingerprint includes Document, reply reference and normalized ordered Text/Mention content; ReplaySnapshot excludes free text.
+Historical Mention-target eligibility is not rerun.
 
 **CLOSED.**
 
@@ -174,13 +171,11 @@ Notification creation/engagement/realtime
 → no mandatory semantic Audit in Launch
 ```
 
-Future regulatory messaging/notification audit remains a T3 reopen trigger.
-
 **CLOSED.**
 
 ### I4 — persistence enforcement
 
-D7 now requires upstream T8-D consolidation to preserve at minimum:
+D7 requires upstream T8-D consolidation to preserve at minimum:
 
 ```text
 notifications.* owner namespace
@@ -192,91 +187,33 @@ immutable accepted DiscussionMessage/Mention
 reply cannot cross Document Discussion
 ```
 
-**CLOSED at architecture level; exact DDL remains downstream consolidation/implementation proof.**
+**CLOSED at architecture level.**
 
 ### I5 — OpenAPI/SSE proof
 
-Operation 86 remains candidate only under a closure proof that the selected Go OpenAPI boundary represents server-side `text/event-stream` without a manual route/DTO authority. Toolchain failure reopens mechanism/tooling, not Product meaning.
+Operation 86 remains admitted only under proof that the selected Go OpenAPI boundary represents server-side `text/event-stream` without manual parallel route/DTO authority.
 
-**CLOSED as an explicit proof gate.**
+**CLOSED as explicit proof gate.**
 
 ### I6 — visual/upstream sequencing
 
-Sequence remains binding:
+Sequence remains:
 
 ```text
 converged candidate
 → fresh independent challenge
 → reviewer adjudication
-→ smallest upstream Product/T1→T9/T11 consolidation
+→ upstream consolidation
 → smallest B01 P8 Notification reopen
-→ operator re-LOCKs implicated B01 delta
+→ operator re-LOCKs B01 delta
 → B03 P8 with real Discussion semantics
-→ operator B03 adjudication/LOCK
 ```
-
-B04+ remains unopened.
 
 **CLOSED.**
 
-## 5. Round-2 adversarial sweep
+## 5. Lead GCR Round 2
 
-### Authority duplication
-
-No duplicate owner survives:
-
-```text
-Controlled Documents -> Discussion/Mention source facts
-Authorization        -> final current ALLOW/DENY
-Notifications        -> persistent attention/engagement
-Audit                -> separate evidence authority only
-application          -> choreography only
-realtime             -> mechanism only
-```
-
-**PASS.**
-
-### Transaction/cycle challenge
-
-Same-Scope Message + Notification creation has no owner→owner import and no event-bus cycle. Application is the sole orchestration class. Protected multi-User eligibility has deterministic acquisition order.
-
-**PASS.**
-
-### Disclosure challenge
-
-Mention autocomplete, Notification list/counts, batch seen and direct engagement all reapply current server-side disclosure. No client-side hide, copied ACL or notification-as-access-token remains.
-
-**PASS.**
-
-### Async/realtime challenge
-
-Persistent Notification truth is independent of wake-up. River remains reserved for required durable future work. SSE loss is recoverable by canonical GET. In-process hub is an admitted one-replica mechanism, replaceable by PostgreSQL LISTEN/NOTIFY if a multi-replica consumer later appears.
-
-**PASS.**
-
-### API/census challenge
-
-No material evidence found a smaller operation family without collapsing independent behaviors or creating generic `/actions` semantics. The candidate remains exactly:
-
-```text
-Discussion / Mention     +3
-Notification state       +4
-SSE invalidation         +1
-                         ---
-                         +8
-78 -> 86 operations
-10 -> 11 Idempotency-Key creations
-```
-
-**PASS pending independent challenge and later executable-wire consolidation.**
-
-### YAGNI / framework challenge
-
-No notification SaaS runtime, generic EventBus, broker, Redis or persistent Lexical format is introduced. Lexical is a replaceable UI mechanism only; Watermill/LISTEN-NOTIFY remain trigger-bound future candidates.
-
-**PASS.**
-
-## 6. Lead GCR Round-2 verdict
+Round 2 re-falsified authority duplication, transaction cycles, disclosure, async/realtime, API/census and YAGNI/framework posture.
 
 ```text
 VERDICT: CONVERGED
@@ -285,31 +222,125 @@ IMPORTANT: 0
 OPTIONAL: 0
 ```
 
-No Lead finding changes the candidate result:
+No Lead finding changed the candidate result.
+
+## 6. Fresh independent Fable challenge
+
+Evidence PR #165 reviewed the exact corrected candidate independently under METHOD and Repository Standard isolation.
+
+Verified Evidence posture:
 
 ```text
-owners                4+2 candidate
-routes                 11 candidate
-PermissionCode         16 candidate
-operations             86 candidate
-Idempotency creations  11 candidate
-ETag domains           13/13
-exact-byte resources   4
+base candidate   arch/t11-implementation-program @ a9047924aa2e31aaa1418a15c8786b7e9ad2967f
+review branch    review/t11-notifications-fable
+review delta     docs/work/current/ai-dialog.md only
+review CI        #1265 SUCCESS on final Fable head
+review PR        DRAFT / NEVER MERGE
 ```
 
-This is still **candidate evidence**, not promoted Product/T1→T9 authority.
+Fable independently re-derived and re-attacked all former Lead findings before reading the Lead closure and confirmed them closed.
 
-## 7. Required next gate
-
-Because this package creates/moves a semantic authority and binds multiple architecture layers, METHOD requires a fresh independent challenge.
+Final Fable verdict:
 
 ```text
-exact corrected candidate HEAD + green CI
-→ isolated review/<gate>-fable branch
-→ delta = docs/work/current/ai-dialog.md only
-→ Fable reconstructs authority and attacks the whole coherent package
-→ reviewer output = Evidence only
-→ Lead adjudicates every material/important finding
-→ Round 2 only if a real contradiction survives
-→ only then upstream consolidation
+VERDICT: CONVERGED
+MATERIAL: 0
+IMPORTANT: 1
+OPTIONAL: 3
+UNSUPPORTED_PREFERENCE: 0
 ```
+
+### F-1 — IMPORTANT — ACCEPTED
+
+Finding: the consolidation-target map did not explicitly name:
+
+```text
+docs/decisions/forward-obligations.md
+docs/decisions/api-operation-census.md
+```
+
+Without those targets, promoted Product/Architecture could say Notifications Launch + 86 operations while the decision register still said ASY-02 DEFERRED and census still said 78.
+
+Adjudication:
+
+```text
+ACCEPT
+```
+
+The consolidation map now explicitly requires both decision-register changes in the same coherent promotion. This is consolidation precision only; it changes no Product capability, owner, route, Permission, operation count or mechanism choice.
+
+### O-1 — OPTIONAL — ACCEPTED
+
+`anchor_message_id` is one first-page navigation filter of `listDocumentDiscussionMessages`; continuation cursor authenticates the same operation/filter/order semantics. T8-E must provide a named fixture. No second pagination authority.
+
+### O-2 — OPTIONAL — ACCEPTED
+
+T6/T8-E must set explicit closed bounds for message segment count and unique Mention targets per message. The global 65,536-byte JSON ceiling alone is insufficient to cap protected-user lock/AuthZ/Notification fan-out.
+
+### O-3 — OPTIONAL — ACCEPTED
+
+T3/T6 must promote one named canonical Discussion-disclosure predicate reused by Discussion read, Mention-candidate/commit validation and Notification presentability. T8-G must record that transient deploy-overlap wake loss is tolerated because SSE is non-authoritative and canonical GET reconciles.
+
+No Fable Round 2 is justified because no material contradiction survived and F-1 was a one-step consolidation-completeness correction accepted by the Lead/operator.
+
+## 7. Independent survival statement
+
+Fable explicitly concluded all of the following survive the independent challenge:
+
+```text
+4+2 owners                                      SURVIVES
+11 stable SPA routes                            SURVIVES
+16 PermissionCode values                        SURVIVES
+86 application operations                       SURVIVES
+11 Idempotency-Key creations                    SURVIVES
+same-Scope Mention -> Notification              SURVIVES
+presentability before paging/counts             SURVIVES
+Lexical                                          SURVIVES
+SSE + in-process wake-up                        SURVIVES
+River as sole durable async                     SURVIVES
+no generic EventBus / broker / Redis            SURVIVES
+```
+
+## 8. Converged review outcome
+
+The coherent review chain is now:
+
+```text
+D0→D8 operator-ratified candidate
+→ Lead GCR R1: NOT CONVERGED, 3M/6I
+→ operator adjudication
+→ corrected candidate
+→ Lead GCR R2: CONVERGED, 0M/0I
+→ fresh Fable: CONVERGED, 0M/1I/3O
+→ Lead/operator adjudication: F-1 + O1→O3 ACCEPTED
+→ Fable Round 2 NOT JUSTIFIED
+→ upstream consolidation NEXT
+```
+
+Candidate counts remain candidate until that consolidation atomically updates every current authority that owns their meaning.
+
+## 9. Required consolidation targets
+
+At minimum:
+
+```text
+Product contract
+T1 semantic state
+Ownership topology
+T3 Authorization/Audit
+T5 async/realtime posture
+T6 journeys/routes/API meaning
+T8-B backend topology
+T8-C internal contracts
+T8-D persistence
+T8-E executable wire
+T8-F frontend realization
+T8-G runtime
+T9 golden-flow/validation obligations
+T11 implementation-readiness planning
+
+docs/decisions/forward-obligations.md
+docs/decisions/api-operation-census.md
+```
+
+Only the actually implicated sections may change. No unrelated T1→T10 decision is reopened.
