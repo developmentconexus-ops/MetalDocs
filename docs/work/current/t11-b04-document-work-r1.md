@@ -1,12 +1,27 @@
-# T11 — B04 Document Work R1 — Method v2.2 candidate
+# T11 — B04 Document Work R1 — Method v2.2 locked
 
-> **Status:** CURRENT FP1 BLOCK / CANDIDATE / NOT LOCKED.  
+> **Status:** LOCKED / OPERATOR-RATIFIED.  
 > **Block:** B04 — Document Work / Authoring.  
 > **Method:** Frontend Product Experience Planning Method v2.2.  
 > **Predecessors:** B01 / B01N / B02 / B03 LOCKED.  
 > **Implementation:** BLOCKED.
 
-## 1. Current Product/architecture boundary
+## 1. Lock basis
+
+The operator explicitly approved, in sequence:
+
+```text
+P7 content-first macro-layout
+Eigenpal DOCX editable boundary
+PDF / SUBMITTED read-only boundary
+right operational rail
+B04-F1 hybrid persistence UX
+functional low-fi P8 R1 after browser operation/review
+```
+
+No material B04 interaction/layout finding remains open at the operator gate.
+
+## 2. Locked Product/architecture boundary
 
 Stable route:
 
@@ -19,16 +34,17 @@ Route resolution law:
 ```text
 getDocument
 → disclosed open_revision
-→ DRAFT      = editable Work lens
+→ DRAFT      = editable/read-only-by-format Work lens
 → SUBMITTED  = read-only submitted Work lens
 → absent     = no current work available; no History fallback
 ```
 
-Document Work owns no official truth and no Governance Case truth.
+Document Work owns no official truth, History truth, Governance Case truth or frontend Authorization authority.
 
-Current operations used by the block remain the accepted Work family:
+Current operation family consumed by B04:
 
 ```text
+getDocument
 getRevision
 getRevisionDraft
 updateRevisionDraft
@@ -42,27 +58,22 @@ withdrawSubmission
 cancelRevision
 ```
 
-No new operation is admitted by this planning block.
+No new application operation was created by B04 planning.
 
-## 2. Operator-approved P7 macro-layout
-
-The operator reviewed the final B04 low-fidelity layout after explicit legacy comparison and **APPROVED** it.
-
-Selected composition:
+## 3. Locked composition
 
 ```text
 MetalDocs minimal Work header
   code + title
-  REV / current Work state
+  Work Revision / state
   current official Revision reference
   visible persistence state
 ↓
 CONTENT-FIRST WORKSPACE
   main canvas
-    DOCX DRAFT     → Eigenpal editor surface
-                     Eigenpal toolbar/chrome + editable document canvas
-    PDF DRAFT      → read-only viewer
-    SUBMITTED      → read-only exact submitted content viewer
+    DOCX DRAFT     → Eigenpal toolbar/chrome + editable document canvas
+    PDF DRAFT      → read-only exact source viewer
+    SUBMITTED      → read-only exact submitted-content viewer
 
   right operational rail
     1. Trabalho atual
@@ -71,228 +82,173 @@ CONTENT-FIRST WORKSPACE
     4. Contexto do documento — collapsed by default
 ```
 
-## 3. Eigenpal boundary
+The full B03 ficha, B06 governance timeline/actions and B07 revision history remain outside B04.
 
-For Launch B04:
+## 4. Eigenpal / viewer boundary
 
 ```text
 DOCX DRAFT
-  only currently editable content format
-  Eigenpal owns internal document-editing ergonomics / toolbar / canvas behavior
-  MetalDocs owns placement, Work semantics, persistence orchestration and Product state presentation
+  Eigenpal owns internal document-editing ergonomics
+  MetalDocs owns Work placement, persistence orchestration and Product-state presentation
 
 PDF DRAFT
   read-only inspect
-  replace source when current command truth admits it
+  source replacement is the content-change path
 
 SUBMITTED
-  read-only
-  never mounts editable DRAFT controls
+  read-only immutable Submission content
+  no editable DRAFT controls
 ```
 
-The P7/P8 wireframes represent Eigenpal toolbar zones structurally; they do not freeze vendor button order, visual styling or implementation internals.
+P8 toolbar controls are structural stand-ins only; vendor button order/style is not locked Product authority.
 
-## 4. Right-rail disposition after legacy review
-
-Legacy Work sidebar evidence contained identity, revision lineage, approval chain/timeline, contextual approval panels, decision footer and ficha navigation.
-
-Current disposition:
-
-```text
-KEEP / ADAPT
-  current Work state
-  source file/format/size where useful
-  persistence/save state
-  Work actions
-  compact collapsed Document context
-  explicit return to B03 ficha
-
-DO NOT RESTORE
-  full revision history          → B07
-  approval chain/timeline        → B06
-  approval decision footer       → B06
-  legacy mode-adaptive Work/Approval owner
-  legacy editorial-comments semantics
-  duplicated full B03 ficha
-```
-
-Collapsed Document context may show only bounded orientation facts already available through the route-entry/current read composition:
-
-```text
-Document Type
-Area
-Responsible owner
-current official Revision/status
-Ver ficha completa → B03
-```
-
-It is orientation, not a second Document Official authority.
-
-## 5. P7/P8 interaction-state laws
-
-Must remain visible/understandable in P8:
-
-```text
-DRAFT vs SUBMITTED distinction
-DOCX editable vs PDF read-only distinction
-current official Revision remains separate from current Work Revision
-source replacement progression:
-  local file chosen
-  → provider upload
-  → server verification/admission
-  → attach under current DRAFT ETag
-  → authoritative WorkingContent updated
-
-provider PUT success != READY
-READY != WorkingContent
-WorkingContent != Submission
-
-412 precondition.draft_changed
-  preserve unsaved/local human input
-  stop autosave progression
-  refetch current server DRAFT
-  require explicit reconciliation
-  no silent LWW / automatic merge
-
-state.upload_expired
-  preserve intended local bytes
-  allocate a fresh upload
-  never revive the expired upload id
-```
-
-## 6. B04-F1 — DOCX persistence UX — CLOSED / OPERATOR-RATIFIED
-
-The operator approved the **hybrid persistence** model.
-
-Contract:
+## 5. B04-F1 — hybrid persistence — CLOSED / OPERATOR-RATIFIED
 
 ```text
 local Eigenpal edit
 → FORM DRAFT becomes DIRTY immediately
-→ after an implementation-appropriate quiet period, coalesce background persistence
+→ coalesced background persistence after an implementation-appropriate quiet period
 → at most one save pipeline in flight
-→ additional edits while saving remain DIRTY and schedule the next coalesced save
+→ edits arriving during a save remain DIRTY for the next coalesced save
 
 Salvar agora / Ctrl+S
-→ force the same save pipeline immediately
+→ force the same persistence pipeline
 
-save pipeline for DOCX body
-→ serialize intended DOCX bytes
-→ allocate/upload/complete admission as required
-→ PATCH exact DRAFT under current If-Match
-→ accept returned DocumentWorkView + new strong ETag
-→ mark clean only for the exact local generation persisted
+DOCX body persistence
+→ serialize intended bytes
+→ allocate/upload/complete admission as needed
+→ PATCH exact DRAFT using current If-Match
+→ accept authoritative DocumentWorkView + new strong ETag
+→ mark clean only for the exact local generation accepted
 ```
 
-Timing/debounce duration is implementation tuning, not Product/frontend authority.
+No fixed debounce duration is Product authority.
 
-Visible presentation states:
+Visible persistence intents:
 
 ```text
 saved
-local changes / dirty
+dirty / local changes
 saving
 save failed — local buffer preserved
-conflict / reconciliation required
+conflict — reconciliation required
 ```
 
-Concurrency/error law:
+### Failure/concurrency law
 
 ```text
 412 precondition.draft_changed
-→ stop normal autosave for that stale base
+→ stop stale autosave progression
 → preserve local human input
 → refetch authoritative DRAFT
 → explicit human reconciliation
-→ no automatic merge / silent overwrite
+→ no automatic merge / no silent LWW
 
 save/dependency failure
 → preserve local buffer
-→ expose retry
-→ no false "saved" state
+→ explicit retry opportunity
+→ never show false saved state
 ```
 
-Submit law:
+### Submit law
 
 ```text
 Enviar para análise
-→ if a save is in flight, wait for it to resolve
-→ if local changes remain, force flush through the same save pipeline
+→ wait for any in-flight save
+→ force-flush remaining local changes
 → require no unresolved save error/conflict/upload attachment
-→ only then createSubmission against the exact current accepted DRAFT ETag
+→ createSubmission only against the exact accepted DRAFT ETag
 ```
 
-Browser state law:
+Browser local state remains transient FORM DRAFT only; no IndexedDB/localStorage/offline durable DRAFT baseline is introduced.
+
+## 6. Exact-content replacement law represented in the lock
 
 ```text
-local editor buffer = transient FORM DRAFT only
-no IndexedDB/localStorage/offline durable DRAFT baseline
-no second client content authority
+local file chosen
+→ startRevisionDraftUpload
+→ provider PUT
+→ completeRevisionDraftUpload establishes READY only after server admission
+→ updateRevisionDraft attaches source_upload_id under current DRAFT ETag
+→ authoritative WorkingContent + new ETag
 ```
 
-## 7. Canonical P8 R1
-
-Current functional evidence:
+Truth ladder:
 
 ```text
-t11-b04-document-work-functional-wireframe.html
+provider PUT success != READY
+READY != WorkingContent
+WorkingContent != Submission
 ```
 
-Medium:
+Expired upload:
 
 ```text
-HTML
-CSS
-vanilla JavaScript
-local deterministic fixtures/state simulation
+preserve intended local bytes
+→ allocate a fresh upload
+→ repeat upload/admission
+→ never revive the expired upload_id
 ```
 
-P8 R1 exercises:
+## 7. Locked P8 R1 evidence
+
+Canonical functional evidence:
 
 ```text
-DOCX Eigenpal-like toolbar + editable canvas
-DIRTY → coalesced autosave → saved/new ETag
-Salvar agora / Ctrl+S
-one-save-in-flight behavior
-save failure + explicit retry opportunity
-412 conflict + local-buffer preservation + manual reconciliation choice
+docs/work/current/t11-b04-document-work-functional-wireframe.html
+```
+
+The operator operated/reviewed the browser-functional prototype and explicitly approved it.
+
+P8 locally exercises:
+
+```text
+DOCX edit → DIRTY → autosave/save-now → new ETag
+coalesced edits while one save is in flight
+save failure with local-buffer preservation
+412 conflict + explicit reconciliation / no auto-merge
 PDF DRAFT read-only viewer
-source replacement:
-  allocation → provider PUT → completion/READY → DRAFT attach
-expired upload → preserve local file → new allocation / re-upload
-submit forces flush before SUBMITTED
-SUBMITTED read-only gates
-withdraw Submission → same Revision back to DRAFT
-cancel Revision with mandatory reason → no current work
-no-History fallback + explicit return to B03
+source replacement allocation → PUT → READY → attach
+expired upload → fresh allocation with same intended local bytes
+submit force-flush → SUBMITTED read-only
+withdraw Submission → same Revision DRAFT
+cancel Revision reason → no-current-work state
+return to B03; no History fallback
 collapsed Document context
-locked B01N notification chrome reuse
+B01N global chrome reuse
 responsive rail stacking
 ```
 
-Review-only fixture controls may force conflict/failure/expiry states. They are P8 Evidence controls, not Product UI.
+Review-only failure/conflict/expiry controls are Evidence, not Product UI.
 
-Repository CI checks only the repository envelope; browser-operable P8 behavior remains operator Evidence and is not claimed as automated E2E proof.
-
-## 8. Current gate
+## 8. State authority
 
 ```text
-P7 macro-layout                         OPERATOR-APPROVED
-Eigenpal DOCX / viewer format boundary  OPERATOR-APPROVED
-right-rail composition                  OPERATOR-APPROVED
-B04-F1 hybrid persistence UX            CLOSED / OPERATOR-RATIFIED
-P8 functional R1                        RENDERED / OPERATOR OPERATION+REVIEW
-B04 LOCK                                NO
+SERVER STATE
+  DocumentOfficialView routing context
+  RevisionView / DocumentWorkView + DRAFT ETag
+  SubmissionView
+
+NAVIGATION / URL
+  document_id + stable Work route
+
+FORM DRAFT
+  title + Eigenpal local buffer + selected replacement file before acceptance
+
+EPHEMERAL UI
+  context disclosure, upload/save progress presentation,
+  conflict/reconciliation dialog, cancellation dialog
 ```
 
-Next:
+No fifth durable/global frontend state class is created.
+
+## 9. Post-LOCK progression
 
 ```text
-operator operates P8 R1
-→ iterate only material B04 layout/interaction findings
-→ operator-only B04 LOCK
-→ P9 exact Screen Contract
-→ P10 bounded pattern consolidation
+B04 LOCK                              COMPLETE / OPERATOR-RATIFIED
+P9 exact Screen Contract              NEXT
+P10 bounded pattern consolidation     after P9
+B05                                   NOT OPEN until P9/P10 close
 ```
 
-B05+ remain NOT OPEN.
+Implementation remains blocked by the repository-wide T11/T12/Whole-R10 gate.
