@@ -1,6 +1,6 @@
 # T11 — Notification Ownership Bounded Reopen
 
-> **Status:** OPERATOR-RATIFIED CANDIDATE / PENDING UPSTREAM CONSOLIDATION.  
+> **Status:** OPERATOR-RATIFIED CANDIDATE / FABLE-CONVERGED / PENDING UPSTREAM CONSOLIDATION.  
 > **Parent:** `t11-b03-discussion-notification-mini-design.md`.  
 > **Reasoning authority:** `developmentconexus-ops/conexus-methodology/METHOD.md` — DevelopmentConexus Engineering Method v1.0.0.  
 > **Implementation:** BLOCKED.  
@@ -184,27 +184,53 @@ This means restructure the target authority now during planning, not implement P
 
 ## 9. Required downstream coherence work
 
-The bounded reopen may implicate at least:
+The bounded reopen implicates the smallest coherent current-authority set:
 
 ```text
-Product Contract     Notification/Inbox = Launch V1
-T1 / domain model    Notification semantic state
-Ownership            4+1 -> 4+2
-T3                    document.discuss + Notification self-access rules
-T5                    async/realtime/event-delivery classification
-T8-B                  Notifications owner realization
-T8-C                  Notifications owner contract + cross-owner transaction composition
-T8-D                  Notification persistence/concurrency
-T8-E                  exact API/schema/census delta
-T8-F                  Inbox/shell/frontend realization
-T8-G                  realtime runtime only if proven
-T9                     new golden flows
-T11                    B01 smallest-scope reopen + B03 Discussion
+Product Contract                      Notification/Inbox = Launch V1
+T1 / domain model                     Notification semantic state
+Ownership                             4+1 -> 4+2
+T3                                   document.discuss + Notification self-access rules
+T5                                   async/realtime/event-delivery classification
+T6                                   Discussion/Inbox journeys + 11 stable SPA routes
+T8-B                                 Notifications owner realization
+T8-C                                 Notifications owner contract + cross-owner transaction composition
+T8-D                                 Notification persistence/concurrency
+T8-E                                 exact API/schema/census delta
+T8-F                                 Inbox/shell/frontend realization
+T8-G                                 realtime runtime
+T9                                   new golden-flow/validation obligations
+T11                                  B01 smallest-scope reopen + B03 Discussion
+
+docs/decisions/forward-obligations.md
+  ASY-02 DEFERRED must be refined/superseded by the ratified Launch requirement
+
+docs/decisions/api-operation-census.md
+  78-operation authority must be promoted to the exact 86-operation bounded-reopen census
 ```
+
+The two decision-register targets above are mandatory parts of the same consolidation so the repository cannot retain a stale `DEFERRED Notifications` disposition or stale `78` census beside promoted Product/Architecture authority.
 
 Only the actually implicated decisions may be reopened during consolidation.
 
-## 10. Reopen triggers
+## 10. Independent challenge result
+
+Fresh Fable review on Evidence PR #165 independently re-falsified the whole D0→D8 package and Lead GCR corrections.
+
+```text
+VERDICT: CONVERGED
+MATERIAL: 0
+IMPORTANT: 1
+OPTIONAL: 3
+```
+
+The sole IMPORTANT finding was the missing explicit decision-register targets corrected in §9 above. The operator accepted it. It changes no Product capability, owner count, route count, Permission count, operation count or mechanism choice.
+
+The operator also accepted three bounded wire/consolidation precisions: exact `anchor_message_id` continuation semantics, explicit message/fan-out bounds, and one named canonical Discussion-disclosure predicate reused by Discussion read/Mention/presentability.
+
+No Fable Round 2 is justified because no material contradiction survived and the IMPORTANT finding is a consolidation-completeness correction only.
+
+## 11. Reopen triggers
 
 Reopen this ownership decision if evidence proves one of:
 
