@@ -22,6 +22,7 @@ Start here after `AGENTS.md`, then read `roadmap.md`, then only the owning docum
 | Responsible-owner eligibility | [Responsible owner](architecture/responsible-owner.md) | Old grant/role assumptions |
 | Document Official management affordances / `allowed_actions` | [Document Official action precision](decisions/document-official-actions-read.md) + [Wire contract](architecture/wire-contract.md) | Frontend permission inference, temporary B03 candidate files |
 | My Work governance row recognition / `WorkGovernanceItem.revision` | [My Work governance read precision](decisions/my-work-governance-identification-read.md) + [Wire contract](architecture/wire-contract.md) + [Frontend](architecture/frontend.md) | Legacy Approval DTOs/actions, per-row Governance Case enrichment |
+| Document History / human-recognizable historical projection | [Document History recognition precision](decisions/document-history-recognition-read.md) + [Wire contract](architecture/wire-contract.md) | Audit reconstruction, browser cross-page history graph, temporary B07 work |
 | Exact content / restore | [Content integrity](architecture/content-integrity.md) | Removed storage-provider contracts |
 | Durable jobs / Search / Notification async boundary | [Async and search](architecture/async-and-search.md) + [Discussion/Notifications authority](decisions/discussion-notifications-launch.md) | Old jobs registry |
 | Technical clean-slate / reuse decision | [Technical baseline](architecture/technical-baseline.md) | Legacy source unless the reuse gate requires it |
