@@ -1,6 +1,6 @@
 # T11 — B05 My Work / Work Queues R1 — Method v2.2 candidate
 
-> **Status:** CURRENT FP1 BLOCK / CANDIDATE / NOT LOCKED.  
+> **Status:** LOCKED / OPERATOR-RATIFIED / P8 COMPLETE.  
 > **Block:** B05 — My Work / Work Queues.  
 > **Method:** Frontend Product Experience Planning Method v2.2.  
 > **Predecessors:** B01 / B01N / B02 / B03 / B04 LOCKED.  
@@ -39,7 +39,7 @@ Destinations:
 
 ```text
 Authoring row  -> B04 LOCKED
-Governance row -> B06 NOT OPEN transition boundary only
+Governance row -> B06 transition boundary only
 ```
 
 ## 2. Current read shapes
@@ -96,7 +96,7 @@ saved searches
 
 ## 4. Human needs
 
-B05 must let the actor answer:
+B05 lets the actor answer:
 
 ```text
 What work is waiting for me?
@@ -214,7 +214,7 @@ Current census remains 86 operations / 11 routes / 16 permissions.
 
 ## 9. P7 — focused queue per selected intent — OPERATOR-APPROVED
 
-Selected structure remains:
+Locked structure:
 
 ```text
 Minha Caixa
@@ -237,7 +237,7 @@ R1 base structure/ergonomics was operator-approved. Operation then exposed the m
 
 No B01 terminology reopen was requested from the explicit `SUBMITTED`-under-`Em edição` test.
 
-## 11. P8 R2 — RENDERED / OPERATOR OPERATION+REVIEW
+## 11. P8 R2 — APPROVED / COMPLETE
 
 Canonical functional evidence:
 
@@ -245,7 +245,7 @@ Canonical functional evidence:
 docs/work/current/t11-b05-my-work-functional-wireframe.html
 ```
 
-R2 exercises:
+R2 exercised:
 
 ```text
 Para aprovação <-> Em edição
@@ -268,21 +268,29 @@ responsive reflow
 
 Review-only fixture controls are Evidence only, not Product UI.
 
-## 12. P8 R2 operator checks
+## 12. Operator LOCK
 
-Operator should specifically test:
+Operator operation on 2026-08-23 approved the R2 experience without a surviving material finding.
+
+Locked Product-experience properties:
 
 ```text
-Does due-first default order feel natural?
-Do no-deadline rows remain discoverable?
-Are four deadline presets enough without generic filtering?
-Does Para aprovação remain simple rather than becoming a workflow cockpit?
-Does Em edição correctly remain free of deadline controls?
-Does advancing fixture server time preserve the current cursor anchor?
-Does Fresh first-page correctly obtain a new anchor?
+one focused queue per selected Minha Caixa intent
+governance rows are human-recognizable before case entry
+governance default order is deadline-first, server-owned
+no-deadline work remains visible and explicitly filterable
+four bounded deadline presets are sufficient Launch triage
+relative filter cursor anchor remains stable during continuation
+fresh first-page request renews the relative-time anchor
+overdue is presentation/attention truth, not lifecycle state
+Em edição has no artificial deadline controls
+row open performs owner-lens handoff; queue owns no decision mutation
+keyboard, stale, error, empty and responsive behavior remain part of the experience
 ```
 
-## 13. Current gate
+No B01 terminology reopen is required from the tested `SUBMITTED` case.
+
+## 13. Post-LOCK proof gate
 
 ```text
 B05 authority recovery                       COMPLETE
@@ -293,18 +301,10 @@ B05-F3 Step deadline                         CLOSED / OPERATOR-RATIFIED
 B05-F4 due-aware queue                       CLOSED / OPERATOR-RATIFIED
 P7 focused queue A                           APPROVED
 P8 R1 base structure                         OPERATOR-APPROVED
-P8 R2 due-aware candidate                    RENDERED / OPERATOR OPERATION+REVIEW
-B05 LOCK                                     NO
+P8 R2 due-aware experience                   APPROVED / COMPLETE
+B05 LOCK                                     LOCKED / OPERATOR-RATIFIED
+P9 Screen Contract                           NEXT
+P10 pattern consolidation                    AFTER P9
 ```
 
-Next:
-
-```text
-operator operates P8 R2
-→ iterate only material findings
-→ operator-only B05 LOCK
-→ P9 exact Screen Contract
-→ P10 bounded pattern consolidation
-```
-
-B06+ remain NOT OPEN.
+B06 remains unopened while P9/P10 prove the locked B05 scope.
