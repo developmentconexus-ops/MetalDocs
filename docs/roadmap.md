@@ -96,10 +96,11 @@ B02   Library / Discovery                          LOCKED / OPERATOR-RATIFIED
 
 B03   Document Official / Ficha + Viewer + Discussion
        CURRENT / CANDIDATE / NOT LOCKED
-       leading structure A                         OPERATOR-APPROVED DIRECTION
-       prior static HTML                           REJECTED — WRONG REPRESENTATION MEDIUM
-       current R1 planning record                  READY
-       canonical functional P8                     RENDERED / OPERATOR OPERATION+REVIEW
+       record/ficha-first semantics                 OPERATOR-APPROVED
+       historical C two-column dossier P7          OPERATOR-APPROVED VISUAL DIRECTION
+       prior static storyboard                     REJECTED — WRONG REPRESENTATION MEDIUM
+       current R2 planning record                  READY
+       canonical functional P8 R2                  RENDERED / OPERATOR OPERATION+REVIEW
        B03-F1 allowed_actions                       OPEN / MUST CLOSE BEFORE FINAL LOCK
 
 B04   Document Work / Authoring                    NOT OPEN
@@ -134,33 +135,58 @@ stable /notifications full Inbox route
 
 ## B03 current candidate
 
-Current R1 record:
+Current R2 record:
 
 ```text
 docs/work/current/t11-b03-document-official-r1.md
 ```
 
-Canonical Method-v2.2 P8:
+Canonical Method-v2.2 P8 R2:
 
 ```text
 docs/work/current/t11-b03-document-official-functional-wireframe.html
 ```
 
-Preserved operator-approved structure:
+Selected structure:
 
 ```text
 /documents/:document_id
 = stable Document ficha/record first
 
-Ficha
+Document hero
+↓
+Two-column dossier
+  left
+    current-work context
+    ficha / classification / responsibility
+    server-hinted management actions
+
+  right
+    official-content preview
+    exact current official Revision label
+    deliberate Visualizar completo
+↓
+Revisions context — full width
+↓
+Stable-Document Discussion — full width
+```
+
+Preview law:
+
+```text
+contextual recognition only
+never exact-content authority
+never DRAFT substitution
+click -> same separate B03 read-only official viewer
+```
+
+Current interaction flow:
+
+```text
+Ficha / preview
 → deliberate Visualizar documento
 → distinct B03 read-only official-content viewer
 → Voltar para ficha
-
-Ficha
-→ bounded current work context
-→ management actions from server-derived hints
-→ stable-Document Discussion
 
 Notification DOCUMENT_MENTION
 → Quick Inbox
@@ -169,7 +195,7 @@ Notification DOCUMENT_MENTION
 → anchor_message_id target
 ```
 
-Functional P8 must be operated before any LOCK. Local fixture behavior is Evidence only; it does not become Product/server authority.
+Functional P8 R2 must be operated before any LOCK. Local fixture behavior is Evidence only; it does not become Product/server authority.
 
 ## B03-F1 — open finding before final LOCK
 
@@ -188,16 +214,19 @@ It is a server-derived UX hint only; commands always recheck current truth. B03 
 ## Exact next action
 
 ```text
-1. Operator operates the canonical B03 functional P8 in browser.
-2. Review only B03 hierarchy, proportions, discoverability and local interaction:
-     ficha-first reading order
+1. Operator operates the canonical B03 functional P8 R2 in browser.
+2. Review only B03 layout/proportions/discoverability/local interaction:
+     two-column dossier balance
+     official preview size/position
+     ficha vs preview hierarchy
      current-work separation
      viewer open/back
      management placement
-     Discussion placement/density
+     Revisions full-width placement
+     Discussion full-width placement/density
      reply / @mention composer
      Notification -> exact message anchor
-     responsive behavior
+     responsive dossier reflow
 3. Iterate only B03 until visual/interaction findings close.
 4. Resolve B03-F1 before final operator LOCK.
 5. Operator-only B03 LOCK.
@@ -215,6 +244,7 @@ no P8 static storyboard accepted as interactive-block lock evidence
 no framework/library allowed to redefine Product semantics
 no generic EventBus/broker/Redis without a named material trigger
 no frontend Authorization matrix
+no unopened downstream block design
 no legacy implementation restoration by sunk cost
 no merge authorization implied
 ```
