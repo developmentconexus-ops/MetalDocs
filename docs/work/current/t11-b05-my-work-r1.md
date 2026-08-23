@@ -215,7 +215,58 @@ frontend join/read fan-out  0
 
 Current census remains 86 operations / 11 routes / 16 permissions.
 
-## 7. Bounded design constraints for P7
+## 7. B05-F2 — Governance queue ordering — OPEN FINDING
+
+### Evidence
+
+Current accepted list ordering is asymmetric:
+
+```text
+listAuthoringWork
+  document.code ASC, document_id ASC
+
+listGovernanceWork
+  governance_attempt_id ASC
+```
+
+`governance_attempt_id` is opaque technical identity. It is required for navigation but gives the human no ordering model. Because the list is cursor-paginated, a client-side reorder of only loaded items would create a false global order and is therefore not an acceptable frontend repair.
+
+### Target invariant
+
+> A paginated human work queue must have a deterministic ordering the user can understand without inventing unsupported urgency/priority semantics, and the frontend must not reorder cursor pages into a misleading partial order.
+
+### Credible alternatives
+
+```text
+KEEP governance_attempt_id ORDER
+  candidate rejection: deterministic but human-arbitrary; preserves UX defect
+
+CLIENT-SIDE SORT OF LOADED PAGE(S)
+  candidate rejection: breaks global cursor-order truth / creates partial-order illusion
+
+created_at ASC/DESC
+  candidate rejection under current evidence: imports FIFO/recency priority semantics not yet promoted by Product
+
+document.code ASC + governance_attempt_id ASC
+  LEADING CANDIDATE: human-stable neutral ordering; matches authoring queue recognition posture; opaque id remains tie-break only
+```
+
+No filter/sort control is implied. This is server-owned fixed ordering only.
+
+Candidate impact:
+
+```text
+new operation               0
+new field                   0
+new route                   0
+new Permission              0
+new priority/SLA semantic   0
+cursor mechanism            unchanged; cursor binds the revised canonical order
+```
+
+**Status:** OPEN / operator adjudication required before final P7 hypothesis.
+
+## 8. Bounded design constraints for P7
 
 ```text
 B01 global shell/Minha Caixa IA is reused, not redesigned
@@ -232,9 +283,19 @@ no merged cross-lane priority algorithm
 
 Pagination remains owned independently by each current server page/cursor.
 
-## 8. P7 design question
+Potential IA tension to test rather than silently reopen:
 
-The material composition question is how the detailed `Minha Caixa` presentation should use the two already-LOCKED intents:
+```text
+B01 label "Em edição"
+vs
+WorkAuthoringItem.state = DRAFT | SUBMITTED
+```
+
+B05 will render explicit row state. Reopen B01 terminology only if operator/use evidence shows the locked label materially misleads users.
+
+## 9. P7 design question
+
+After B05-F2 closes, compare how the detailed `Minha Caixa` presentation should use the two already-LOCKED intents:
 
 ```text
 A. focused lane / full-width queue per selected sidebar intent
@@ -259,13 +320,14 @@ backend truth fit
 cognitive load
 ```
 
-## 9. Current gate
+## 10. Current gate
 
 ```text
 B05 authority recovery                       COMPLETE
 legacy queue ergonomics recovery             COMPLETE
 B05-F1 governance identification precision   CLOSED / OPERATOR-RATIFIED
-P7 composition                               NEXT / OPEN
+B05-F2 governance ordering                   OPEN / NEXT DECISION
+P7 composition                               BLOCKED ON F2
 P8 functional HTML                           NOT OPEN
 B05 LOCK                                     NO
 ```
