@@ -342,6 +342,14 @@ P9 / P10                               NOT OPEN
 B08+                                   NOT OPEN
 ```
 
+Verification checkpoint before operator delivery:
+
+```text
+HEAD before this metadata record       752a30669cb7534ac88504f40ae02911aa2cabe7
+CI on that HEAD                        #1402 SUCCESS
+required job                           97260190583 SUCCESS
+```
+
 Next gate:
 
 > Operator opens/operates B07 P8 R1, especially loading the second page where REV001 reappears after REV002 cancellation, opening historical Submission/Release content, forcing pagination/content failure and checking the 404 state. If friction exists, revise the same HTML. Only explicit B07 LOCK opens P9 then P10.
