@@ -84,7 +84,7 @@ B07   Document History
        B07-F1 human-recognizable History read      CLOSED / OPERATOR-RATIFIED
        P6                                          COMPLETE
        P7 H1 Revision Chapters                     OPERATOR-APPROVED
-       P8 R1 functional HTML                       NEXT / IN PROGRESS
+       P8 R1 functional HTML                       READY / AWAITING OPERATOR USE
        LOCK / P9 / P10                             NOT OPEN
 B08   Notifications Full Inbox                     NOT OPEN
 B09   Audit                                        NOT OPEN
@@ -121,10 +121,11 @@ No B06 semantic rail/workspace abstraction was generalized.
 
 ## B07 current gate
 
-Canonical work record:
+Canonical current evidence:
 
 ```text
 docs/work/current/t11-b07-document-history-r1.md
+docs/work/current/t11-b07-document-history-functional-wireframe.html
 ```
 
 Current History boundary:
@@ -145,8 +146,6 @@ occurred_at ASC,
 kind,
 semantic id
 ```
-
-P6 reference evidence supports a chronological origin-to-current History lens and exact historical read-only content, while compare/restore/delete remain outside current Launch scope.
 
 ### B07-F1 — CLOSED / OPERATOR-RATIFIED
 
@@ -171,56 +170,40 @@ release predecessor
 
 The exact law is owned by `docs/decisions/document-history-recognition-read.md`.
 
-This remains derived Controlled Documents read truth only:
-
-```text
-no Audit join
-no browser cross-page relationship graph as authority
-no fabricated title-at-revision-creation snapshot
-no new operation / route / Permission / owner / lifecycle state
-```
+No Audit join, browser historical graph authority, fabricated title-at-revision-creation snapshot, new operation, route, Permission, owner or lifecycle state is introduced.
 
 ### P7 — OPERATOR-APPROVED
 
 ```text
 H1 Revision Chapters + chronological event spine
-
-History header
-  Document code + current official orientation
-  return to B03
-
-REV000
-  revision created
-  Submission(s)
-  governance feedback / Step Decisions
-  withdrawal / return when present
-  Release / rendition or cancellation
-
-REV001...
-  same controlled-cycle structure
-
-obsolescence events remain attached to exact target Revision
-
-content-bearing event
-  -> existing Exact Read-Only Content Viewer Shell
 ```
 
-Rejected as leading:
+The chronological stream is authoritative. A later event may target an older Revision after a newer Revision cycle has occurred.
+
+P8 R1 therefore exercises this case explicitly:
 
 ```text
-flat audit-like event feed
-revision summary table requiring frontend aggregation
-compare/restore/delete controls without current Product authority
+REV001 original cycle / Release
+REV002 later cycle / cancellation
+REV001 marker appears again later
+  obsolescence request / withdrawal
+  new request / governance / completion
 ```
+
+The repeated Revision marker is a P8 UX hypothesis for preserving server chronology without moving later events backward in time.
+
+Content-bearing Submission/Release events open the existing Exact Read-Only Content Viewer Shell.
+
+P8 R1 also exercises cursor continuation/failure, exact-content failure, disclosure-neutral 404, responsive reflow and inherited B01N Quick Inbox.
 
 ## Exact next action
 
 ```text
-1. Create B07 functional P8 R1 using the ratified H1 + B07-F1 authority.
-2. Operator opens/operates the HTML in chat.
-3. If friction/finding exists -> revise the same B07 HTML; do not open B08.
-4. If operator explicitly LOCKS B07 -> P9 Screen Contract -> P10 pattern consolidation.
-5. Do not open B08+ while B07 is active.
+1. Operator opens/operates B07 functional P8 R1 from the chat attachment.
+2. Exercise cursor continuation until REV001 reappears after REV002 cancellation.
+3. Exercise Submission/Release historical viewer, pagination failure, content failure and 404 state.
+4. If friction/finding exists -> revise the same B07 HTML; do not open B08.
+5. If operator explicitly LOCKS B07 -> P9 Screen Contract -> P10 pattern consolidation.
 ```
 
 ## Hard stops
