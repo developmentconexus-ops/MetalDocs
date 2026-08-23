@@ -1,24 +1,24 @@
 # MetalDocs Launch V1 — Ownership Topology
 
 > **Status:** ACTIVE / OPERATOR-APPROVED ARCHITECTURE AUTHORITY  
-> **Accepted:** 2026-08-18  
+> **Accepted baseline:** 2026-08-18  
+> **T11 bounded reopen:** 2026-08-22 — stable-Document Discussion / `@mention` / Notifications, Lead GCR + fresh Fable CONVERGED  
 > **Repository:** `developmentconexus-ops/MetalDocs`  
-> **Branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131  
-> **Product authority:** `wiki/architecture/launch-v1-product-contract.md`  
-> **GCR authority:** `wiki/architecture/whole-product-alignment-review.md`  
 > **Implementation:** BLOCKED
 
-This page replaces the prior R10-A Launch ownership conclusion. It defines **semantic ownership only**. It does not define package layout, tables, schemas, storage ports, API routes, workers or implementation structure.
+This page defines **semantic ownership only**. It does not define package layout, tables, schemas, storage ports, API routes, workers or implementation structure.
 
-The operator approved this topology on 2026-08-18 together with an explicit evolution constraint: known future capabilities must not be forgotten or made structurally expensive merely because they are deferred from Launch. The governing law is therefore:
+The governing evolution law remains:
 
 > **Defer the capability; preserve the evolution seam. Prepare the seam, not the dormant implementation.**
+
+The T11 bounded reopen exercised the existing trigger exactly as intended: Notifications was previously deferred because no concrete consumer or independent lifecycle existed; explicit Document `@mention` plus a persistent recipient-controlled Inbox created both. The topology therefore changes only by the smallest proven owner addition.
 
 ---
 
 ## 1. Decision
 
-Launch V1 has exactly **four business semantic owners plus one supporting semantic owner**:
+Launch V1 has exactly **four business semantic owners plus two supporting semantic owners**:
 
 ```text
 BUSINESS
@@ -29,19 +29,20 @@ BUSINESS
 
 SUPPORTING SEMANTIC
 5. Audit
+6. Notifications
 ```
 
 Everything else is mechanism, projection, operations/cutover capability, Launch+ or Future until a concrete consumer proves an independent semantic lifecycle.
 
-Method outcome:
+Current Method outcome:
 
 ```text
-RESTRUCTURE NOW
-prior R10-A 8+3 topology → superseded for Launch
-replacement              → 4+1 semantic ownership topology
+prior Launch topology  4 + 1
+new concrete consumer  stable-Document @Mention + persistent Inbox engagement
+bounded restructure    4 + 2
 ```
 
-This minimizes accidental cross-owner atomicity without collapsing independently evolving authorities.
+The new supporting owner does not imply another service, database, broker or runtime.
 
 ---
 
@@ -59,15 +60,7 @@ IdP anti-corruption boundary
 
 The authentication provider owns credentials, password policy/recovery, MFA/passkeys, upstream federation and provider authentication journeys.
 
-Authentication does **not** own:
-
-```text
-organizational User identity
-Area / Group
-Role / Permission
-document access policy
-document governance
-```
+Authentication does **not** own organizational User identity, Area/Group, Role/Permission, document access policy, document governance or Notification engagement.
 
 Provider roles/groups/organizations/permissions never become canonical MetalDocs Authorization merely because the provider exposes them.
 
@@ -87,7 +80,7 @@ GroupMembership
 organizational User lifecycle / offboarding identity
 ```
 
-It does not decide what an actor may do. Organizational relationships are inputs to Authorization and Controlled Documents without transferring ownership.
+It does not decide what an actor may do and does not own the recipient's Notification attention lifecycle. Organizational relationships are inputs to Authorization, Controlled Documents and Notifications choreography without transferring ownership.
 
 ---
 
@@ -103,17 +96,17 @@ scope semantics
 canonical grant evaluation
 ```
 
-Exact Launch roles, permissions and bundles are **not inherited from the prior 5×43 catalog**. They are re-derived later from accepted Launch journeys and must include a least-privilege Auditor / Governance Viewer path.
-
-Authorization owns grants. The owning business domain owns case/resource relationship meaning and lifecycle predicates.
+Authorization owns grants and final ALLOW/default-DENY. The owning business domain owns case/resource relationship meaning and lifecycle/disclosure predicate facts.
 
 Conceptually:
 
 ```text
 Authorization grant + scope
-+ Controlled Documents relationship/state predicate
++ Controlled Documents relationship/state/disclosure predicate
 = ALLOW or default DENY
 ```
+
+The T11 Discussion capability adds `document.discuss` as a write-participation Permission; reading the stable-Document Discussion remains governed by the canonical current Document Discussion disclosure composition, not by a second read Permission.
 
 No provider-role bridge, generic ACL/ReBAC graph or hidden bypass is implied.
 
@@ -141,9 +134,18 @@ EFFECTIVE / SUPERSEDED
 explicit governed OBSOLETE without replacement
 revision / lifecycle / provenance history
 exact-content facts attached to the semantic record that freezes them
+stable-Document Discussion
+immutable DiscussionMessage
+semantic Mention(user_id)
 ```
 
 `Controlled Documents` is one **semantic authority**, not one giant aggregate, file, package or transaction. Internal responsibility clusters may remain small and independently testable; they do not become separate semantic owners merely because code is separated.
+
+### Discussion placement
+
+Discussion belongs to stable Document identity across Revisions. A message may carry the exact official Revision identity that existed when posted as contextual provenance, but Discussion is not Revision history, WorkingContent/editor comments, SubmissionFeedback or GovernanceCase feedback.
+
+A message may reference one prior message; no generic Thread/chat domain is introduced. Accepted Launch messages are immutable; correction is a new message.
 
 ### Governance placement
 
@@ -156,27 +158,17 @@ Launch has two proven document-governance consumers:
 
 The smallest common sequential governance semantics may be reused by both journeys. Launch does **not** create a generic arbitrary-subject BPM/workflow platform.
 
-A future capability with a genuinely independent governance lifecycle may later justify a separate owner; current separation is not preserved by sunk cost.
-
 ### Exact content
 
 There is no standalone `Artifact` semantic owner.
 
 Exact byte facts such as hash, size, format and governed-content identity belong to the semantic record that freezes or owns that content. Storage handle, provider key, staging object, upload state, scanner execution and physical location remain mechanisms.
 
-This preserves:
-
-```text
-semantic content identity != storage/provider identity
-```
-
-without creating an intermediate domain solely to mediate bytes.
-
 ---
 
 ## 6. Audit
 
-Audit is the one supporting semantic owner because it has independent transversal meaning:
+Audit is a supporting semantic owner because it has independent transversal meaning:
 
 ```text
 immutable action/timeline evidence
@@ -188,11 +180,59 @@ bounded PII-minimized audit facts
 
 Audit never owns or reconstructs current business state.
 
-Required governed operations may require same-local-commit Audit evidence. The deployment-wide cryptographic `AuditChainHead` / global-lock design is **not** a Launch requirement unless a concrete assurance requirement reopens it.
+DiscussionMessage already owns immutable author/time/content truth; Launch does not duplicate each message into Audit solely because it exists. Notification creation/engagement/realtime also has no mandatory semantic AuditEvent absent a concrete assurance requirement.
 
 ---
 
-## 7. Not semantic owners in Launch
+## 7. Notifications
+
+Notifications is the second supporting semantic owner because the current Launch Inbox has independent persistent recipient-controlled meaning that cannot be rebuilt from its source Mention.
+
+Notifications owns:
+
+```text
+Notification identity
+recipient User reference
+closed Notification kind
+closed source reference
+created_at
+deduplication identity
+seen_at
+read_at
+archived_at
+Inbox ordering/current engagement state
+```
+
+Current Launch kind:
+
+```text
+DOCUMENT_MENTION
+  document_id
+  message_id
+```
+
+Notifications does **not** own:
+
+```text
+Document identity/title/lifecycle
+DiscussionMessage content/validity
+Mention target eligibility
+User/Profile identity
+Authorization/disclosure
+Audit/history
+email/push transport
+SSE/realtime transport
+River jobs
+event bus
+```
+
+A Notification never grants or preserves source access and never becomes equivalent to document read/acknowledgement/governance evidence.
+
+Current source presentation is resolved under current disclosure at read time. Persistent Notification rows do not copy source ACL/presentability truth merely to make Inbox reads convenient.
+
+---
+
+## 8. Not semantic owners in Launch
 
 The following remain explicitly outside semantic ownership unless future evidence promotes them:
 
@@ -201,7 +241,7 @@ storage / staging / byte integrity / malware inspection
 rendering / viewers / editor providers
 Search
 async jobs / outbox / retry / lease / DLQ
-notifications
+realtime connection / SSE wake-up transport
 backup / restore transport
 Historical Migration execution/cutover machinery
 ```
@@ -213,6 +253,7 @@ storage/integrity     → mechanism
 render/view/editor    → mechanism
 Search                → rebuildable projection
 async                 → durable/ephemeral mechanism as required
+realtime wake-up      → ephemeral mechanism
 Historical Migration → cutover capability that writes through owning semantic seams
 backup/restore        → operations/readiness concern
 ```
@@ -221,7 +262,7 @@ Historical Migration never becomes a generic `Interchange` domain. Imported endu
 
 ---
 
-## 8. Semantic dependency shape
+## 9. Semantic dependency shape
 
 Conceptually:
 
@@ -231,23 +272,26 @@ Authentication
 Organization
     ↓ supplies Users / Groups / Areas
 Authorization
-    ↓ supplies grants / scopes
+    ↓ supplies grants / scopes / final decisions
 Controlled Documents
-    ↓ emits required transversal action evidence
+    ↓ owns source Document/Discussion/Mention facts
+Notifications
+    ↓ owns persistent recipient attention/engagement derived from accepted source facts
 Audit
+    ↓ owns required transversal evidence only where explicitly required
 ```
 
 This is an **authority dependency shape**, not a package-import or transaction prescription.
 
-Search, storage, rendering, migration, async execution and backup/restore sit around these owners as mechanisms/projections/cutover/operations and may not acquire business meaning by convenience.
+For explicit accepted Mentions, application choreography composes Controlled Documents + Notifications in one caller-owned local PostgreSQL transaction so accepted Mention and required persistent in-app Notification cannot diverge. Owners do not import one another.
+
+Search, storage, rendering, migration, async execution, realtime transport and backup/restore sit around owners as mechanisms/projections/cutover/operations and may not acquire business meaning by convenience.
 
 ---
 
-## 9. Known future capability horizon
+## 10. Known future capability horizon
 
-Deferral does **not** mean the future capability is forgotten or architecturally irrelevant.
-
-The following are declared expected evolution and therefore count as **evidence of future direction** under the DevelopmentConexus Engineering Method. They justify preserving seams where doing so is materially cheaper than later dismantling core authority; they do **not** justify dormant modules/tables/permissions/jobs today.
+Deferral does **not** mean future capability is forgotten or architecturally irrelevant.
 
 ### Launch+
 
@@ -256,10 +300,13 @@ The following are declared expected evolution and therefore count as **evidence 
 | Distribution / Read & Acknowledge | Released Document/Revision + concrete User/Group audience | effectivity authority or access grant |
 | Periodic Review | stable Document + exact current EFFECTIVE Revision | Approval route or effectivity authority |
 
+Notification `READ` is explicitly **not** Read & Acknowledge.
+
 ### Future product capabilities
 
 | Capability | Expected attachment seam | Boundary to preserve |
 |---|---|---|
+| additional Notification channels | persistent Notification intent + named durable delivery effect | channel transport must not own Notification/Product truth |
 | Dossier / documentary context | stable Document identity and future Evidence identity | context must not own content or grant access |
 | Evidence / quality records | Organization/AuthZ + exact-content mechanism; likely independent lifecycle when promoted | must not be forced through Document REV/Release without requirement |
 | Retention / Legal Hold / Disposition | stable governed-subject identities and immutable lifecycle history | records policy must not become Document lifecycle or storage-provider authority |
@@ -274,23 +321,23 @@ These seams describe **what must remain attachable**, not future table/module sh
 
 ---
 
-## 10. Future-evolution law for remaining technical design
+## 11. Future-evolution law for remaining technical design
 
 Every material technical decision after this topology must run this check:
 
 1. **Launch correctness first:** does the decision satisfy the accepted Launch invariant without relying on a future capability?
-2. **Named-future compatibility:** can the known future capabilities above attach without changing the meaning/identity of existing Document, Revision, Submission, Release, User/Group/Area or Audit history?
+2. **Named-future compatibility:** can known future capabilities attach without changing the meaning/identity of existing core semantic records?
 3. **No history rewrite:** would adding the future feature require rewriting immutable governed history or fabricating facts? If yes, current design is presumptively wrong.
 4. **Additive evolution where reasonable:** prefer a seam that permits future capability addition through new owner/state plus bounded migration, rather than dismantling current authority.
 5. **No dormant implementation:** do not create unused modules, tables, permissions, workers, generic registries or feature flags solely for the future.
-6. **No generic framework by anticipation:** known future direction justifies an attachment seam, not a generic ECM/BPM/records/integration platform.
+6. **No generic framework by anticipation:** known future direction justifies an attachment seam, not a generic ECM/BPM/records/integration/event platform.
 7. **Record unavoidable future cost:** if a current decision knowingly makes a named future capability materially expensive, record why the Launch benefit outweighs the future cost and state the reopen trigger before accepting it.
 
-A later capability may become a **new semantic owner** when it gains a real independent lifecycle/consumer. The 4+1 topology is the smallest Launch authority set, not a claim that MetalDocs will forever have only five owners.
+The 4+2 topology is the smallest current Launch authority set, not a claim that MetalDocs will forever have six owners.
 
 ---
 
-## 11. Future-proofing invariants
+## 12. Future-proofing invariants
 
 Technical architecture must preserve these stable anchors unless later evidence explicitly reopens them:
 
@@ -301,52 +348,42 @@ Revision remains a business change cycle
 Working Content remains replaceable DRAFT authority/mechanism boundary
 Submission remains immutable exact governed-attempt identity
 Release remains effectivity authority
+Discussion remains stable-Document conversation, not DRAFT/Submission/Governance authority
+Mention identity remains stable User reference
+Notification remains recipient attention state, not access/acknowledgement authority
 Audit remains evidence, not current state
 storage/provider identity never becomes semantic identity
 future contexts attach by reference rather than duplicate core authority
 ```
 
-This is the intended balance:
-
-```text
-YAGNI today
-+ explicit known future horizon
-+ stable semantic anchors
-+ replaceable mechanisms
-= sustainable evolution without speculative platform code
-```
-
 ---
 
-## 12. Reopen triggers
+## 13. Reopen triggers
 
 Reopen this ownership topology when material evidence shows one of:
 
-- a deferred/Launch+ capability now has a concrete consumer and independent lifecycle that merits a new owner;
+- a deferred/Launch+ capability now has a concrete consumer and independent lifecycle that merits another owner;
 - Controlled Documents accumulates unrelated authority rather than cohesive controlled-document semantics;
+- Notifications loses its independent persistent engagement lifecycle and becomes truthfully rebuildable;
 - a future capability cannot attach without duplicating or rewriting core authority;
 - AuthN, Organization or Authorization cease to evolve independently in a way that justifies their boundary;
 - a new cross-repository/trust boundary creates independently owned truth;
 - implementation evidence shows a boundary creates materially more accidental cross-owner complexity than it prevents.
 
-Do not reopen merely because a future feature exists on the horizon; the explicit seam is already the preparation.
+Do not reopen merely because a future feature exists on the horizon; explicit seams are already the preparation.
 
 ---
 
-## 13. Gate / next step
+## 14. Review proof
 
-Ownership/topology is closed and operator-approved.
+The T11 Notifications promotion was challenged by:
 
 ```text
-Product Contract
-→ Whole-Product GCR / A1–A10
-→ Launch V1 ownership topology 4+1  ✅
-→ re-derive remaining technical architecture  NEXT
-→ Whole-R10 Global Coherence Review
-→ cold independent review
-→ final operator ratification
-→ implementation spec/plan
-→ code
+Lead GCR Round 1   NOT CONVERGED / MATERIAL=3 / IMPORTANT=6
+corrected Round 2  CONVERGED / MATERIAL=0 / IMPORTANT=0
+fresh Fable #165   CONVERGED / MATERIAL=0 / IMPORTANT=1 / OPTIONAL=3
 ```
 
-Implementation remains **BLOCKED**.
+The sole Fable IMPORTANT was consolidation-target completeness and changed no ownership decision. Fable explicitly confirmed `4+2 owners` survives the independent challenge. No second Fable round was justified.
+
+Current bounded cross-layer details are routed by `docs/decisions/discussion-notifications-launch.md`.
