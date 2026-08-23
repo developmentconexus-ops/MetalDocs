@@ -1,20 +1,21 @@
 # T11 — B01 Notifications Smallest-Scope Reopen
 
-> **Status:** OPERATOR-RATIFIED CANDIDATE / PENDING UPSTREAM CONSOLIDATION.  
+> **Status:** P8 RENDERED / OPERATOR ADJUDICATION REQUIRED / NOT RE-LOCKED.  
 > **Parent:** B01 App Shell + Global Information Architecture.  
-> **Reasoning authority:** `developmentconexus-ops/conexus-methodology/METHOD.md` — DevelopmentConexus Engineering Method v1.0.0.  
+> **Current Product/architecture authority:** `../../decisions/discussion-notifications-launch.md`.  
+> **Reasoning authority:** `developmentconexus-ops/conexus-methodology/METHOD.md` v1.0.0.  
 > **Implementation:** BLOCKED.  
-> **Current locked B01 baseline remains authority except for this bounded reopen candidate until the full reopen is consolidated.**
+> **Preservation law:** the prior B01 LOCK remains binding outside the exact Notification chrome delta below.
 
 ## 1. Material trigger
 
-Launch V1 now requires a persistent Notifications supporting semantic owner and an in-app Notification Inbox whose engagement lifecycle includes `seen`, `read/unread` and `archive/unarchive`.
+Launch V1 now has a current Notifications supporting semantic owner and persistent in-app Inbox with `seen`, `read/unread` and `archive/unarchive` engagement.
 
-That new Product requirement creates a real global-attention consumer and triggers the normal smallest-scope evidence-backed reopen law for B01.
+That current Product requirement reopens only the smallest B01 scope needed to make global attention discoverable.
 
 ## 2. Preserved B01 mental model
 
-The sidebar meaning remains unchanged:
+Unchanged:
 
 ```text
 Início       = current operational situation
@@ -24,9 +25,11 @@ Gestão       = system configuration
 Evidência    = audit/evidence
 ```
 
-Notifications is deliberately **not** placed under `Minha Caixa`, because attention items and assigned work have different semantics.
+Notifications is deliberately **not** placed under `Minha Caixa`: attention items and assigned work have different semantics.
 
-## 3. Alternatives
+## 3. Ratified structure before P8
+
+Alternatives already adjudicated:
 
 ```text
 A  Notifications inside Minha Caixa        REJECTED — conflates attention with assigned work
@@ -35,139 +38,130 @@ C  bell/popover only                        REJECTED — insufficient for persis
 D  global bell + Quick Inbox + full Inbox   SELECTED / OPERATOR-RATIFIED
 ```
 
-## 4. Global shell delta
-
-Desktop:
-
-```text
-utility header
-  + global Notification bell
-  + unseen badge
-  + Quick Inbox popover
-
-sidebar
-  unchanged
-
-content region
-  unchanged
-```
-
-Narrow/mobile:
-
-```text
-bell remains globally reachable
-quick surface transforms to accessible sheet/full-screen material surface
-full Inbox remains available through its stable route
-```
-
-The badge represents only currently presentable + non-archived + unseen Notifications.
-
-## 5. Quick Inbox
-
-The Quick Inbox is a bounded glance/action surface over the same Notifications authority as the full Inbox.
-
-It may provide:
-
-```text
-recent presentable Notifications
-open Notification source
-mark all applicable items as read
-entry to full Inbox
-```
-
-It is not a second store, second lifecycle authority or complete triage workspace.
-
-Opening the bell does not automatically mark all loaded data as `seen`. Only Notifications actually presented under the accepted visibility semantics may become seen.
-
-## 6. Full Inbox route
-
-A real persistent Inbox requires a dedicated stable Product route:
+Current stable route:
 
 ```text
 /notifications
 ```
 
-Therefore, after bounded upstream consolidation:
+The route exists without a permanent sidebar entry.
+
+## 4. P8 rendered artifact
+
+Canonical candidate for the bounded reopen:
 
 ```text
-stable Product SPA routes  10 -> 11
+docs/work/current/t11-b01-notifications-wireframe.html
 ```
 
-This is a legitimate requirement-driven reopen; preserving the old route count is not an architectural goal.
-
-The route supports the accepted engagement model, conceptually including:
+The original locked baseline remains preserved separately:
 
 ```text
-active Inbox
-unread filter/lens
-archived filter/lens
-mark read
-mark unread
-archive
-unarchive
-mark all applicable as read
+docs/work/current/t11-b01-app-shell-wireframe.html
 ```
 
-Exact query-state encoding, pagination and wire operations belong the later D7/API precision.
-
-## 7. Navigation law
-
-`/notifications` does not gain a permanent sidebar entry in the Launch baseline.
+The P8 candidate intentionally renders only three affected states:
 
 ```text
-primary IA sidebar  unchanged
-utility header      Notification entry
+1. utility header with bell + unseen badge, closed
+2. desktop Quick Inbox open as an anchored overlay
+3. narrow/mobile Quick Inbox transformed to a full-width sheet/material surface
 ```
 
-A Notification source remains owned by its real Product lens. `DOCUMENT_MENTION` navigates back to the existing Document Official route and exact Discussion message context; the Inbox does not become a Document viewer.
+It does **not** redesign Home, sidebar, primary navigation or existing work cards.
 
-## 8. Frontend authority law
-
-Quick Inbox and full Inbox are two presentations of the same Notifications owner/read family.
+## 5. Desktop structure under review
 
 ```text
-no header-only notification truth
-no page-only notification truth
-no frontend permission/disclosure matrix
-no toast/realtime signal as notification authority
+utility header
+  existing brand/tagline
+  spacer
+  Notification bell + unseen badge
+  existing session control
+
+bell open
+  anchored Quick Inbox overlay
+  content layout does not shift
 ```
 
-A realtime signal may later trigger refetch/reconciliation only.
-
-## 9. P8 reopen requirement
-
-Because B01 is already LOCKED, this textual approval does not silently rewrite the locked structural artifact.
-
-Before the bounded B01 delta is re-LOCKED:
+Quick Inbox hierarchy:
 
 ```text
-render smallest P8 visual delta
-→ utility-header bell/badge
-→ desktop Quick Inbox
-→ narrow/mobile transformation
-→ operator visual adjudication
-→ re-LOCK only the implicated B01 scope
+Notificações
++ Mark all read
++ active / unread quick lenses
++ bounded recent presentable items
++ source context sufficient for recognition
++ Ver todas -> /notifications
 ```
 
-Sidebar and unrelated B01 structure remain locked and are not reopened.
+Quick Inbox is glance/action only. Archive/unarchive and full triage remain the full Inbox's responsibility.
 
-## 10. METHOD outcome
+## 6. Narrow/mobile structure under review
+
+Do not squeeze the desktop popover into a narrow viewport.
 
 ```text
-CURRENT STRUCTURE CONFIRMED
-+ smallest-scope B01 structural reopen
+utility header remains globally reachable
+bell opens full-width sheet/material surface below header
+items become one-column touch targets
+Ver todas -> /notifications
+sidebar/drawer behavior remains independently unchanged
 ```
 
-The existing B01 mental model remains globally sound. The new requirement needs a transversal utility surface and one new stable route, not a new primary-navigation category or a redesign of Home/My Work.
-
-## 11. Reopen triggers
-
-Revisit this decision only if evidence proves one of:
+## 7. Engagement / authority constraints represented by P8
 
 ```text
-Inbox becomes assigned-work authority rather than attention;
-Notification volume/consumer diversity makes header + Inbox structure unusable;
-a stronger global IA emerges from later assembled Product evidence;
-the accepted Notification lifecycle is materially reduced and no longer needs a full Inbox;
-accessibility/responsive proof invalidates the selected shell transformation.
+badge = presentable + non-archived + unseen
+unread != unseen
+opening bell does not blindly mark every loaded/paginated item seen
+only actually presented items may become seen
+Quick Inbox and full Inbox share one server-state authority
+click source -> Notification read/seen + authoritative source navigation
+source always rechecks current disclosure
+SSE/toast never becomes Notification truth
 ```
+
+No client-side permission/disclosure matrix is introduced.
+
+## 8. Accessibility / responsive checks for operator review
+
+P8 structurally preserves:
+
+```text
+bell has an accessible name including new-item quantity
+badge novelty is not communicated by color alone
+no material action depends on hover
+focus order can proceed header -> Quick Inbox controls -> items -> full Inbox transition
+mobile sheet exposes an explicit close/back control
+bounded touch targets replace compressed desktop popover
+```
+
+Exact focus-trap/popover library, final icons, colors, typography and motion remain visual/implementation choices and are not locked by P8.
+
+## 9. Operator visual adjudication questions
+
+Review only the reopened delta:
+
+1. Is the bell in the correct global location relative to session/user controls?
+2. Is the Quick Inbox visually large enough for recognition without becoming a second workspace?
+3. Is `Marcar todas como lidas` appropriately visible without competing with opening a Notification?
+4. Is `Ver todas` discoverable enough to communicate that full Inbox exists?
+5. Does the overlay preserve the already-approved Home hierarchy rather than displacing it?
+6. On mobile, is sheet/full-width transformation preferable to a compressed popover?
+7. Does anything make Notifications feel like assigned work under `Minha Caixa`? If yes, the structure fails.
+8. Is any material interaction dependent on hover, color alone, or inaccessible reading order? If yes, the structure fails.
+
+## 10. Lock law
+
+Current status remains:
+
+```text
+B01 baseline              LOCKED
+Notification architecture CURRENT
+Notification P8 delta     CANDIDATE / NOT LOCKED
+```
+
+Only the operator may re-LOCK this delta after viewing the rendered artifact. A re-LOCK updates only the implicated header/Quick-Inbox/responsive structure; unrelated B01 remains untouched.
+
+After re-LOCK, B03 P8 resumes with current Discussion/Notification semantics.
