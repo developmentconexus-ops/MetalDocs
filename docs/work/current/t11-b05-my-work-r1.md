@@ -1,6 +1,6 @@
-# T11 — B05 My Work / Work Queues R1 — Method v2.2 candidate
+# T11 — B05 My Work / Work Queues R1 — Method v2.2 entry candidate
 
-> **Status:** CURRENT FP1 BLOCK / CANDIDATE / NOT LOCKED.  
+> **Status:** PRE-OPEN ENTRY CANDIDATE / EVIDENCE — ROADMAP STILL OWNS `B05 NEXT / NOT OPEN`.  
 > **Block:** B05 — My Work / Work Queues.  
 > **Method:** Frontend Product Experience Planning Method v2.2.  
 > **Predecessors:** B01 / B01N / B02 / B03 / B04 LOCKED.  
