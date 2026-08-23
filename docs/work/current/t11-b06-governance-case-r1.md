@@ -1,102 +1,53 @@
-# T11 — B06 Governance Case R1 — Method v2.2 candidate
+# T11 — B06 Governance Case R1 — Method v2.2 locked
 
-> **Status:** OPEN / ACTIVE / P7 OPERATOR-APPROVED / P8 R1 OPERATOR-APPROVED / B06-F2 CLOSED / LOCK READY.  
+> **Status:** LOCKED / OPERATOR-RATIFIED / P9-P10 COMPLETE.  
 > **Block:** B06 — Governance Case.  
 > **Method:** Frontend Product Experience Planning Method v2.2 + DevelopmentConexus Engineering Method.  
 > **Predecessors:** B01 / B01N / B02 / B03 / B04 / B05 LOCKED.  
-> **Current bounded authority:** `../../decisions/governance-case-step-deadline-read.md` + `../../decisions/governance-step-deadline.md` + `../../decisions/governance-review-layer-seam.md`.  
-> **B06-F2 record:** `t11-b06-f2-docx-review-layer.md`.  
-> **Canonical P8 R1:** `t11-b06-governance-case-functional-wireframe.html`.  
-> **Implementation:** BLOCKED.  
-> **LOCK:** AWAITING EXPLICIT OPERATOR LOCK — do not infer from prior approvals.
+> **Bounded authorities:** `../../decisions/governance-case-step-deadline-read.md` + `../../decisions/governance-step-deadline.md` + `../../decisions/governance-review-layer-seam.md`.  
+> **Canonical P8:** `t11-b06-governance-case-functional-wireframe.html`.  
+> **Post-LOCK proof:** `t11-b06-screen-contract.md` + `t11-b06-pattern-consolidation.md`.  
+> **Implementation:** BLOCKED.
 
-## 1. Entry recovery outcome
+## 1. Lock basis
 
-B06 entry recovery covered current Product/T2/T3/T6/T8-E/T8-F authority plus useful legacy governance ergonomics.
-
-```text
-Governance Case semantic owner     Controlled Documents lens
-stable route                       /work/governance/:attempt_id
-primary read                       getGovernanceAttempt
-write family                       feedback + Step Decision only
-frontend Authorization authority   none
-case content                       exact immutable governed subject
-legacy semantics inherited         none by sunk cost
-```
-
-B06-F1 corrected the entry gap around real Step deadline truth. B06-F2 later preserved a future provider-neutral inline-review seam without changing current Launch behavior.
-
-## 2. Human jobs
+The operator explicitly approved, in sequence:
 
 ```text
-J1 identify the exact Document / Revision / governed subject and inspect immutable content
-J2 understand ordered Steps, active Step, prior Decisions/feedback and real deadline when present
-J3 ACCEPT or RETURN_FOR_CHANGES deliberately against the exact case
-J4 add governance feedback without confusing communication with Decision
-J5 reconcile stale/conflicting truth from the server
-J6 understand a disclosed case even when no current action is offered
+P7 H1 Content-first Governance Workspace
+functional P8 R1 after browser operation
+B06-F2 future DOCX Review Layer seam
+final B06 LOCK authorization
 ```
 
-`RETURN_FOR_CHANGES` requires a reason. Governance feedback remains a separate immutable fact and never satisfies the RETURN reason by accident.
+No material current-Launch B06 finding remains open.
 
-## 3. Exact current authority boundary
+B06-F2 did not require a P8 R2 because it promotes no present-tense inline-review behavior; adding dormant controls would violate the method/repository hard stops.
 
-### Reads
+## 2. Locked Product/architecture boundary
+
+Stable route:
+
+```text
+/work/governance/:attempt_id
+```
+
+Primary case truth:
 
 ```text
 67 getGovernanceAttempt
 68 listGovernanceFeedback
 70 getGovernanceStepDecision
-exact governed source only through already-admitted owner reads
 ```
 
-Submission subject:
-
-```text
-subject.submission_id
--> exact immutable Submission source
--> never current WorkingContent
-```
-
-Obsolescence subject:
-
-```text
-subject.target_revision
--> exact target Revision identity
--> supporting official/release reads must match that exact target
--> never substitute a newer/different Revision
-```
-
-If exact target bytes cannot be lawfully resolved, B06 fails closed rather than leaking History or rendering another Revision.
-
-### Writes
+Writes:
 
 ```text
 69 createGovernanceFeedback
-   message
-   one Idempotency-Key per logical creation
-
 71 recordGovernanceStepDecision
-   ACCEPT
-   RETURN_FOR_CHANGES + mandatory reason
-   natural singleton PUT
 ```
 
-### Local frontend state
-
-```text
-feedback draft
-decision intent / return reason until accepted
-confirmation disclosure
-viewer page/presentation state
-feedback cursor/pagination state
-```
-
-No durable business truth is created in the browser.
-
-## 4. Action / Authorization / deadline law
-
-Current closed action vocabulary:
+Current action vocabulary:
 
 ```text
 accept
@@ -104,186 +55,156 @@ return_for_changes
 add_feedback
 ```
 
-`allowed_actions` is server-derived UX guidance only.
-
-```text
-hidden control != denied authority proof
-shown control  != granted authority proof
-command always rechecks current server truth
-```
+`allowed_actions` is server-derived UX guidance only. Every command rechecks current canonical server truth.
 
 B06 owns no current control for:
 
 ```text
-publish / release
-withdraw Submission
-cancel Revision
-withdraw obsolescence request
-cancel GovernanceAttempt
-reassign / delegate
-quorum / overseer
-extend deadline / SLA
-escalate
-manual priority
-edit governed content
-inline anchored comment / resolve / reply
-tracked-change / suggestion mutation
+release/publish
+Submission withdrawal
+Revision cancellation
+obsolescence withdrawal
+GovernanceAttempt cancellation
+reassignment/delegation/quorum
+SLA extension/escalation/manual priority
+WorkingContent mutation
+inline anchored comment/reply/resolve
+tracked-change/suggestion mutation
 ```
 
-Deadline law:
-
-```text
-PENDING Step
-  no absolute due_at
-
-ACTIVE timed Step
-  exact persisted due_at
-
-DECIDED timed Step
-  exact persisted due_at preserved
-
-now >= due_at
-  presentation may say overdue
-  Step/Attempt state, Authorization and allowed_actions do not change solely because time passed
-```
-
-B06 re-reads deadline truth from `getGovernanceAttempt`; B05 navigation state is never case authority.
-
-## 5. Material failure / recovery branches
-
-```text
-404 case/disclosure loss
-  -> neutral unavailable state; no existence leak; safe return to Minha Caixa
-
-403 action-time denial
-  -> refetch current case; server remains authority
-
-409 state.governance_step_already_decided
-  -> refetch case/exact Decision; show winner; never silently retry a different outcome
-
-ambiguous createGovernanceFeedback result
-  -> preserve same logical message + Idempotency-Key for retry
-
-exact-content integrity/dependency failure
-  -> no partial-success exact-content claim
-  -> keep understandable case/process context
-  -> R1 makes Decision unavailable until exact content returns
-```
-
-The content-failure Decision treatment remains UX evidence, not a new Authorization/lifecycle rule.
-
-## 6. P6 evidence disposition
-
-Useful evidence retained:
-
-```text
-ordered process sequence supports orientation
-real due date is useful when present
-visible decision area reduces action hunting
-explicit retry/error state is useful
-change-request reason is materially different from generic feedback
-```
-
-Rejected generic/legacy semantics:
-
-```text
-SLA extension
-cancel governance instance
-fast-forward / "Aprovar já"
-password/eSignature ceremony
-legacy passed/failed/cancelled ontology
-peer Approval product/workspace
-reassignment / generic priority / task administration
-```
-
-P6 = COMPLETE.
-
-## 7. P7 — OPERATOR-APPROVED
-
-Selected hypothesis:
-
-```text
-H1 Content-first Governance Workspace
-```
-
-Composition:
+## 3. Locked composition
 
 ```text
 minimal Governance Case header
   return to Minha Caixa
   Document code + exact Revision/title
-  subject kind
+  governed subject kind
   case state
   active Step deadline when present
 
-main workspace
-  dominant exact governed-content region
+CONTENT-FIRST GOVERNANCE WORKSPACE
+  dominant exact-content region
     Exact Read-Only Content Viewer Shell
-    immutable Submission or exact obsolescence target
+    exact immutable Submission
+    OR exact obsolescence target
 
   B06-local governance rail
-    A. what is being decided
-    B. ordered Steps / active deadline / prior Decisions
-    C. governance feedback
-    D. deliberate Decision zone
+    1. governed subject summary
+    2. ordered Steps / active deadline / prior Decisions
+    3. governance feedback
+    4. deliberate Decision zone
 ```
 
-Rejected:
+Narrow order remains:
 
 ```text
-H2 dossier-first + separate viewer
-H3 three-column generic workflow cockpit
+orientation
+-> compact subject/deadline
+-> exact content
+-> Steps
+-> feedback
+-> Decision
 ```
 
-The B06 governance rail remains B06-local; B04's Work operational rail is not generalized merely because both sit beside content.
+## 4. Exact-content / subject law
 
-## 8. P8 R1 — OPERATOR-APPROVED
-
-Canonical file:
+Submission:
 
 ```text
-docs/work/current/t11-b06-governance-case-functional-wireframe.html
+subject.submission_id
+-> exact immutable Submission source
+-> never current WorkingContent
 ```
 
-The operator opened/operated R1 in-browser on 2026-08-23 and approved the current layout/experience.
-
-R1 exercises:
+Obsolescence:
 
 ```text
-Submission / timed active Step
-Obsolescence / overdue active Step
-case with allowed_actions=[]
-404-neutral unavailable case
-clock crossing due_at without lifecycle change
-exact-content failure + retry
-409 Decision winner reconciliation
-403 current-authority reconciliation
-feedback + cursor + ambiguous replay
-ACCEPT confirmation
-RETURN_FOR_CHANGES required reason + confirmation
-viewer page navigation
-B01N Quick Inbox global chrome
-B05 return boundary
-responsive reflow
-modal Escape/focus + aria-live reconciliation
+subject.target_revision
+-> exact target Revision identity
+-> supporting official/release reads must prove that exact target
+-> never substitute another current/newer Revision
 ```
 
-### P8 content-failure hypothesis
+If exact governed bytes cannot be proven/lawfully resolved, B06 fails closed rather than rendering substitute content.
 
-R1 makes the Decision zone unavailable while exact governed bytes are unavailable:
+Locked R1 content-failure treatment:
 
 ```text
-content read failure
--> keep case/process context visible
--> do not imply successful review of unavailable bytes
--> offer content retry
+exact bytes unavailable
+-> keep understandable case/process context
+-> do not claim successful content review
+-> Decision surface unavailable until exact content returns
+-> explicit retry
 ```
 
-No Authorization/lifecycle authority is inferred from the presentation.
+This is UX structure, not Authorization/lifecycle authority.
 
-## 9. B06-F2 — CLOSED / OPERATOR-RATIFIED
+## 5. Governance Step deadline law
 
-Durable authority:
+B06-F1 is CLOSED / OPERATOR-RATIFIED.
+
+```text
+PENDING
+  due_at forbidden
+
+ACTIVE / DECIDED timed Step
+  due_at = exact persisted GovernanceAttemptStep.due_at
+
+ACTIVE / DECIDED untimed Step
+  due_at absent
+```
+
+Presentation may derive relative wording and explicit overdue attention.
+
+```text
+now >= due_at
+!= Step lifecycle transition
+!= GovernanceAttempt transition
+!= Authorization change
+!= allowed_actions change
+!= SLA breach state
+```
+
+B06 rereads this truth from op67; B05 queue-carried deadline state is never current case authority.
+
+## 6. Feedback / Decision separation
+
+Governance feedback:
+
+```text
+immutable multi-record fact
+separate from Decision
+op69 uses one Idempotency-Key per logical creation
+ambiguous response -> retry same logical message/key
+```
+
+Decision:
+
+```text
+ACCEPT
+  -> deliberate confirmation
+  -> singleton op71
+
+RETURN_FOR_CHANGES
+  -> mandatory reason
+  -> deliberate confirmation
+  -> singleton op71
+```
+
+Decision singleton conflict:
+
+```text
+first accepted Decision wins
+later different outcome/reason -> 409 state.governance_step_already_decided
+-> reread authoritative case/Decision
+-> never silently retry a changed outcome
+```
+
+Command-time 403 likewise causes authoritative reread; the frontend never builds a permission matrix.
+
+## 7. B06-F2 — future Governance Review Layer seam
+
+B06-F2 is CLOSED / OPERATOR-RATIFIED through:
 
 ```text
 ../../decisions/governance-review-layer-seam.md
@@ -295,99 +216,153 @@ Forward obligation:
 GOV-12 in ../../decisions/forward-obligations.md
 ```
 
-Ratified future-seam invariants:
+Future invariants preserved without current capability:
 
 ```text
-exact governed Submission remains immutable
+future selected-range review binds to exact immutable reviewed snapshot
 stable Document Discussion != inline governance review
 DRAFT EditorialComment remains separately deferred
-future selected-range review binds to exact immutable reviewed snapshot
-current unanchored GovernanceFeedback remains valid
+current ordinary GovernanceFeedback remains valid
 tracked changes/suggestions require separate semantic promotion
 vendor/editor ids never become MetalDocs semantic authority
-RETURN leaves old review anchors with old immutable Submission
+RETURN leaves old anchors with old immutable Submission
 old anchors never blindly remap onto changed DRAFT bytes
 future B04 remediation needs explicit server-authored review-context identity
 ```
 
-### Current Launch disposition
-
-B06-F2 promotes no present-tense inline-review capability.
+Current Launch remains unchanged:
 
 ```text
-GovernanceFeedback wire     unchanged
-allowed_actions             unchanged
-current census              86 ops / 11 routes / 16 permissions
-B04 contract                unchanged
-B06 P8 R1 controls          unchanged
+GovernanceFeedback wire      unchanged
+allowed_actions              unchanged
+B04 contract                 unchanged
+B06 P8 controls              unchanged
+operations/routes/permissions 86 / 11 / 16
 ```
 
-No disabled/coming-soon review controls are added.
+## 8. Locked P8 evidence
 
-## 10. R2 adjudication after B06-F2
-
-The future seam does not change any current visible B06 behavior.
-
-Therefore:
+Canonical browser-functional evidence:
 
 ```text
-P8 R1 operator approval      remains valid
-P8 R2 inline review          NOT REQUIRED for current Launch
-material visible findings    0
+docs/work/current/t11-b06-governance-case-functional-wireframe.html
 ```
 
-Creating R2 merely to show deferred controls would violate the no-dormant-capability rule.
-
-## 11. Responsive / accessibility structure
-
-Desktop:
+R1 exercises:
 
 ```text
-exact content remains dominant
-Governance rail remains independently understandable
-Decision remains reachable without covering content
+Submission / timed active Step
+obsolescence / overdue Step
+allowed_actions=[] case
+404-neutral unavailable case
+deadline crossing without lifecycle mutation
+exact-content failure/retry
+feedback pagination + ambiguous replay
+ACCEPT confirmation
+RETURN required reason + confirmation
+409 winner reconciliation
+403 authority reconciliation
+B01N Quick Inbox global chrome
+B05 return boundary
+responsive reflow
+Escape/focus + aria-live behavior
 ```
 
-Narrow:
+The operator operated and approved the R1 experience, then explicitly authorized final B06 LOCK after B06-F2 closure.
+
+## 9. State authority
 
 ```text
-orientation header
--> compact subject/deadline context
--> exact content
--> Steps
--> feedback
--> Decision
+SERVER STATE
+  GovernanceCaseView
+  GovernanceFeedback pages
+  GovernanceDecisionView
+  exact content/source responses
+
+NAVIGATION / URL
+  governance_attempt_id + stable B06 route
+
+FORM DRAFT
+  feedback message before acceptance
+  RETURN reason before Decision acceptance
+
+EPHEMERAL UI
+  viewer presentation/page
+  composer disclosure
+  confirmation modal
+  content failure/retry
+  conflict/denial announcements
+  inherited Quick Inbox visibility
 ```
 
-Structural obligations represented in R1:
+No fifth durable/global frontend state class exists.
+
+## 10. P9 Screen Contract — COMPLETE
+
+Canonical proof:
 
 ```text
-Step state not color-only
-active Step has semantic current indication
-absolute deadline remains alongside relative wording
-overdue has explicit text
-exact Revision identity remains outside rendered bytes
-feedback and Decision are separately labeled
-RETURN reason explicitly required
-modal Escape/cancel path
-409/403 reconciliation announced
+docs/work/current/t11-b06-screen-contract.md
 ```
 
-## 12. Current gate
+Closure:
 
 ```text
-P6                                   COMPLETE
-P7 H1                                OPERATOR-APPROVED
-P8 R1 visual/functional experience   OPERATOR-APPROVED
-B06-F1 deadline read                  CLOSED / OPERATOR-RATIFIED
-B06-F2 review future seam             CLOSED / OPERATOR-RATIFIED
-P8 R2 inline review                   NOT REQUIRED
-material current P8 findings          0
-B06 LOCK                              READY / AWAITING EXPLICIT OPERATOR LOCK
-P9 / P10                              NOT OPEN
-B07+                                  NOT OPEN
+material B06 regions/controls traced        18 / 18
+unbound material controls                   0
+invented operations                         0
+operation 87+                               absent
+screen-shaped APIs                          0
+frontend Authorization evaluator            0
+WorkingContent mutation path                 0
+current inline-review controls               0
+navigation identities unsourced              0
+material B06 Screen Contract findings        0
 ```
 
-Next gate:
+## 11. P10 Pattern Consolidation — COMPLETE
 
-> Operator explicitly LOCKS B06 R1. Only after that explicit LOCK may P9 Screen Contract then P10 pattern consolidation execute. B07 remains closed until B06 P10 closure.
+Canonical proof:
+
+```text
+docs/work/current/t11-b06-pattern-consolidation.md
+```
+
+Shared patterns reused:
+
+```text
+Global App Shell
+Notification Quick Inbox
+Exact Read-Only Content Viewer Shell
+```
+
+No new shared pattern graduates from B06.
+
+B06-local semantics remain local, including Content-first Governance Workspace, Governance rail, Step/deadline context, GovernanceFeedback, Decision zone and authoritative Decision reconciliation.
+
+Closure:
+
+```text
+existing locked shared patterns reused          3
+new shared semantic patterns graduated           0
+B06-local semantic patterns retained             8
+false abstractions introduced                    0
+unexplained duplicate locked semantic patterns  0
+```
+
+## 12. Block closure
+
+```text
+B06 authority recovery                    COMPLETE
+B06-F1 deadline projection                CLOSED / OPERATOR-RATIFIED
+P6                                       COMPLETE
+P7 H1                                    OPERATOR-APPROVED
+P8 R1                                    OPERATOR-APPROVED
+B06-F2 Governance Review Layer seam       CLOSED / OPERATOR-RATIFIED
+P8 R2 inline review                       NOT REQUIRED
+B06 LOCK                                  LOCKED / OPERATOR-RATIFIED
+P9 Screen Contract                        COMPLETE
+P10 pattern consolidation                 COMPLETE
+```
+
+B06 is closed for FP1. B07 is now eligible as the next block but remains NOT OPEN until explicitly begun through the roadmap.
