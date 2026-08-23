@@ -86,7 +86,7 @@ B08   Notifications Full Inbox
        P6                                          COMPLETE
        B08-F1 human-recognizable Inbox read        CLOSED / OPERATOR-RATIFIED
        P7 H1 Focused Triage Inbox                  OPERATOR-RATIFIED
-       P8 functional HTML                          OPEN / NEXT
+       P8 R1 functional HTML                       READY / AWAITING OPERATOR USE
        LOCK / P9 / P10                             NOT OPEN
 B09   Audit                                        NOT OPEN
 B10   Organization Administration                 NOT OPEN
@@ -114,33 +114,26 @@ B07 remains LOCKED. Document History uses server-authored Revision recognition, 
 
 ## B08 current gate
 
-Canonical work record:
-
-```text
-docs/work/current/t11-b08-notifications-full-inbox-r1.md
-```
-
-Durable B08-F1 authority:
+Canonical B08 authority/work/evidence:
 
 ```text
 docs/decisions/notification-inbox-recognition-read.md
+docs/work/current/t11-b08-notifications-full-inbox-r1.md
+docs/work/current/t11-b08-p8-realization-plan.md
+docs/work/current/t11-b08-notifications-full-inbox-functional-wireframe.html
 ```
 
-B08 remains the full persistent Notification triage surface over the already-admitted `/notifications` route:
+Canonical P8 R1 HTML blob:
 
 ```text
-82 listNotifications
-83 updateNotificationEngagement
-84 markNotificationsSeen
-85 markAllNotificationsRead
-86 streamNotificationEvents
+bb130535721b2381524763a4885ade5199a15596
 ```
 
-B01N remains global bell + Quick Inbox. B08 is not `Minha Caixa` and does not rebuild Document Official/Discussion.
+B08 remains the full persistent Notification triage surface over existing operations 82–86. B01N remains global bell + Quick Inbox; B08 is not `Minha Caixa` and does not rebuild Document Official/Discussion.
 
 ### B08-F1 — CLOSED / OPERATOR-RATIFIED
 
-Existing op82 is sufficient and now has bounded human-recognition projection authority:
+Existing op82 now has bounded human-recognition projection authority:
 
 ```text
 Notification identity + engagement state
@@ -178,18 +171,49 @@ Focused Triage Inbox
 → SSE only invalidates/refetches canonical op82 truth
 ```
 
-No current search/filter/preferences/snooze/priority/delete/bulk-archive platform is admitted.
+### P8 R1 — READY FOR OPERATOR USE
+
+The functional low-fidelity HTML exercises:
+
+```text
+fixed lenses
+Nova != Não lida
+read/unread
+archive/unarchive
+mark-all-read
+presentation-driven seen batching
+loaded-but-off-screen != seen
+B03 exact source boundary
+access-drift 404 reconciliation
+cursor continuation/failure/retry
+per-item + mark-all failures
+three empty states
+SSE invalidation/refetch + disconnect/reconnect
+Quick Inbox/full Inbox coherence
+responsive/accessibility structure
+```
+
+Structural pre-write verification:
+
+```text
+HTML parse PASS
+33 static ids / 0 duplicates
+JavaScript node --check PASS
+forbidden Product control hits 0
+local blob == repository blob
+```
+
+No search/filter/preferences/snooze/priority/delete/bulk-archive platform is admitted.
 
 ## Exact next action
 
 ```text
-1. Create the temporary B08 P8 realization plan under docs/work/current.
-2. Create B08 functional low-fidelity HTML from the ratified B08-F1 + P7 H1.
-3. Verify material local interactions/states and responsive/accessibility structure.
-4. Deliver the exact HTML to the operator for browser operation.
-5. If friction exists, revise the same B08 P8; do not open B09.
-6. Only explicit operator LOCK opens B08 P9 then P10.
-7. Implementation remains blocked.
+1. Operator opens/operates B08 functional P8 R1 from the chat attachment.
+2. Exercise lenses, engagement, page-2 seen behavior, source-open/access drift, failures, SSE and Quick Inbox coherence.
+3. If friction/finding exists -> revise the same B08 HTML; do not open B09.
+4. If operator explicitly LOCKS B08 -> P9 Screen Contract -> P10 pattern consolidation.
+5. Do not open B09+ early.
+6. Implementation remains blocked.
 ```
 
 ## Hard stops
