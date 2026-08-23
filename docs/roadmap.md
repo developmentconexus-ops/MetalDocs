@@ -180,7 +180,7 @@ H1 Revision Chapters + chronological event spine
 
 The chronological stream is authoritative. A later event may target an older Revision after a newer Revision cycle has occurred.
 
-P8 R1 therefore exercises this case explicitly:
+P8 R1 exercises this explicitly:
 
 ```text
 REV001 original cycle / Release
@@ -195,6 +195,12 @@ The repeated Revision marker is a P8 UX hypothesis for preserving server chronol
 Content-bearing Submission/Release events open the existing Exact Read-Only Content Viewer Shell.
 
 P8 R1 also exercises cursor continuation/failure, exact-content failure, disclosure-neutral 404, responsive reflow and inherited B01N Quick Inbox.
+
+Verified canonical HTML blob:
+
+```text
+20ec64d34085fbc9075b136a61e69c48c0cad981
+```
 
 ## Exact next action
 
