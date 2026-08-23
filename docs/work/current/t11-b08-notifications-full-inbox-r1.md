@@ -1,138 +1,30 @@
-# T11 — B08 Notifications Full Inbox R1 — Method v2.2 ratified
+# T11 — B08 Notifications Full Inbox R1 — Method v2.2
 
-> **Status:** OPEN / ACTIVE / B08-F1 OPERATOR-RATIFIED / P6 COMPLETE / P7 H1 OPERATOR-RATIFIED / P8 OPEN.  
+> **Status:** OPEN / ACTIVE / B08-F1 OPERATOR-RATIFIED / P6 COMPLETE / P7 H1 OPERATOR-RATIFIED / P8 R1 READY FOR OPERATOR USE.  
 > **Block:** B08 — Notifications Full Inbox.  
 > **Method:** Frontend Product Experience Planning Method v2.2 + DevelopmentConexus Engineering Method.  
 > **Predecessors:** B01 / B01N / B02 / B03 / B04 / B05 / B06 / B07 LOCKED.  
 > **Bounded authorities:** `../../decisions/discussion-notifications-launch.md` + `../../decisions/notification-inbox-recognition-read.md`.  
+> **Canonical P8 R1:** `t11-b08-notifications-full-inbox-functional-wireframe.html`.  
+> **Canonical HTML blob:** `bb130535721b2381524763a4885ade5199a15596`.  
 > **Implementation:** BLOCKED.  
-> **P8:** OPEN / functional low-fidelity HTML is the next evidence gate.
+> **LOCK:** NOT YET — operator must operate/iterate P8 first.
 
-## 1. Ratification basis
+## 1. Ratified basis
 
-The operator approved in sequence:
+The operator approved:
 
 ```text
-B08 entry direction / continue FP1
+B08 entry / continue FP1
 B08-F1 + P7 H1 design in chat
 written B08 candidate exactly as recorded
 ```
 
-The written candidate self-review had:
-
-```text
-TBD / TODO / undecided semantic field = 0
-new operation = 0
-new route = 0
-new Permission = 0
-new semantic owner = 0
-```
-
-B08-F1 is now promoted to durable authority:
+B08-F1 durable authority:
 
 ```text
 ../../decisions/notification-inbox-recognition-read.md
 ```
-
-## 2. Product/owner boundary
-
-B08 is the full persistent Notification Inbox already admitted by Launch.
-
-```text
-stable route
-  /notifications
-
-reads
-  82 listNotifications
-  86 streamNotificationEvents
-
-writes
-  83 updateNotificationEngagement
-  84 markNotificationsSeen
-  85 markAllNotificationsRead
-
-semantic owner
-  Notifications
-
-source owner
-  Controlled Documents for DOCUMENT_MENTION context
-```
-
-B01N remains the global bell + Quick Inbox.
-
-Mental model:
-
-```text
-Notifications = personal attention / triage
-Minha Caixa   = assigned authoring/governance work
-```
-
-Quick Inbox and B08 consume one owner/read family and never become separate engagement stores or counters.
-
-## 3. B08-F1 — CLOSED / OPERATOR-RATIFIED
-
-Every currently presentable `DOCUMENT_MENTION` row returned by op82 is independently human-recognizable after server-side current disclosure.
-
-Current semantic item projection:
-
-```text
-NotificationInboxItem {
-  notification_id
-  kind=DOCUMENT_MENTION
-  created_at
-  seen_at?
-  read_at?
-  archived_at?
-
-  source {
-    document: DocumentReference
-    message_id
-    author: UserReference
-    official_revision_at_post?: RevisionReference
-    message_preview: ShortText
-  }
-}
-```
-
-Source laws:
-
-```text
-document
-  current-disclosable stable DocumentReference
-
-message_id
-  exact immutable DiscussionMessage identity
-  navigation authority for B03 anchor
-
-author
-  immutable author_user_id + current admissible bounded UserReference enrichment
-  display_name may be absent after lawful profile erasure
-
-official_revision_at_post
-  exact Revision recorded by the immutable DiscussionMessage when one existed
-  never silently replaced by whichever Revision is official now
-
-message_preview
-  server-composed after disclosure from immutable MessageContentSegment[]
-  <= ShortText
-  presentation only
-  not persistence / navigation / dedupe / AuthZ authority
-```
-
-Notifications persistence remains only:
-
-```text
-Notification identity
-recipient
-kind
-source document_id + message_id
-created_at
-seen_at?
-read_at?
-archived_at?
-```
-
-No source message/title/profile/ACL copy is promoted.
 
 Current census remains:
 
@@ -140,278 +32,203 @@ Current census remains:
 86 operations / 11 routes / 16 PermissionCode values
 ```
 
-## 4. Engagement law preserved
+## 2. Product boundary
+
+```text
+/notifications
+
+82 listNotifications
+83 updateNotificationEngagement
+84 markNotificationsSeen
+85 markAllNotificationsRead
+86 streamNotificationEvents
+```
+
+B01N remains the global bell + Quick Inbox.
+
+```text
+Notifications = personal attention / triage
+Minha Caixa   = assigned authoring/governance work
+```
+
+B08 does not become a second Document Official, Discussion, viewer, task queue or Authorization surface.
+
+## 3. B08-F1 — CLOSED / OPERATOR-RATIFIED
+
+Each presentable `DOCUMENT_MENTION` op82 row is independently human-recognizable after server-side current disclosure:
+
+```text
+NotificationInboxItem
+  notification identity + engagement state
+
+  source
+    current-disclosable DocumentReference
+    exact immutable message_id
+    author UserReference
+    exact official_revision_at_post? RevisionReference
+    bounded server-composed message_preview
+```
+
+Persistence remains Notification/source identities + engagement only. Source text/title/profile/ACL is not copied into Notifications authority.
+
+Fixed views:
+
+```text
+active    = presentable + non-archived
+unread    = presentable + non-archived + unread
+archived  = presentable + archived
+```
+
+`unread` is a subset of active. There is no unseen list view.
+
+## 4. P7 — H1 Focused Triage Inbox — OPERATOR-RATIFIED
+
+```text
+Notificações
+  unseen + unread summary
+  Marcar todas como lidas
+
+[ Caixa de entrada ] [ Não lidas ] [ Arquivadas ]
+
+one server-order list
+  source recognition
+  Nova distinct from Não lida
+  Abrir conversa
+  Marcar lida / não lida
+  Arquivar / desarquivar
+
+cursor continuation
+```
+
+Source-open remains a boundary to B03:
+
+```text
+op83 read=true
+-> exact source.document.document_id + source.message_id
+-> B03
+-> op79 anchor_message_id
+-> current disclosure rechecked
+```
+
+## 5. Engagement law represented
 
 ```text
 READ => SEEN
-mark unread clears read_at only
-mark unread never makes unseen
-archive/unarchive preserves read/seen
-per-item deliberate engagement implies seen if absent
+mark unread preserves seen
+archive/unarchive preserves read + seen
 archive != delete
-read != Document read
-read != Read & Acknowledge
-Notification != access grant
+read != Document read / acknowledgement
 ```
 
-Fixed op82 views after presentability:
+Seen remains presentation-driven:
 
 ```text
-active
-  archived_at absent
-
-unread
-  archived_at absent
-  AND read_at absent
-
-archived
-  archived_at present
+fetch/cache != seen
+materially present unseen row -> candidate for bounded op84 batch
 ```
 
-`unread` is a subset of active. There is no unseen list lens.
+P8 deliberately exposes the seen-batch ids in a review-only console so the operator can falsify whether loaded-but-off-screen rows are being marked seen prematurely.
 
-First-page summaries remain presentable non-archived:
+## 6. P8 R1 — functional low-fidelity evidence
+
+Canonical file:
 
 ```text
-unseen_count
-unread_count
+docs/work/current/t11-b08-notifications-full-inbox-functional-wireframe.html
 ```
 
-## 5. P6 — COMPLETE
-
-Reference study saturated after GitHub Notifications, Linear Inbox and Slack Activity.
-
-Accepted lessons:
+The artifact is pure:
 
 ```text
-Inbox = attention triage, not assigned-work authority
-read/unread is distinct from removing/archiving active attention
-source work remains in the source owner lens
-compact recognition + source entry beats rebuilding source work inside Inbox
+HTML
+CSS
+vanilla JavaScript
+deterministic local fixtures
+IntersectionObserver only for P8 presentation/seen simulation
 ```
 
-Rejected breadth:
+It contains no:
 
 ```text
-search/filter platform
-saved/custom views
-snooze/reminders/priority
-preferences/subscriptions
-arbitrary bulk selection
+React
+backend/API calls
+OpenAPI client
+real SSE transport
+frontend Authorization evaluator
+Product persistence/schema implementation
 ```
 
-## 6. P7 — H1 Focused Triage Inbox — OPERATOR-RATIFIED
-
-Selected structure:
+### Structural verification before repository write
 
 ```text
-minimal Full Inbox header
-  Notificações
-  unseen/unread summary
-  Marcar todas como lidas
-
-three fixed lenses
-  Caixa de entrada = active
-  Não lidas        = unread
-  Arquivadas       = archived
-
-single dominant list
-  Notification recognition
-  unseen novelty distinct from unread
-  bounded source preview
-  exact created time
-  primary source-open affordance
-  per-item read/unread
-  per-item archive/unarchive
-
-continuation
-  cursor + retry preserving loaded items
+HTML parse                          PASS
+static ids                          33
+duplicate static ids                0
+inline JavaScript node --check      PASS
+Product forbidden-control hits      0
+local Git blob                      bb130535721b2381524763a4885ade5199a15596
+repository blob                     bb130535721b2381524763a4885ade5199a15596
 ```
 
-Rejected as leading:
+## 7. Material P8 interactions implemented
 
 ```text
-master/detail Inbox that rebuilds B03
-Document-grouped Inbox that replaces canonical recency order
+active / unread / archived lenses
+unseen + unread item
+seen + intentionally unread item
+read item
+per-item read / unread
+archive / unarchive preserving read state
+archived unread item
+mark-all-read affecting active unread only
+IntersectionObserver seen queue + bounded batch simulation
+loaded page-2 rows remaining unseen until materially presented
+exact source-open B03 boundary with document_id + message_id
+one-shot access-drift 404 / row disappearance
+cursor continuation
+cursor failure + retry preserving loaded rows
+per-item mutation failure preserving state
+mark-all-read failure preserving state
+initial Inbox unavailable + retry
+empty active / unread / archived fixtures
+SSE `notifications.changed {}` invalidation + canonical refetch simulation
+SSE disconnect/reconnect freshness behavior
+Quick Inbox using the same local engagement/count state
+responsive one-column treatment
+Escape/focus/live-region recovery structure
 ```
 
-No B08 viewer, Discussion composer or governance action zone exists.
+Review-only fixture controls are explicitly outside Product UI.
 
-## 7. Source-open interaction
+## 8. Ordering / realtime represented
 
-Exact identity:
-
-```text
-source.document.document_id
-+ source.message_id
-```
-
-Flow:
-
-```text
-activate source
--> op83 read=true
--> on admitted success navigate to B03 Document Official
--> B03 uses exact source.message_id as Discussion anchor intent
--> op79 anchored read
--> B03/current disclosure rechecked
-```
-
-If op83 returns non-disclosing 404 because presentability drifted:
-
-```text
-refetch Inbox
-item may disappear
-no navigation from stale source presentation
-no disclosure reason leaked
-```
-
-If B03 becomes unavailable after engagement but before destination read, B03 owns its own neutral unavailable state. Notification read never proves source view.
-
-## 8. Seen presentation
-
-There is no manual mark-seen/unseen command.
-
-```text
-fetch/cache row != present row
-
-actually present unseen row to recipient
--> candidate id for bounded op84 batch
--> server intersects with current recipient + presentability
--> 204 exposes no per-id cardinality
-```
-
-P8 must visibly prove that loaded-but-off-screen rows are not blindly marked seen merely because they were fetched.
-
-Exact viewport threshold/debounce/batching mechanism is not Product authority.
-
-## 9. Ordering / pagination
-
-Server order remains:
+Canonical fixture order follows:
 
 ```text
 created_at DESC,
 notification_id DESC
 ```
 
-B08 never globally re-sorts cursor pages.
+No Product sort/search/custom filter exists.
+
+Realtime fixture law:
 
 ```text
-first page
-  view + optional limit
-
-continuation
-  cursor + optional limit only
-
-change lens
-  fresh first-page traversal
+notifications.changed {}
+-> invalidate
+-> refetchCanonical fixture
 ```
 
-No total count, page number, generic sort, search or saved filter.
+The SSE simulation carries no Notification row payload.
 
-## 10. Realtime
-
-Operation 86 remains invalidation only:
-
-```text
-event: notifications.changed
-data: {}
-```
-
-```text
-signal
--> invalidate/refetch current Notification summaries/lens
--> op82 restores canonical truth
-```
-
-SSE never carries a Notification/source business row. Disconnect is freshness degradation, not Product-state loss.
-
-## 11. Failure / reconciliation targets
-
-```text
-initial op82 failure
-  Inbox unavailable + retry; shell stays available
-
-continuation failure
-  preserve loaded rows + current lens + retry cursor
-
-op83 404/non-presentable
-  refetch; row may disappear; neutral explanation
-
-op83 ambiguous/transport failure
-  do not fabricate changed engagement state
-
-op84 failure
-  novelty stays conservative until refetch
-
-op85 failure
-  do not locally declare all read
-
-SSE disconnect
-  reconnect/focus/refetch restores truth
-```
-
-## 12. P8 region inventory
-
-```text
-R1  Global App Shell inherited from B01
-R2  Notification bell / Quick Inbox inherited from B01N
-R3  Full Inbox heading
-R4  unseen + unread summary
-R5  Mark all read
-R6  active / unread / archived lenses
-R7  human-recognizable Notification row
-R8  unseen novelty distinct from unread treatment
-R9  read / unread
-R10 archive / unarchive
-R11 exact source open to B03 Discussion anchor
-R12 cursor continuation
-R13 continuation failure/retry preserving rows
-R14 per-item engagement failure/reconciliation
-R15 mark-all-read failure/reconciliation
-R16 access-drift disappearance after neutral 404/refetch
-R17 empty active
-R18 empty unread
-R19 empty archived
-R20 SSE invalidation/refetch
-R21 narrow/mobile row/action treatment
-R22 accessibility/focus/live reconciliation
-```
-
-## 13. P8 R1 proof targets
-
-Functional HTML must exercise at least:
-
-```text
-active / unread / archived fixed lenses
-unseen + unread item
-seen + intentionally unread item
-read item
-archive preserving read state
-archived unread item + unarchive
-mark-all-read affects active unread only
-loaded-but-not-presented rows not blindly seen
-bounded seen batching evidence
-exact source-open boundary to B03 anchor
-source engagement 404/access-drift disappearance
-cursor continuation + failure/retry
-mark-all-read failure
-per-item engagement failure
-empty states for all three lenses
-SSE invalidation/refetch
-Quick Inbox coherence with Full Inbox
-responsive row/actions
-keyboard/focus/live-region recovery
-```
-
-## 14. Explicit non-goals
+## 9. Explicit non-goals preserved
 
 ```text
 search
 free-form/custom filters
 filter by author/Document
 saved views
-bulk selection/archive
+bulk row selection/archive
 mark-all-unread / mark-unseen
 snooze / priority / reminders
 Notification preferences
@@ -421,18 +238,37 @@ Notification-kind selector
 source reply/editor/viewer inside Inbox
 ```
 
-## 15. Current gate
+## 10. Operator-use focus
+
+The operator should especially exercise:
+
+```text
+1. Compare "Nova" vs "Não lida".
+2. Mark a seen row unread and confirm it does not become Nova.
+3. Archive a read row and inspect the same read state under Arquivadas.
+4. Open an archived unread row, unarchive it, and inspect its engagement continuity.
+5. Load page 2 and inspect the Seen batching console before scrolling lower rows into view.
+6. Arm Próximo abrir -> access drift 404 and open one source.
+7. Arm page/action/mark-all failures and confirm current visible truth is preserved.
+8. Emit SSE changed {} and confirm the new row appears only after the simulated refetch.
+9. Open the bell Quick Inbox and confirm counts/engagement match the Full Inbox.
+10. Resize to narrow/mobile and inspect row actions + Quick Inbox sheet behavior.
+```
+
+## 11. Current gate
 
 ```text
 entry recovery                         COMPLETE
 P6                                     COMPLETE
 B08-F1                                 CLOSED / OPERATOR-RATIFIED
-P7 H1 Focused Triage Inbox             OPERATOR-RATIFIED
-P8                                     OPEN / NEXT
-B08 LOCK / P9 / P10                    NOT OPEN
+P7 H1                                  OPERATOR-RATIFIED
+P8 R1 functional HTML                  EXISTS / READY FOR OPERATOR USE
+P8 material finding                    NONE RECORDED YET — OPERATOR USE PENDING
+B08 LOCK                               NOT YET
+P9 / P10                               NOT OPEN
 B09+                                   NOT OPEN
 ```
 
-Next action:
+Next gate:
 
-> Write the temporary P8 realization plan, create the functional low-fidelity B08 HTML with deterministic local fixtures, verify structural behavior, deliver the exact HTML to the operator, and remain in B08 until explicit LOCK.
+> Operator opens/operates B08 P8 R1. If friction/finding exists, revise the same B08 HTML. Only explicit B08 LOCK opens P9 Screen Contract then P10 pattern consolidation. B09 remains closed.
