@@ -1,6 +1,6 @@
 # T11 — B03 Discussion / Notification D7 Contract
 
-> **Status:** OPERATOR-RATIFIED CANDIDATE / GCR-CORRECTED / PENDING INDEPENDENT CHALLENGE + UPSTREAM CONSOLIDATION.  
+> **Status:** OPERATOR-RATIFIED CANDIDATE / GCR-CORRECTED / FABLE-CONVERGED / PENDING UPSTREAM CONSOLIDATION.  
 > **Parent:** `t11-b03-discussion-notification-mini-design.md`.  
 > **Reasoning authority:** `developmentconexus-ops/conexus-methodology/METHOD.md`.  
 > **Implementation:** BLOCKED.  
@@ -77,7 +77,16 @@ BEGIN Scope
 COMMIT
 ```
 
-No `document.read_discussion` Permission is introduced. D1 remains binding: reading Discussion follows the exact current ability to receive the Document Official / Discussion lens. The frontend and Controlled Documents never reconstruct the permission matrix.
+No `document.read_discussion` Permission is introduced. T3/T6 consolidation must give the exact ability to receive/read the stable-Document Discussion one canonical named predicate and use that same predicate as the citable source for:
+
+```text
+Discussion read disclosure
+Mention-candidate admission
+Mention commit-time target validation
+DOCUMENT_MENTION Notification presentability
+```
+
+No caller may maintain a parallel description or role matrix once that canonical predicate is promoted.
 
 ### Offboarding serialization
 
@@ -109,7 +118,44 @@ No semantic owner imports another owner. Notification persistence failure aborts
 
 `createDocumentDiscussionMessage` is the 11th `Idempotency-Key` creation. Its replay snapshot contains only stable result identity such as `message_id`; message/free text is excluded from durable replay data.
 
-Discussion list semantics remain seek/cursor based. A bounded `anchor_message_id` navigation mode may retrieve a page containing the exact target message for Notification deep-linking; this is navigation over the same resource family, not a separate message-detail operation.
+### Discussion pagination + deep-link law
+
+Discussion list semantics remain seek/cursor based.
+
+`anchor_message_id` is an optional **first-page navigation filter** for the same `listDocumentDiscussionMessages` operation. It requests a bounded page that contains the exact target message when currently disclosable; it does not create a second message-detail resource or a second pagination authority.
+
+Continuation law:
+
+```text
+first page without anchor
+  canonical Discussion ordering + normal initial seek semantics
+
+first page with anchor_message_id
+  same operationId
+  same canonical ordering
+  target message must be contained when it exists and is disclosable
+
+next page
+  cursor authenticates listDocumentDiscussionMessages
+  + the original anchor/filter semantics
+  + canonical seek position
+
+cursor + contradictory repeated first-page filter
+  rejected under the existing global cursor law
+```
+
+T8-E consolidation must add at least one named contract fixture proving anchored first-page navigation and continuation remain one pagination authority.
+
+### Message/fan-out bounds
+
+The 65,536-byte global JSON request ceiling is not sufficient by itself to bound semantic fan-out. T6/T8-E consolidation must set explicit, human-sufficient closed limits for at least:
+
+```text
+MessageContentSegment count per accepted message
+unique Mention targets per accepted message
+```
+
+Those bounds cap protected User-lock acquisition, Authorization batch size and Notification fan-out for one command. Exact numeric limits belong the executable wire consolidation and must be justified as the smallest practical Launch bounds rather than imported from an editor/framework default.
 
 Mention candidate search is purpose-built and Document-scoped. Organization candidate search is not authority by itself: application composes candidate User facts with exact Controlled Documents predicate facts and current Authorization decisions before any candidate is returned. It never reuses an administrative User list as disclosure authority.
 
@@ -195,7 +241,7 @@ owned by current recipient
 + currently presentable
 ```
 
-Absent, foreign-recipient or now-non-presentable ids produce zero mutation and no per-id status/cardinality detail. The response never reveals which requested ids existed.
+Absent, foreign-recipient or now-non-presentable ids produce zero mutation and no per-id status/cardinality detail. The success wire must remain count-free (for example `204` semantics), so the operation cannot be used as a cardinality oracle over requested ids.
 
 ### Mark all read
 
@@ -253,7 +299,7 @@ The same current-disclosure composition owns `unseen_count` and `unread_count`. 
 
 Read-time presentation may compose currently disclosable source enrichment such as actor `UserReference`, `DocumentReference` and bounded message preview. These are returned only after current disclosure succeeds.
 
-Notifications has no new Product Permission. Ordinary Inbox access is structurally recipient-self-only under the authenticated ENABLED User; source presentation additionally rechecks current source disclosure.
+Notifications has no new Product Permission. Ordinary Inbox access is structurally recipient-self-only under the authenticated ENABLED User; source presentation additionally rechecks current source disclosure through the same canonical Discussion-disclosure predicate named by T3/T6.
 
 ## 7. Realtime signaling — +1
 
@@ -303,6 +349,8 @@ mark all read
 Semantic owners never invoke realtime directly. The relevant application leaf calls the narrow wake-up mechanism only after semantic commit succeeds. Wake-up failure never rolls back committed Product state and is not retried through River merely for UI freshness.
 
 The D8 Launch mechanism remains an in-process coalescing hub behind the narrow port. WebSocket, Redis and a broker are not implied.
+
+Transient process overlap during a rolling/restarting deployment may lose an ephemeral wake between subscribers attached to different process instances; T8-G consolidation must state explicitly that this is tolerated because SSE carries no Product truth and canonical Notification GET/refetch restores correctness.
 
 ## 8. Audit / History disposition
 
@@ -390,7 +438,25 @@ Failure of one generator/toolchain is a bounded mechanism/tooling reopen; it doe
 
 T8-G consolidation owns heartbeat/flush/proxy-timeout/shutdown/resource-limit behavior for the long-lived response while preserving the one-application-runtime baseline.
 
-## 13. Proof strategy
+## 13. Independent challenge result
+
+Fresh Fable review on Evidence PR #165 returned:
+
+```text
+VERDICT: CONVERGED
+MATERIAL: 0
+IMPORTANT: 1
+OPTIONAL: 3
+UNSUPPORTED_PREFERENCE: 0
+```
+
+The sole IMPORTANT finding was consolidation-target completeness, accepted in the ownership/reopen map. The three OPTIONAL precisions are incorporated here: anchored Discussion navigation/continuation, explicit message/fan-out bounds, and one canonical named Discussion-disclosure predicate plus T8-G deploy-overlap tolerance.
+
+The reviewer explicitly re-falsified and confirmed the complete candidate result — 4+2 owners, 11 routes, 16 PermissionCode values, 86 operations, 11 Idempotency-Key creations, same-Scope Mention→Notification, server-side presentability, Lexical, SSE/in-process wake-up, River-only durable async and absence of generic EventBus/broker/Redis.
+
+No Fable Round 2 is justified.
+
+## 14. Proof strategy
 
 Implementation/readiness proof must be able to falsify at least:
 
@@ -419,7 +485,7 @@ contract census -> exactly 86 application operations
 first-party dependency graph -> zero owner→owner imports + zero generic EventBus
 ```
 
-## 14. Reopen triggers
+## 15. Reopen triggers
 
 Reopen D7 if evidence proves:
 
