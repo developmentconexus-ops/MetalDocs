@@ -174,18 +174,28 @@ Submission subject
   revision + title
 
 Obsolescence subject
-  target_revision = revision + title
+  target_revision = RevisionReference
 ```
 
 ### Candidate smallest precision
+
+Reuse the already-accepted wire component:
+
+```text
+RevisionReference {
+  revision:RevisionIdentity,
+  title:LongText
+}
+```
+
+and add exactly one member:
 
 ```text
 WorkGovernanceItem {
   governance_attempt_id:Uuid,
   subject_kind:GovernanceSubjectKind,
   document:DocumentReference,
-  revision:RevisionIdentity,
-  title:LongText,
+  revision:RevisionReference,
   created_at:UtcInstant
 }
 ```
@@ -194,10 +204,10 @@ Semantics:
 
 ```text
 subject_kind=submission
-  revision/title = immutable Submission governed subject snapshot
+  revision = immutable Submission governed Revision/title snapshot
 
 subject_kind=obsolescence
-  revision/title = immutable target RevisionReference snapshot
+  revision = immutable target RevisionReference snapshot
 ```
 
 Properties:
@@ -207,6 +217,7 @@ new operation               0
 new route                   0
 new Permission              0
 new semantic owner          0
+new schema family           0
 new persistence authority   0
 frontend join/read fan-out  0
 ```
@@ -215,7 +226,7 @@ The projection remains non-authoritative navigation/recognition data. B06 re-rea
 
 Without this precision, a professional queue would force users to identify governance work primarily by code + generic `Submission/Obsolescence`, which is materially weaker than the already-available governed subject truth.
 
-**Status:** OPEN / operator adjudication required before final B05 LOCK. P7 may compare composition using the candidate fields, clearly marked as B05-F1.
+**Status:** OPEN / operator adjudication required before final B05 LOCK. P7 may compare composition using the candidate member, clearly marked as B05-F1.
 
 ## 7. Bounded design constraints for P7
 
