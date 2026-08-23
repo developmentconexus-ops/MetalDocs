@@ -6,6 +6,7 @@
 > **Predecessors:** B01 / B01N / B02 / B03 / B04 / B05 / B06 LOCKED.  
 > **Bounded authority:** `../../decisions/document-history-recognition-read.md`.  
 > **Canonical P8 R1:** `t11-b07-document-history-functional-wireframe.html`.  
+> **Canonical HTML blob:** `20ec64d34085fbc9075b136a61e69c48c0cad981`.  
 > **Implementation:** BLOCKED.  
 > **LOCK:** NOT YET — operator must operate/iterate P8 first.
 
@@ -80,19 +81,7 @@ Release predecessor is projected as:
 predecessor_revision?: RevisionIdentity
 ```
 
-The refinement creates no:
-
-```text
-operation 87+
-route
-Permission
-semantic owner
-lifecycle state
-Audit join
-History sort/filter/search DSL
-historical title-at-revision-creation snapshot
-frontend historical relationship graph as authority
-```
+The refinement creates no operation 87+, route, Permission, semantic owner, lifecycle state, Audit join, History sort/filter/search DSL, fabricated title-at-revision-creation snapshot or frontend historical relationship graph as authority.
 
 Current census remains 86 operations / 11 routes / 16 PermissionCode values.
 
@@ -225,6 +214,16 @@ docs/work/current/t11-b07-document-history-functional-wireframe.html
 ```
 
 R1 is pure HTML/CSS/vanilla JavaScript with deterministic local fixtures only. It contains no production framework, API call, frontend Authorization evaluator or Product schema implementation.
+
+Local structural verification before repository write:
+
+```text
+HTML parsed successfully
+static duplicate ids = 0
+JavaScript node --check = PASS
+local Git blob = 20ec64d34085fbc9075b136a61e69c48c0cad981
+repository blob = 20ec64d34085fbc9075b136a61e69c48c0cad981
+```
 
 ### Material regions / behavior exercised
 
