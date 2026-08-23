@@ -34,9 +34,7 @@ docs/decisions/governance-review-layer-seam.md
 docs/decisions/document-history-recognition-read.md
 ```
 
-B07-F1 authority: [Document History human-recognition read precision](decisions/document-history-recognition-read.md).
-
-Current system census:
+Current system census remains:
 
 ```text
 semantic owners                  4 business + 2 supporting
@@ -79,14 +77,10 @@ B06   Governance Case
        B06-F1 deadline projection                  CLOSED / OPERATOR-RATIFIED
        B06-F2 Governance Review Layer seam         CLOSED / OPERATOR-RATIFIED / FUTURE-SEAM
 B07   Document History
-       OPEN / ACTIVE
-       entry recovery                              COMPLETE
+       LOCKED / OPERATOR-RATIFIED
        B07-F1 human-recognizable History read      CLOSED / OPERATOR-RATIFIED
-       P6                                          COMPLETE
-       P7 H1 Revision Chapters                     OPERATOR-APPROVED
-       P8 R1 functional HTML                       READY / AWAITING OPERATOR USE
-       LOCK / P9 / P10                             NOT OPEN
-B08   Notifications Full Inbox                     NOT OPEN
+       P8 R1 / P9 / P10                            COMPLETE
+B08   Notifications Full Inbox                     NOT OPEN / NEXT ELIGIBLE
 B09   Audit                                        NOT OPEN
 B10   Organization Administration                 NOT OPEN
 B11   Access Administration                       NOT OPEN
@@ -107,9 +101,59 @@ Evidência    = audit/evidence
 
 Notifications remains transversal utility chrome, not `Minha Caixa` authority.
 
-## B06 closure
+## B07 closure
 
-B06 remains LOCKED. Its exact content, Step/deadline context, GovernanceFeedback/Decision separation, 403/409 reconciliation and future provider-neutral review seam are closed. P10 reused only:
+Canonical authority/work/evidence:
+
+```text
+docs/decisions/document-history-recognition-read.md
+docs/work/current/t11-b07-document-history-r1.md
+docs/work/current/t11-b07-document-history-functional-wireframe.html
+docs/work/current/t11-b07-screen-contract.md
+docs/work/current/t11-b07-pattern-consolidation.md
+```
+
+Locked experience:
+
+```text
+Revision Chapters + chronological event spine
+→ exact RevisionIdentity on every event
+→ frozen human Step label on governance Decisions
+→ server chronology remains authoritative
+→ later activity may repeat an older Revision marker
+→ exact historical Submission / Release opens read-only viewer
+→ cursor failure preserves already-loaded facts
+→ exact-content failure never substitutes another/current version
+→ History remains distinct from Audit
+→ no compare / restore / delete / History mutation
+```
+
+P9 closure:
+
+```text
+material regions/controls traced        20 / 20
+unbound material controls               0
+invented operations                     0
+operation 87+                           0
+screen-shaped APIs                      0
+frontend historical graph authority     0
+frontend Authorization evaluator        0
+History mutations                       0
+Audit reconstruction dependencies       0
+material findings                       0
+```
+
+P10 closure:
+
+```text
+shared patterns reused                  3
+new shared patterns graduated           0
+B07-local patterns                      6
+false abstractions                      0
+History/Audit semantic merges           0
+```
+
+Shared patterns reused are:
 
 ```text
 Global App Shell
@@ -117,99 +161,15 @@ Notification Quick Inbox
 Exact Read-Only Content Viewer Shell
 ```
 
-No B06 semantic rail/workspace abstraction was generalized.
-
-## B07 current gate
-
-Canonical current evidence:
-
-```text
-docs/work/current/t11-b07-document-history-r1.md
-docs/work/current/t11-b07-document-history-functional-wireframe.html
-```
-
-Current History boundary:
-
-```text
-/documents/:document_id/history
-→ op47 getDocument for current orientation only
-→ op53 getDocumentHistory for Controlled Documents history
-→ document.read_history
-→ read-only; no History mutation
-→ History != Audit
-```
-
-Current op53 remains cursor-paginated in server order:
-
-```text
-occurred_at ASC,
-kind,
-semantic id
-```
-
-### B07-F1 — CLOSED / OPERATOR-RATIFIED
-
-Operation 53 remains the sole History list read and the 86-operation census is unchanged.
-
-Every `DocumentHistoryItem` now projects exact human-recognition context:
-
-```text
-all variants
-  revision: RevisionIdentity
-
-governance_decision
-  subject_kind
-  frozen step_label
-
-feedback_added
-  subject_kind
-
-release predecessor
-  predecessor_revision?: RevisionIdentity
-```
-
-The exact law is owned by `docs/decisions/document-history-recognition-read.md`.
-
-No Audit join, browser historical graph authority, fabricated title-at-revision-creation snapshot, new operation, route, Permission, owner or lifecycle state is introduced.
-
-### P7 — OPERATOR-APPROVED
-
-```text
-H1 Revision Chapters + chronological event spine
-```
-
-The chronological stream is authoritative. A later event may target an older Revision after a newer Revision cycle has occurred.
-
-P8 R1 exercises this explicitly:
-
-```text
-REV001 original cycle / Release
-REV002 later cycle / cancellation
-REV001 marker appears again later
-  obsolescence request / withdrawal
-  new request / governance / completion
-```
-
-The repeated Revision marker is a P8 UX hypothesis for preserving server chronology without moving later events backward in time.
-
-Content-bearing Submission/Release events open the existing Exact Read-Only Content Viewer Shell.
-
-P8 R1 also exercises cursor continuation/failure, exact-content failure, disclosure-neutral 404, responsive reflow and inherited B01N Quick Inbox.
-
-Verified canonical HTML blob:
-
-```text
-20ec64d34085fbc9075b136a61e69c48c0cad981
-```
+B07 does not graduate a generic Timeline/Event/History abstraction.
 
 ## Exact next action
 
 ```text
-1. Operator opens/operates B07 functional P8 R1 from the chat attachment.
-2. Exercise cursor continuation until REV001 reappears after REV002 cancellation.
-3. Exercise Submission/Release historical viewer, pagination failure, content failure and 404 state.
-4. If friction/finding exists -> revise the same B07 HTML; do not open B08.
-5. If operator explicitly LOCKS B07 -> P9 Screen Contract -> P10 pattern consolidation.
+1. B08 Notifications Full Inbox is the next eligible FP1 block and remains NOT OPEN.
+2. Open B08 only when the operator chooses to continue FP1.
+3. Do not open B09+ early.
+4. Implementation remains blocked.
 ```
 
 ## Hard stops
@@ -221,6 +181,7 @@ no production framework in P8
 no frontend History graph as business authority
 no History/Audit semantic merge
 no compare/restore/delete without current Product authority
+no dormant inline-review UI
 no frontend Authorization matrix
 no unopened downstream block design
 no legacy restoration by sunk cost
