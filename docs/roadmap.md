@@ -20,7 +20,7 @@ branch                 arch/t11-implementation-program
 opening main           cae6ba48df5d611959c0390e0f2b9b8194d62a9d
 ```
 
-Current Product/architecture authority lives in `docs/product/**`, `docs/architecture/**`, and `docs/decisions/**`. Discussion / `@mention` / Notifications is current under `docs/decisions/discussion-notifications-launch.md`. Document Official management action-hint precision is current under `docs/decisions/document-official-actions-read.md`.
+Current Product/architecture authority lives in `docs/product/**`, `docs/architecture/**`, and `docs/decisions/**`. Discussion / `@mention` / Notifications is current under `docs/decisions/discussion-notifications-launch.md`. Document Official management action-hint precision is current under `docs/decisions/document-official-actions-read.md`. My Work governance-row identification precision is current under `docs/decisions/my-work-governance-identification-read.md`.
 
 Current system census:
 
@@ -112,7 +112,13 @@ B04   Document Work / Authoring
        P9 Screen Contract                          COMPLETE
        P10 bounded pattern pass                    COMPLETE
 
-B05   My Work / Work Queues                        NEXT / NOT OPEN
+B05   My Work / Work Queues
+       CURRENT / CANDIDATE / NOT LOCKED
+       authority + legacy ergonomics recovery      COMPLETE
+       B05-F1 governance row RevisionReference     CLOSED / OPERATOR-RATIFIED
+       P7 queue composition                        NEXT / OPEN
+       functional low-fi P8                        NOT OPEN
+
 B06   Governance Case                              NOT OPEN
 B07   Document History                             NOT OPEN
 B08   Notifications Full Inbox                     NOT OPEN
@@ -314,19 +320,105 @@ Exact Read-Only Content Viewer Shell
 
 The pattern is planning vocabulary only; it does not create a generic resolver, provider adapter, lifecycle owner or implementation authorization.
 
+## B05 current candidate
+
+Planning record:
+
+```text
+docs/work/current/t11-b05-my-work-r1.md
+```
+
+Durable bounded read precision:
+
+```text
+docs/decisions/my-work-governance-identification-read.md
+```
+
+Locked inherited IA:
+
+```text
+Início
+  default /work operational-home presentation — B01 LOCKED
+
+Minha Caixa
+  Para aprovação → detailed governance-work presentation
+  Em edição      → detailed authoring-work presentation
+```
+
+B05 remains read-only:
+
+```text
+listAuthoringWork
++ listGovernanceWork
+→ recognition / selection / navigation only
+→ owner lens rechecks exact/current truth
+```
+
+Operator-ratified B05-F1:
+
+```text
+WorkGovernanceItem {
+  governance_attempt_id
+  subject_kind
+  document
+  revision:RevisionReference
+  created_at
+}
+```
+
+`revision` is exact governed-subject recognition data:
+
+```text
+submission   -> immutable Submission Revision/title snapshot
+obsolescence -> exact governed target RevisionReference
+```
+
+No row-admission, permission, operation, route, persistence or owner change is implied. B06 remains owner of Steps, feedback, allowed actions, exact governed content and decisions.
+
+Legacy queue evidence may inform only:
+
+```text
+queue scanning / selection
+one selected work summary
+previous / next and keyboard orientation
+clear loading / empty / stale-row recovery
+human code / Revision / title prominence
+```
+
+Explicitly excluded absent current authority:
+
+```text
+quick approve/return
+SLA / due / overdue
+quorum / Step preview
+filters/sort DSL
+combined authoring/governance priority feed
+per-row getGovernanceAttempt enrichment
+```
+
 ## Exact next action
 
 ```text
-B05 My Work / Work Queues is NEXT / NOT OPEN.
+B05 P7 — compare only the real composition alternatives:
 
-When B05 opens:
-  recover only bounded current My Work authority + legacy queue ergonomics evidence
-  execute P6/P7 only where triggered
-  build one functional low-fi P8 candidate
-  operator operates / iterates / LOCKs
-  then P9 / P10
+A. focused lane / full-width queue for the selected Minha Caixa intent
+B. two-lane detailed overview
+C. legacy-inspired master/selection queue with bounded read-only summary
 
-Do not generate B06+ as baseline early.
+Evaluate against:
+  task completion
+  scanability / recognition
+  density / cognitive load
+  context preservation
+  independent cursor pagination truth
+  stale-row recovery
+  accessibility / keyboard behavior
+  responsive viability
+  backend truth fit
+
+Select one leading P7 hypothesis.
+Do NOT generate P8 before that direction is operator-approved.
+Do NOT design B06+.
 ```
 
 ## Hard stops
