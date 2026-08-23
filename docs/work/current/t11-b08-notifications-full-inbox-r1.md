@@ -1,38 +1,37 @@
-# T11 — B08 Notifications Full Inbox R1 — Method v2.2
+# T11 — B08 Notifications Full Inbox R1 — Method v2.2 locked
 
-> **Status:** OPEN / ACTIVE / B08-F1 OPERATOR-RATIFIED / P6 COMPLETE / P7 H1 OPERATOR-RATIFIED / P8 R1 READY FOR OPERATOR USE.  
+> **Status:** LOCKED / OPERATOR-RATIFIED / P9-P10 COMPLETE.  
 > **Block:** B08 — Notifications Full Inbox.  
 > **Method:** Frontend Product Experience Planning Method v2.2 + DevelopmentConexus Engineering Method.  
 > **Predecessors:** B01 / B01N / B02 / B03 / B04 / B05 / B06 / B07 LOCKED.  
 > **Bounded authorities:** `../../decisions/discussion-notifications-launch.md` + `../../decisions/notification-inbox-recognition-read.md`.  
 > **Canonical P8 R1:** `t11-b08-notifications-full-inbox-functional-wireframe.html`.  
 > **Canonical HTML blob:** `bb130535721b2381524763a4885ade5199a15596`.  
-> **Implementation:** BLOCKED.  
-> **LOCK:** NOT YET — operator must operate/iterate P8 first.
+> **P9:** `t11-b08-screen-contract.md`.  
+> **P10:** `t11-b08-pattern-consolidation.md`.  
+> **Implementation:** BLOCKED.
 
-## 1. Ratified basis
+## 1. Operator LOCK basis
 
-The operator approved:
+The operator approved the B08 design, ratified the written candidate, operated P8 R1 and then explicitly approved the operated result.
 
-```text
-B08 entry / continue FP1
-B08-F1 + P7 H1 design in chat
-written B08 candidate exactly as recorded
-```
-
-B08-F1 durable authority:
+Locked sequence:
 
 ```text
-../../decisions/notification-inbox-recognition-read.md
+B08 entry / continue FP1                     OPERATOR-AUTHORIZED
+B08-F1 + H1 in-chat design                    OPERATOR-APPROVED
+written B08 candidate                         OPERATOR-RATIFIED
+P8 R1 functional HTML                         OPERATED / OPERATOR-APPROVED
+B08 final LOCK                                OPERATOR-RATIFIED
+P9 Screen Contract                            COMPLETE
+P10 Pattern Consolidation                     COMPLETE
 ```
 
-Current census remains:
+No operator-requested structural revision was required after P8 R1.
 
-```text
-86 operations / 11 routes / 16 PermissionCode values
-```
+## 2. Product boundary locked
 
-## 2. Product boundary
+Stable route and operation homes remain:
 
 ```text
 /notifications
@@ -51,11 +50,17 @@ Notifications = personal attention / triage
 Minha Caixa   = assigned authoring/governance work
 ```
 
-B08 does not become a second Document Official, Discussion, viewer, task queue or Authorization surface.
+B08 is not a second Document Official, Discussion, viewer, task queue, Audit stream or Authorization surface.
+
+Current census remains:
+
+```text
+86 operations / 11 routes / 16 PermissionCode values
+```
 
 ## 3. B08-F1 — CLOSED / OPERATOR-RATIFIED
 
-Each presentable `DOCUMENT_MENTION` op82 row is independently human-recognizable after server-side current disclosure:
+Each presentable `DOCUMENT_MENTION` op82 row is independently human-recognizable after current server-side disclosure:
 
 ```text
 NotificationInboxItem
@@ -69,9 +74,17 @@ NotificationInboxItem
     bounded server-composed message_preview
 ```
 
-Persistence remains Notification/source identities + engagement only. Source text/title/profile/ACL is not copied into Notifications authority.
+Notification persistence remains source identities + engagement only. The following are not copied into Notifications persistence merely for rendering:
 
-Fixed views:
+```text
+Document title/code snapshots
+message text/preview
+author display name
+Revision title
+source ACL/presentability truth
+```
+
+Fixed list meanings remain:
 
 ```text
 active    = presentable + non-archived
@@ -81,7 +94,7 @@ archived  = presentable + archived
 
 `unread` is a subset of active. There is no unseen list view.
 
-## 4. P7 — H1 Focused Triage Inbox — OPERATOR-RATIFIED
+## 4. Locked experience — Focused Triage Inbox
 
 ```text
 Notificações
@@ -90,8 +103,8 @@ Notificações
 
 [ Caixa de entrada ] [ Não lidas ] [ Arquivadas ]
 
-one server-order list
-  source recognition
+one canonical recency-ordered list
+  human-recognizable source
   Nova distinct from Não lida
   Abrir conversa
   Marcar lida / não lida
@@ -100,36 +113,86 @@ one server-order list
 cursor continuation
 ```
 
-Source-open remains a boundary to B03:
+Canonical order stays server-owned:
 
 ```text
-op83 read=true
--> exact source.document.document_id + source.message_id
--> B03
--> op79 anchor_message_id
--> current disclosure rechecked
+created_at DESC,
+notification_id DESC
 ```
 
-## 5. Engagement law represented
+No browser grouping or re-sort by source, author, read state or Document becomes collection authority.
+
+## 5. Engagement law locked
 
 ```text
 READ => SEEN
-mark unread preserves seen
+mark unread clears read_at only
+mark unread never restores unseen/new
 archive/unarchive preserves read + seen
 archive != delete
 read != Document read / acknowledgement
 ```
 
-Seen remains presentation-driven:
+Seen is presentation-driven:
 
 ```text
 fetch/cache != seen
-materially present unseen row -> candidate for bounded op84 batch
+materially presented unseen row -> candidate for bounded op84 batch
+server intersects current recipient + current presentability
 ```
 
-P8 deliberately exposes the seen-batch ids in a review-only console so the operator can falsify whether loaded-but-off-screen rows are being marked seen prematurely.
+B08 exposes no manual `mark seen` / `mark unseen` Product control.
 
-## 6. P8 R1 — functional low-fidelity evidence
+## 6. Source handoff locked
+
+Source activation uses exact server-returned identities:
+
+```text
+op82 source.document.document_id
++ op82 source.message_id
+```
+
+Sequence:
+
+```text
+user activates source
+-> op83 read=true
+-> admitted success
+-> B03 Document Official route
+-> B03 op79 anchor_message_id = exact source.message_id
+-> current B03 disclosure rechecked
+```
+
+If op83 returns non-disclosing 404 because current presentability drifted:
+
+```text
+refetch Inbox
+stale row may disappear
+no source navigation
+no reason/source metadata leak
+```
+
+A Notification being read never proves the source Document/message was viewed.
+
+## 7. Realtime locked
+
+Operation 86 remains invalidation only:
+
+```text
+event: notifications.changed
+data: {}
+```
+
+Frontend behavior:
+
+```text
+signal
+-> invalidate/refetch canonical op82 state
+```
+
+SSE contains no Notification/Document/message/User business payload. Disconnect is a freshness degradation only; reconnect/focus/refetch restores canonical truth.
+
+## 8. P8 R1 evidence
 
 Canonical file:
 
@@ -137,28 +200,19 @@ Canonical file:
 docs/work/current/t11-b08-notifications-full-inbox-functional-wireframe.html
 ```
 
-The artifact is pure:
+R1 is behaviorally truthful but technically disposable:
 
 ```text
-HTML
-CSS
-vanilla JavaScript
-deterministic local fixtures
-IntersectionObserver only for P8 presentation/seen simulation
+HTML + CSS + vanilla JavaScript
+local deterministic fixtures
+no React
+no backend/API call
+no OpenAPI client
+no real SSE transport
+no frontend Authorization evaluator
 ```
 
-It contains no:
-
-```text
-React
-backend/API calls
-OpenAPI client
-real SSE transport
-frontend Authorization evaluator
-Product persistence/schema implementation
-```
-
-### Structural verification before repository write
+Structural verification captured before repository write:
 
 ```text
 HTML parse                          PASS
@@ -170,64 +224,106 @@ local Git blob                      bb130535721b2381524763a4885ade5199a15596
 repository blob                     bb130535721b2381524763a4885ade5199a15596
 ```
 
-## 7. Material P8 interactions implemented
+Material behavior exercised:
 
 ```text
 active / unread / archived lenses
 unseen + unread item
 seen + intentionally unread item
 read item
-per-item read / unread
-archive / unarchive preserving read state
+read / unread
+archive / unarchive preserving state
 archived unread item
 mark-all-read affecting active unread only
-IntersectionObserver seen queue + bounded batch simulation
-loaded page-2 rows remaining unseen until materially presented
-exact source-open B03 boundary with document_id + message_id
-one-shot access-drift 404 / row disappearance
-cursor continuation
-cursor failure + retry preserving loaded rows
-per-item mutation failure preserving state
-mark-all-read failure preserving state
-initial Inbox unavailable + retry
-empty active / unread / archived fixtures
-SSE `notifications.changed {}` invalidation + canonical refetch simulation
-SSE disconnect/reconnect freshness behavior
-Quick Inbox using the same local engagement/count state
-responsive one-column treatment
-Escape/focus/live-region recovery structure
+presentation-driven seen batching
+loaded-but-off-screen rows staying unseen until presentation
+exact B03 source boundary
+access-drift 404 disappearance
+cursor continuation + failure/retry
+per-item + mark-all failure
+initial unavailable state
+three empty states
+SSE invalidation/refetch + disconnect/reconnect
+Quick Inbox / Full Inbox shared engagement/count state
+responsive/accessibility recovery structure
 ```
 
-Review-only fixture controls are explicitly outside Product UI.
+## 9. P9 Screen Contract closure
 
-## 8. Ordering / realtime represented
-
-Canonical fixture order follows:
+Canonical P9:
 
 ```text
-created_at DESC,
-notification_id DESC
+docs/work/current/t11-b08-screen-contract.md
 ```
 
-No Product sort/search/custom filter exists.
-
-Realtime fixture law:
+Closure proof:
 
 ```text
-notifications.changed {}
--> invalidate
--> refetchCanonical fixture
+material B08 regions/controls traced         22 / 22
+unbound material controls                    0
+invented operations                          0
+operation 87+                                absent
+screen-shaped APIs                           0
+frontend presentability/AuthZ evaluator      0
+second Notification state store              0
+source-workspace duplication                 0
+SSE business-payload authority               0
+material B08 Screen Contract findings        0
 ```
 
-The SSE simulation carries no Notification row payload.
+Operation homes remain 82–86; B03 op79 is only the destination owner read after explicit source handoff.
 
-## 9. Explicit non-goals preserved
+## 10. P10 Pattern Consolidation closure
+
+Canonical P10:
+
+```text
+docs/work/current/t11-b08-pattern-consolidation.md
+```
+
+Existing shared patterns reused:
+
+```text
+Global App Shell
+Notification Quick Inbox
+```
+
+No new shared Product/component pattern graduated.
+
+B08-local patterns retained:
+
+```text
+Focused Triage Inbox
+fixed active/unread/archived lens set
+human-recognizable Notification row
+novelty separate from read state
+presentation-driven seen batching
+Notification engagement reconciliation
+source engagement + owner-lens handoff
+SSE invalidation-only reconciliation
+```
+
+P10 explicitly rejects a generic Inbox, Activity/Event feed, generic filter engine, realtime entity sync, deep-link resolver or generic seen/read state machine.
+
+Closure:
+
+```text
+existing locked shared patterns reused           2
+new shared semantic patterns graduated            0
+B08-local semantic/composition patterns retained  8
+false abstractions introduced                     0
+Notifications/Minha Caixa semantic merges         0
+source-workspace duplications                      0
+```
+
+## 11. Explicit non-goals preserved
+
+B08 Launch does not add:
 
 ```text
 search
-free-form/custom filters
+free-form/custom/saved filters
 filter by author/Document
-saved views
 bulk row selection/archive
 mark-all-unread / mark-unseen
 snooze / priority / reminders
@@ -238,37 +334,19 @@ Notification-kind selector
 source reply/editor/viewer inside Inbox
 ```
 
-## 10. Operator-use focus
-
-The operator should especially exercise:
-
-```text
-1. Compare "Nova" vs "Não lida".
-2. Mark a seen row unread and confirm it does not become Nova.
-3. Archive a read row and inspect the same read state under Arquivadas.
-4. Open an archived unread row, unarchive it, and inspect its engagement continuity.
-5. Load page 2 and inspect the Seen batching console before scrolling lower rows into view.
-6. Arm Próximo abrir -> access drift 404 and open one source.
-7. Arm page/action/mark-all failures and confirm current visible truth is preserved.
-8. Emit SSE changed {} and confirm the new row appears only after the simulated refetch.
-9. Open the bell Quick Inbox and confirm counts/engagement match the Full Inbox.
-10. Resize to narrow/mobile and inspect row actions + Quick Inbox sheet behavior.
-```
-
-## 11. Current gate
+## 12. Final block closure
 
 ```text
 entry recovery                         COMPLETE
 P6                                     COMPLETE
 B08-F1                                 CLOSED / OPERATOR-RATIFIED
 P7 H1                                  OPERATOR-RATIFIED
-P8 R1 functional HTML                  EXISTS / READY FOR OPERATOR USE
-P8 material finding                    NONE RECORDED YET — OPERATOR USE PENDING
-B08 LOCK                               NOT YET
-P9 / P10                               NOT OPEN
-B09+                                   NOT OPEN
+P8 R1                                  LOCKED / OPERATOR-RATIFIED
+P9                                     COMPLETE
+P10                                    COMPLETE
+B08                                    LOCKED / OPERATOR-RATIFIED
+B09                                    NOT OPEN / NEXT ELIGIBLE
+B10-B12                                NOT OPEN
 ```
 
-Next gate:
-
-> Operator opens/operates B08 P8 R1. If friction/finding exists, revise the same B08 HTML. Only explicit B08 LOCK opens P9 Screen Contract then P10 pattern consolidation. B09 remains closed.
+Implementation remains blocked. B08 LOCK does not authorize Product code/schema/OpenAPI/runtime/deploy work, T12, merge, B09 opening or T11 closeout.
