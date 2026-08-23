@@ -109,7 +109,6 @@ B04   Document Work / Authoring
        right operational rail                      OPERATOR-APPROVED
        B04-F1 hybrid persistence UX                CLOSED / OPERATOR-RATIFIED
        functional low-fi P8 R1                     RENDERED / OPERATOR OPERATION+REVIEW
-       exact verification checkpoint               CI #1321 SUCCESS @ 9ed04e8d
 
 B05   My Work / Work Queues                        NOT OPEN
 B06   Governance Case                              NOT OPEN
