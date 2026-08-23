@@ -26,6 +26,7 @@ Current bounded T11 authorities include:
 
 ```text
 docs/decisions/discussion-notifications-launch.md
+docs/decisions/notification-inbox-recognition-read.md
 docs/decisions/document-official-actions-read.md
 docs/decisions/my-work-governance-identification-read.md
 docs/decisions/governance-step-deadline.md
@@ -83,9 +84,10 @@ B08   Notifications Full Inbox
        OPEN / ACTIVE
        entry recovery                              COMPLETE
        P6                                          COMPLETE
-       B08-F1 human-recognizable Inbox read        DESIGN APPROVED IN CHAT / WRITTEN RATIFICATION PENDING
-       P7 H1 Focused Triage Inbox                  DESIGN APPROVED IN CHAT / WRITTEN RATIFICATION PENDING
-       P8 / LOCK / P9 / P10                        NOT OPEN
+       B08-F1 human-recognizable Inbox read        CLOSED / OPERATOR-RATIFIED
+       P7 H1 Focused Triage Inbox                  OPERATOR-RATIFIED
+       P8 functional HTML                          OPEN / NEXT
+       LOCK / P9 / P10                             NOT OPEN
 B09   Audit                                        NOT OPEN
 B10   Organization Administration                 NOT OPEN
 B11   Access Administration                       NOT OPEN
@@ -112,43 +114,46 @@ B07 remains LOCKED. Document History uses server-authored Revision recognition, 
 
 ## B08 current gate
 
-Canonical written candidate:
+Canonical work record:
 
 ```text
 docs/work/current/t11-b08-notifications-full-inbox-r1.md
 ```
 
-Current Notification boundary remains:
+Durable B08-F1 authority:
 
 ```text
-/notifications
-→ op82 listNotifications
-→ op83 updateNotificationEngagement
-→ op84 markNotificationsSeen
-→ op85 markAllNotificationsRead
-→ op86 streamNotificationEvents (invalidation only)
-→ Notifications owner
-→ current DOCUMENT_MENTION source disclosure from Controlled Documents
+docs/decisions/notification-inbox-recognition-read.md
 ```
 
-B01N remains the global bell + Quick Inbox. B08 is the full persistent triage surface and does not become `Minha Caixa` or a second Document/Discussion workspace.
-
-### B08-F1 written candidate
-
-No operation 87+ is proposed. Existing op82 would project enough currently disclosable source context for one row to be independently recognizable:
+B08 remains the full persistent Notification triage surface over the already-admitted `/notifications` route:
 
 ```text
-Notification engagement identity/state
-+ stable DocumentReference
-+ exact message_id
+82 listNotifications
+83 updateNotificationEngagement
+84 markNotificationsSeen
+85 markAllNotificationsRead
+86 streamNotificationEvents
+```
+
+B01N remains global bell + Quick Inbox. B08 is not `Minha Caixa` and does not rebuild Document Official/Discussion.
+
+### B08-F1 — CLOSED / OPERATOR-RATIFIED
+
+Existing op82 is sufficient and now has bounded human-recognition projection authority:
+
+```text
+Notification identity + engagement state
++ current-disclosable DocumentReference
++ exact source message_id
 + author UserReference
-+ exact official Revision-at-post reference when one existed
++ exact official Revision-at-post when one existed
 + bounded server-composed message preview
 ```
 
-The source presentation remains read-time composition after current disclosure. Notification persistence continues to own only identities + engagement state; no Document title/message/profile/ACL copy becomes Notification authority.
+All source presentation is composed after current disclosure. Notifications persistence remains identity + engagement only; no source text/title/profile/ACL copy is promoted.
 
-Fixed list meanings remain:
+Fixed views remain:
 
 ```text
 active    = presentable + non-archived
@@ -156,14 +161,16 @@ unread    = presentable + non-archived + unread
 archived  = presentable + archived
 ```
 
-### P7 H1 written candidate
+Current census remains 86 operations / 11 routes / 16 PermissionCode values.
+
+### P7 H1 — OPERATOR-RATIFIED
 
 ```text
 Focused Triage Inbox
 → heading + unseen/unread summaries
 → Mark all read
 → Caixa de entrada / Não lidas / Arquivadas
-→ one chronological Notification list
+→ one canonical recency-ordered Notification list
 → per-item read/unread + archive/unarchive
 → exact source open to B03 Discussion anchor
 → cursor continuation/retry
@@ -171,25 +178,18 @@ Focused Triage Inbox
 → SSE only invalidates/refetches canonical op82 truth
 ```
 
-Not current B08 scope:
-
-```text
-search / arbitrary filters / saved views
-bulk selection/archive
-snooze / priority / reminders
-preferences / email / push
-Notification delete
-source reply/editor/viewer inside Inbox
-```
+No current search/filter/preferences/snooze/priority/delete/bulk-archive platform is admitted.
 
 ## Exact next action
 
 ```text
-1. Operator reviews and ratifies the written B08 candidate.
-2. Only after written ratification may B08-F1 become durable authority.
-3. Then open B08 P8 functional HTML for operator use.
-4. Do not open B09+ while B08 is active.
-5. Implementation remains blocked.
+1. Create the temporary B08 P8 realization plan under docs/work/current.
+2. Create B08 functional low-fidelity HTML from the ratified B08-F1 + P7 H1.
+3. Verify material local interactions/states and responsive/accessibility structure.
+4. Deliver the exact HTML to the operator for browser operation.
+5. If friction exists, revise the same B08 P8; do not open B09.
+6. Only explicit operator LOCK opens B08 P9 then P10.
+7. Implementation remains blocked.
 ```
 
 ## Hard stops
@@ -202,6 +202,7 @@ no Notifications/Minha Caixa semantic merge
 no frontend source-disclosure matrix or post-filter
 no copied source content/ACL as Notification authority
 no generic Inbox/filter/preferences platform without consumer
+no source reply/editor/viewer inside Inbox
 no frontend Authorization matrix
 no unopened downstream block design
 no legacy restoration by sunk cost
