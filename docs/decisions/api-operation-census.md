@@ -84,11 +84,32 @@ exact-byte resources          4
 
 The T11 creation reuses the current global durable Idempotency-Key law; its ReplaySnapshot stores stable `message_id` only and does not copy message/free text.
 
-## Authority law
+## Authority / historical-snapshot law
 
-`docs/decisions/discussion-notifications-launch.md` is the bounded current authority that supersedes prior Product/T6/T8-E/T8-F/T8-H/T9 sentences asserting that operation 79 was absent or that the Launch application census was closed at 78.
+`docs/decisions/discussion-notifications-launch.md` is the bounded current authority for operations 79–86 and supersedes prior current-tense Product/T6/T8-E/T8-F/T8-H/T9 statements asserting that operation 79 was absent or that the Launch application census was closed at 78.
 
-All unchanged journey meaning and wire laws remain owned by `docs/product/journeys.md` and `docs/architecture/wire-contract.md`. The eight-operation delta and its exact Discussion/Notification semantics are owned by the bounded current authority until a future substantive rewrite absorbs them.
+This page is the **sole current numeric census authority**. Therefore any older `78`, `78/78`, `operation 79 absent`, or `no operation 79` statement found in:
+
+```text
+Product/T6 authority
+T4/T8/T9/T10 architecture pages
+T8-F/T8-H/T9/T10 ratification records
+frontend-read/responsible-owner precision provenance
+transition/content-integrity closure prose
+other pre-T11 closure snapshots
+```
+
+is interpreted as one of:
+
+```text
+historical stage snapshot, truthful for that stage when ratified
+OR
+bounded current-tense clause superseded by this T11 census authority
+```
+
+It never overrides the current `86 / 11 / 13-13 / 4` census.
+
+All unchanged journey and wire laws remain owned by `docs/product/journeys.md` and `docs/architecture/wire-contract.md`. The eight-operation delta and exact Discussion/Notification semantics are owned by `docs/decisions/discussion-notifications-launch.md` until a future substantive rewrite absorbs them.
 
 Any operation **87 or later** requires unchanged semantic normalization already permitted by current authority or a new explicit bounded Product/T6 reopen. Framework convenience, screen shape or implementation preference is not authority to add an operation.
 
