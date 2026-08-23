@@ -272,6 +272,15 @@ responsive rail stacking
 
 Review-only fixture controls may force conflict/failure/expiry states. They are P8 Evidence controls, not Product UI.
 
+Fresh repository verification checkpoint after P8 + roadmap consolidation:
+
+```text
+HEAD 9245c33fa4910430ffec83b2205867689b2138d1
+CI   #1323 SUCCESS
+```
+
+This CI proves the repository envelope at that checkpoint. Browser-operable P8 behavior remains operator Evidence and is not claimed as automated E2E proof.
+
 ## 8. Current gate
 
 ```text
