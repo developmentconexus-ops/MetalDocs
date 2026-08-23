@@ -320,105 +320,16 @@ Exact Read-Only Content Viewer Shell
 
 The pattern is planning vocabulary only; it does not create a generic resolver, provider adapter, lifecycle owner or implementation authorization.
 
-## B05 current candidate
-
-Planning record:
-
-```text
-docs/work/current/t11-b05-my-work-r1.md
-```
-
-Durable bounded read precision:
-
-```text
-docs/decisions/my-work-governance-identification-read.md
-```
-
-Locked inherited IA:
-
-```text
-Início
-  default /work operational-home presentation — B01 LOCKED
-
-Minha Caixa
-  Para aprovação → detailed governance-work presentation
-  Em edição      → detailed authoring-work presentation
-```
-
-B05 remains read-only:
-
-```text
-listAuthoringWork
-+ listGovernanceWork
-→ recognition / selection / navigation only
-→ owner lens rechecks exact/current truth
-```
-
-Operator-ratified B05-F1:
-
-```text
-WorkGovernanceItem {
-  governance_attempt_id
-  subject_kind
-  document
-  revision:RevisionReference
-  created_at
-}
-```
-
-`revision` is exact governed-subject recognition data:
-
-```text
-submission   -> immutable Submission Revision/title snapshot
-obsolescence -> exact governed target RevisionReference
-```
-
-No row-admission, permission, operation, route, persistence or owner change is implied. B06 remains owner of Steps, feedback, allowed actions, exact governed content and decisions.
-
-Legacy queue evidence may inform only:
-
-```text
-queue scanning / selection
-one selected work summary
-previous / next and keyboard orientation
-clear loading / empty / stale-row recovery
-human code / Revision / title prominence
-```
-
-Explicitly excluded absent current authority:
-
-```text
-quick approve/return
-SLA / due / overdue
-quorum / Step preview
-filters/sort DSL
-combined authoring/governance priority feed
-per-row getGovernanceAttempt enrichment
-```
-
 ## Exact next action
 
 ```text
-B05 P7 — compare only the real composition alternatives:
-
-A. focused lane / full-width queue for the selected Minha Caixa intent
+B05 P7 — compare only the real queue-composition alternatives:
+A. focused lane / full-width queue
 B. two-lane detailed overview
-C. legacy-inspired master/selection queue with bounded read-only summary
+C. legacy-inspired master/selection queue
 
-Evaluate against:
-  task completion
-  scanability / recognition
-  density / cognitive load
-  context preservation
-  independent cursor pagination truth
-  stale-row recovery
-  accessibility / keyboard behavior
-  responsive viability
-  backend truth fit
-
-Select one leading P7 hypothesis.
-Do NOT generate P8 before that direction is operator-approved.
-Do NOT design B06+.
+Select one leading hypothesis before P8.
+B06+ remain NOT OPEN.
 ```
 
 ## Hard stops
