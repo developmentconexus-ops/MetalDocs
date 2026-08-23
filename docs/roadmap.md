@@ -87,8 +87,9 @@ B06   Governance Case
        entry recovery                              CLOSED
        B06-F1 case Step deadline projection        CLOSED / OPERATOR-RATIFIED
        P6                                          COMPLETE
-       P7                                          CANDIDATE / AWAITING OPERATOR ADJUDICATION
-       P8                                          NOT OPEN
+       P7 H1 Content-first Governance Workspace    OPERATOR-APPROVED
+       P8 R1 functional HTML                       READY / AWAITING OPERATOR USE
+       LOCK / P9 / P10                             NOT YET
 B07   Document History                             NOT OPEN
 B08   Notifications Full Inbox                     NOT OPEN
 B09   Audit                                        NOT OPEN
@@ -155,12 +156,18 @@ No manual priority state, generic sort/filter DSL, business-calendar buckets or 
 
 B05 P9 proves 19/19 material regions/controls with operations 54/55 only and zero invented write/API authority. P10 graduates no new shared pattern; B05 queue/deadline/cursor semantics remain local.
 
-## B06 current entry authority
+## B06 current authority / evidence
 
 Canonical current work record:
 
 ```text
 docs/work/current/t11-b06-governance-case-r1.md
+```
+
+Canonical functional P8 R1:
+
+```text
+docs/work/current/t11-b06-governance-case-functional-wireframe.html
 ```
 
 B06 owns the exact Governance Case lens only:
@@ -173,7 +180,7 @@ B06 owns the exact Governance Case lens only:
 → live server-derived allowed_actions
 ```
 
-B06-F1 is now operator-ratified:
+B06-F1 remains operator-ratified:
 
 ```text
 GovernanceStepView pending
@@ -192,7 +199,7 @@ docs/decisions/governance-case-step-deadline-read.md
 
 The deadline remains attention/context truth only. B06 owns no deadline mutation, SLA engine, lifecycle breach effect, manual priority or frontend Authorization.
 
-Current P7 leading candidate:
+P7 operator-approved structure:
 
 ```text
 Content-first Governance Workspace
@@ -204,16 +211,40 @@ Content-first Governance Workspace
     deliberate ACCEPT / RETURN_FOR_CHANGES decision zone
 ```
 
-The dossier-first separate-viewer structure is not leading; the three-column workflow cockpit is rejected. P7 remains CANDIDATE until operator adjudication. No P8 HTML has been created.
+Rejected:
+
+```text
+dossier-first separate-viewer structure as leading choice
+three-column generic workflow cockpit
+```
+
+P8 R1 exercises:
+
+```text
+Submission + obsolescence exact-subject cases
+active/overdue/preserved deadline presentation
+allowed_actions empty state
+feedback + pagination + ambiguous replay
+ACCEPT / RETURN_FOR_CHANGES confirmation
+required return reason
+409 Decision winner reconciliation
+403 current-authority reconciliation
+404 disclosure-neutral terminal state
+exact-content failure/retry
+clock crossing due_at without lifecycle effect
+responsive/accessibility structure
+```
+
+One explicit P8 UX hypothesis is under operator review: while exact governed bytes are unavailable, the R1 Decision zone is unavailable so the prototype does not imply successful content review. This is not Product/AuthZ authority and may be revised during P8 iteration.
 
 ## Exact next action
 
 ```text
-1. Operator adjudicates B06 P7 H1 Content-first Governance Workspace.
-2. If approved, create B06 functional P8 HTML with deterministic local fixtures/state simulation.
-3. Operate / iterate the same B06 block until explicit operator LOCK.
-4. Only after LOCK execute B06 P9 Screen Contract then P10 pattern consolidation.
-5. Do not design or open B07+ early.
+1. Operator opens and operates B06 functional P8 R1.
+2. Exercise Submission, obsolescence, deadline crossing, feedback, Decision, 409/403, 404 and content-failure states.
+3. If friction/finding exists -> revise the same B06 HTML as R2; do not open B07.
+4. If operator explicitly LOCKS B06 -> execute P9 Screen Contract then P10 pattern consolidation.
+5. Only after B06 P10 closure may B07 become eligible to open.
 ```
 
 ## Hard stops
