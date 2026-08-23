@@ -1,4 +1,4 @@
-# T11 — B03 Document Official R1 — Method v2.2 candidate
+# T11 — B03 Document Official R2 — Method v2.2 candidate
 
 > **Status:** CURRENT FP1 BLOCK / CANDIDATE / NOT LOCKED.  
 > **Block:** B03 — Document Official / Ficha + Viewer + stable-Document Discussion.  
@@ -8,34 +8,66 @@
 > **Predecessors:** B01 / B01N / B02 LOCKED.  
 > **Implementation:** BLOCKED.
 
-## 1. Previous evidence disposition
+## 1. Evidence disposition
 
-Preserved design learning:
+Preserved Product/UX decisions:
 
 ```text
 viewer-first whole-page B03              REJECTED — too collapsed
-record/ficha-first direction             OPERATOR-APPROVED LEADING DIRECTION
-sectioned vertical hierarchy A           OPERATOR-APPROVED LEADING DIRECTION
+record/ficha-first B03                   OPERATOR-APPROVED
 stable-Document Discussion on ficha      CURRENT Product authority
-viewer deliberately separate             preserved
-Notification -> exact message deep-link  current authority
+viewer deliberately separate             OPERATOR-APPROVED
+Notification -> exact message deep-link  CURRENT Product authority
 ```
 
-The previous file:
+Previous P8 storyboard:
 
 ```text
 t11-b03-document-official-wireframe.html
-```
-
-is now:
-
-```text
 REJECTED — wrong representation medium
 ```
 
-It remains evidence only. It was an HTML storyboard/static review board rather than the canonical functional P8 required by Method v2.2. Rejecting that artifact does **not** reject the approved hierarchy A.
+Method v2.2 replaced static/storyboard P8 evidence with a browser-operable functional low-fi prototype.
 
-## 2. User needs
+## 2. P7 visual-hypothesis adjudication
+
+The operator asked to recover the pre-Discussion B03 visual hypothesis that had an official-content preview on the same ficha.
+
+Historical evidence in the prior B03 ledger named:
+
+```text
+C — Two-column dossier
+left: identity / current Revision / responsibility / work context
+right: official-content summary card + actions
+lower: revisions / management / discussion
+```
+
+The operator reviewed a reconstructed C hypothesis updated with current Discussion/Notification semantics and **APPROVED** it as the visual/layout direction for P8.
+
+Selected composition:
+
+```text
+Document hero
+↓
+TWO-COLUMN DOSSIER
+  left
+    current-work context
+    ficha / metadata
+    management actions
+
+  right
+    official-content preview card
+    exact Revision / representation label
+    deliberate Visualizar completo action
+↓
+Revisions context — full width
+↓
+Stable-Document Discussion — full width
+```
+
+The preview is contextual recognition only. It never becomes exact-content authority and never replaces the separate viewer.
+
+## 3. User needs
 
 B03 must let a person answer and act on:
 
@@ -43,85 +75,79 @@ B03 must let a person answer and act on:
 What controlled Document is this?
 What is official now?
 Is newer work underway without replacing official truth?
-Who owns/responsibly maintains it?
-How do I deliberately read exact official content?
+Who responsibly maintains it and where does it belong?
+Can I recognize the official content without leaving the ficha?
+How do I deliberately open the exact official viewer?
 How do I reach Work or History without confusing their truth with this ficha?
 What are people discussing about this stable Document?
 Was I mentioned, and can I return to the exact message?
 What management actions are currently offered by the server?
 ```
 
-## 3. Leading structure A — preserved
+## 4. Canonical P8 R2
 
-Canonical reading order:
+Current functional evidence:
 
 ```text
-Shell inherited from B01/B01N
-↓
-Breadcrumb / return to Library
-↓
-Document hero
-  code
-  governed official title
-  lifecycle status
-  official Revision
-  primary: Visualizar documento
-  secondary: Download / History where admitted
-↓
-Current-context banner
-  disclosed open Revision or active obsolescence context
-↓
-Ficha do documento
-  Type
-  Area
-  Responsible owner
-  official Revision
-  released-at
-  representation/source information
-↓
-Revisões — current context only
-  official Revision
-  disclosed open Revision
-  link to B07 full History
-↓
-Gestão
-  server-hinted current actions only
-↓
-Discussão do Documento
-  stable-Document timeline
-  reply reference
-  @mention composer
+t11-b03-document-official-functional-wireframe.html
 ```
 
-Discussion remains intentionally below official/current-management truth. A Notification deep-link reveals/scrolls directly to the target message without creating a second B03 layout.
-
-## 4. Distinct viewer surface
-
-`Visualizar documento` changes the material viewing mode and therefore opens a distinct B03-owned read-only surface.
+Medium:
 
 ```text
-Ficha
--> Visualizar documento
--> B03 read-only exact official-content viewer
--> Voltar para ficha
+HTML
+CSS
+vanilla JavaScript
+local deterministic fixtures
+```
+
+P8 R2 combines the selected historical C layout with the already-reviewed interactions:
+
+```text
+bell -> Quick Inbox
+DOCUMENT_MENTION -> exact Discussion anchor
+preview -> exact-content viewer -> back to ficha
+hero/revision Visualizar -> same viewer
+reply select/cancel
+@mention autocomplete/select
+send local Discussion fixture
+responsible-owner drawer
+server-hinted management disclosure/menu
+responsive navigation/dossier reflow
+explicit B04/B07/B08 transition stubs
+```
+
+The prototype is Evidence only; no local fixture becomes Product/server truth.
+
+## 5. Official preview vs exact viewer
+
+Preview laws:
+
+```text
+contextual recognition only
+bound to current official Revision presentation
+no DRAFT substitution
+no edit/governance controls
+click opens the same B03 exact-content viewer
+responsive layout may move preview below ficha without changing meaning
 ```
 
 Viewer laws:
 
 ```text
+Ficha -> Visualizar documento / preview -> viewer -> Voltar para ficha
+read-only
+explicit Document code + official Revision outside rendered bytes
+exact source vs official rendition remains labeled truth
 no edit
 no submit
 no governance controls
-explicit Document code + Revision outside rendered bytes
-exact source vs official rendition remains labeled truth
-no official Release -> no fake viewer / no DRAFT substitution
+no official Release -> no fake viewer
 ```
 
-This is not B04 Document Work.
+This remains distinct from B04 Document Work.
 
-## 5. Discussion interaction laws represented in P8
-
-P8 must behaviorally demonstrate:
+## 6. Discussion interaction laws represented in P8
 
 ```text
 load stable-Document Discussion fixture
@@ -133,7 +159,7 @@ send simulated accepted message
 Notification entry -> anchor_message_id -> exact message reveal/highlight
 ```
 
-P8 simulation must preserve Product meaning:
+Semantic separations remain:
 
 ```text
 Discussion != WorkingContent comments
@@ -143,51 +169,48 @@ Mention display text != identity authority
 Notification != access grant
 ```
 
-No production Lexical integration is required in P8. The low-fi composer may use plain browser controls while representing the accepted Text | Mention semantics truthfully.
+No production Lexical integration is required in P8.
 
-## 6. Locked Notification chrome reuse
+## 7. Locked Notification chrome reuse
 
 B03 reuses B01N; it does not redesign it.
-
-The low-fi P8 must allow the operator to exercise the already-locked flow:
 
 ```text
 bell
 -> Quick Inbox
 -> DOCUMENT_MENTION item
--> mark item seen/read in local fixture
--> close Quick Inbox
--> remain/navigate to exact B03 Document
--> reveal Discussion
--> highlight anchor message
+-> local seen/read simulation
+-> exact B03 Document
+-> Discussion anchor reveal
 ```
 
 Quick Inbox is not full B08 triage.
 
-## 7. Downstream transition law
-
-B03 may demonstrate destination intent without designing unopened blocks:
+## 8. Downstream transition law
 
 ```text
 Abrir trabalho
-  -> transition stub: /documents/:document_id/work
-  -> B04 NOT OPEN; no B04 baseline generated
+  -> /documents/:document_id/work stub
+  -> B04 NOT OPEN
 
 Histórico
-  -> transition stub: /documents/:document_id/history
-  -> B07 NOT OPEN; no B07 baseline generated
+  -> /documents/:document_id/history stub
+  -> B07 NOT OPEN
+
+Ver todas as notificações
+  -> /notifications stub
+  -> B08 NOT OPEN
 ```
 
-This preserves the block progression law.
+No unopened block is visually designed inside B03.
 
-## 8. P7 lightweight data/action feasibility
-
-Leading hypothesis A requires:
+## 9. P7/P8 data feasibility
 
 | Requirement | Source | Status |
 |---|---|---|
 | stable Document code/status/type/area/owner | `getDocument` / current read authority | PRESENT-IN-AUTHORITY |
 | official Revision/title/released-at/content summary | `getDocument` + Release reads | PRESENT-IN-AUTHORITY |
+| official preview input | exact current official content summary/representation | PRESENT-IN-AUTHORITY |
 | disclosed open Revision context | `getDocument.open_revision` | PRESENT-IN-AUTHORITY |
 | active obsolescence context | current Document/request read | PRESENT-IN-AUTHORITY |
 | Discussion timeline + anchor navigation | op79 | PRESENT-IN-AUTHORITY |
@@ -196,9 +219,9 @@ Leading hypothesis A requires:
 | Notification source navigation | ops82–86 + current authority | PRESENT-IN-AUTHORITY |
 | management action visibility | `DocumentOfficialView.allowed_actions` | **FINDING B03-F1** |
 
-No screen-shaped API is justified by the candidate.
+No screen-shaped API is justified by the selected layout.
 
-## 9. B03-F1 — required before final LOCK
+## 10. B03-F1 — required before final LOCK
 
 Candidate precision remains:
 
@@ -222,59 +245,33 @@ no frontend permission matrix
 no new operation / route / Permission / semantic owner
 ```
 
-P8 may simulate a server-provided `allowed_actions` fixture to evaluate placement, but B03 cannot receive final operator LOCK until this precision is durably reconciled or proven unnecessary.
+P8 may simulate `allowed_actions`; B03 cannot receive final operator LOCK until this precision is durably reconciled or proven unnecessary.
 
-## 10. Canonical P8 contract under Method v2.2
+## 11. Current operator gate
 
-Required medium:
+P7 visual direction is approved. P8 R2 is now the only current visual/interaction candidate.
 
-```text
-HTML
-CSS
-vanilla JavaScript
-local deterministic fixtures
-```
-
-The artifact must be one browser-operable B03 prototype, not multiple static screens stacked as a review board.
-
-Material local interactions must work:
+Operator should operate it and judge:
 
 ```text
-Notification Quick Inbox open/close
-Notification -> Discussion anchor
-Visualizar documento -> viewer -> Voltar
-Discussion reply select/cancel
-@mention candidate open/select
-send local Discussion fixture
-management disclosure/menu/drawer used by current candidate
-responsive shell/drawer plausibility
-```
-
-Controls that merely cross into B04/B07 may resolve to explicit transition stubs rather than inventing those screens.
-
-## 11. P8 review questions
-
-Operator should operate the prototype and judge:
-
-```text
-Does the ficha feel like the Document record rather than a dashboard?
-Is official truth visible before work/management/discussion?
-Does current open work remain clearly separate from official truth?
-Is Visualizar documento discoverable and does the separate viewer feel natural?
-Does Notification -> exact message feel obvious and context-preserving?
-Is Discussion too low, too high or appropriately secondary to official truth?
-Does @mention interaction feel natural without turning B03 into chat?
-Are management controls visible enough without dominating reader intent?
-Does mobile/narrow behavior preserve the same semantic order?
+Does the two-column dossier feel more modern without becoming a dashboard?
+Does the official preview materially improve recognition/context?
+Is the preview large enough without overpowering the ficha?
+Does opening the full viewer feel like the natural next step?
+Does current work remain clearly separate from official truth?
+Are management controls appropriately secondary?
+Do Revisions and Discussion work well at full width below the dossier?
+Does Notification -> exact message remain context-preserving?
+Does narrow/mobile reflow preserve the same reading order?
 ```
 
 ## 12. Exit
 
 ```text
-functional P8 operated by operator
+P8 R2 operated by operator
 -> findings iterated only inside B03
 -> B03-F1 closed
--> operator-only LOCK
+-> operator-only B03 LOCK
 -> P9 exact Screen Contract + bidirectional trace
 -> P10 bounded pattern consolidation
 -> only then B04 may open normally
