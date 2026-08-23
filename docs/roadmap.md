@@ -30,15 +30,10 @@ docs/decisions/document-official-actions-read.md
 docs/decisions/my-work-governance-identification-read.md
 docs/decisions/governance-step-deadline.md
 docs/decisions/governance-case-step-deadline-read.md
+docs/decisions/governance-review-layer-seam.md
 ```
 
-B06-F2 is planning work, not durable authority:
-
-```text
-docs/work/current/t11-b06-f2-docx-review-layer.md
-```
-
-Current system census:
+Current system census remains:
 
 ```text
 semantic owners                  4 business + 2 supporting
@@ -79,12 +74,13 @@ B05   My Work / Work Queues
 B06   Governance Case
        OPEN / ACTIVE
        B06-F1 deadline projection                  CLOSED / OPERATOR-RATIFIED
+       B06-F2 DOCX Review Layer seam               CLOSED / OPERATOR-RATIFIED / FUTURE-SEAM
        P6                                          COMPLETE
        P7 H1 Content-first                         OPERATOR-APPROVED
        P8 R1 functional HTML                       OPERATOR-APPROVED
-       B06-F2 DOCX Review Layer seam               WRITTEN RATIFICATION PENDING
-       P8 R2 inline review                         NOT OPEN
-       LOCK / P9 / P10                             NOT YET
+       P8 R2 inline review                         NOT REQUIRED FOR CURRENT LAUNCH
+       LOCK                                        READY / AWAITING EXPLICIT OPERATOR LOCK
+       P9 / P10                                    NOT OPEN
 B07   Document History                             NOT OPEN
 B08   Notifications Full Inbox                     NOT OPEN
 B09   Audit                                        NOT OPEN
@@ -117,7 +113,7 @@ docs/work/current/t11-b06-governance-case-functional-wireframe.html
 docs/work/current/t11-b06-f2-docx-review-layer.md
 ```
 
-Current B06 Product boundary remains:
+Current B06 Product boundary:
 
 ```text
 /work/governance/:attempt_id
@@ -128,34 +124,19 @@ Current B06 Product boundary remains:
 → server-derived allowed_actions; no frontend Authorization authority
 ```
 
-P8 R1 was operated and approved by the operator on 2026-08-23. The selected shape remains **Content-first Governance Workspace**: exact governed content dominant, with B06-local subject/Steps/feedback/Decision context beside it.
+P8 R1 was operated and approved by the operator on 2026-08-23. The selected shape remains **Content-first Governance Workspace**.
 
-### B06-F2 planning candidate
-
-Operator review surfaced a real future need for Word-like DOCX review, but it is **not promoted into current Launch**.
-
-Candidate invariants awaiting written ratification:
+B06-F2 is now durable future-seam authority only:
 
 ```text
-exact governed Submission remains immutable
+future selected-range review binds to exact immutable reviewed snapshot
 stable Document Discussion != inline governance review
 DRAFT EditorialComment remains separately deferred
-future selected-range review binds to the exact immutable reviewed snapshot
-current unanchored GovernanceFeedback remains valid
-tracked changes/suggestions require a separate semantic promotion
+tracked changes/suggestions require separate semantic promotion
 vendor/editor ids never become MetalDocs semantic authority
-RETURN leaves review context with the old immutable Submission
-old anchors never blindly remap onto changed DRAFT bytes
-future B04 remediation requires explicit server-authored review-context identity
-```
-
-Mechanism posture is non-authoritative:
-
-```text
-EigenPal Apache core       current viable free DOCX baseline
-EigenPal Pro               future commercial review candidate
-SuperDoc Community         excluded from proprietary baseline under AGPLv3
-SuperDoc commercial        future commercial candidate
+RETURN leaves old review context with old immutable Submission
+old anchors never blindly remap onto changed DRAFT
+future B04 remediation needs explicit server-authored review-context identity
 ```
 
 Current no-dormant-capability consequence:
@@ -172,11 +153,10 @@ P8 R2 inline-review controls absent
 ## Exact next action
 
 ```text
-1. Operator reviews/ratifies docs/work/current/t11-b06-f2-docx-review-layer.md.
-2. If ratified, promote only durable future seam/reopen obligations; keep current Launch API/census unchanged.
-3. Re-evaluate B06 LOCK on the approved R1; create R2 only if ratification changes present-tense visible behavior.
-4. After explicit B06 LOCK, execute P9 then P10.
-5. Only after B06 P10 closure may B07 open.
+1. Operator explicitly LOCKS B06 R1 if satisfied with the already-operated/approved experience.
+2. After explicit LOCK, execute B06 P9 Screen Contract.
+3. Then execute B06 P10 pattern consolidation.
+4. Only after B06 P10 closure may B07 open.
 ```
 
 ## Hard stops
