@@ -1,11 +1,12 @@
 # T11 — B05 My Work / Work Queues R1 — Method v2.2 candidate
 
-> **Status:** LOCKED / OPERATOR-RATIFIED / P8 COMPLETE.  
+> **Status:** LOCKED / OPERATOR-RATIFIED / P9-P10 COMPLETE.  
 > **Block:** B05 — My Work / Work Queues.  
 > **Method:** Frontend Product Experience Planning Method v2.2.  
 > **Predecessors:** B01 / B01N / B02 / B03 / B04 LOCKED.  
 > **Current bounded authorities:** `../../decisions/my-work-governance-identification-read.md` + `../../decisions/governance-step-deadline.md`.  
 > **Canonical P8:** `t11-b05-my-work-functional-wireframe.html`.  
+> **Post-LOCK proof:** `t11-b05-screen-contract.md` + `t11-b05-pattern-consolidation.md`.  
 > **Implementation:** BLOCKED.
 
 ## 1. Product / architecture boundary
@@ -290,7 +291,53 @@ keyboard, stale, error, empty and responsive behavior remain part of the experie
 
 No B01 terminology reopen is required from the tested `SUBMITTED` case.
 
-## 13. Post-LOCK proof gate
+## 13. P9 — exact Screen Contract — COMPLETE
+
+Canonical proof:
+
+```text
+docs/work/current/t11-b05-screen-contract.md
+```
+
+Closure:
+
+```text
+material B05 regions/controls traced        19 / 19
+unbound material controls                   0
+invented operations                         0
+operation 87+                               absent
+screen-shaped APIs                          0
+frontend Authorization evaluator            0
+frontend global queue sorter                 0
+manual priority state                        0
+per-row B06 enrichment                       0
+navigation identities unsourced              0
+material B05 Screen Contract findings        0
+```
+
+Only operations 54 `listAuthoringWork` and 55 `listGovernanceWork` are consumed directly by B05.
+
+## 14. P10 — bounded pattern consolidation — COMPLETE
+
+Canonical proof:
+
+```text
+docs/work/current/t11-b05-pattern-consolidation.md
+```
+
+Closure:
+
+```text
+existing locked shared patterns reused          2
+new shared semantic patterns graduated          0
+B05-local semantic patterns retained            7
+false abstractions introduced                   0
+unexplained duplicate locked semantic patterns  0
+```
+
+B05 reuses only the existing Global App Shell and Notification Quick Inbox as shared patterns. Queue/deadline/cursor/stale semantics remain B05-local until another LOCKED block proves a matching semantic contract.
+
+## 15. Block closure
 
 ```text
 B05 authority recovery                       COMPLETE
@@ -303,8 +350,8 @@ P7 focused queue A                           APPROVED
 P8 R1 base structure                         OPERATOR-APPROVED
 P8 R2 due-aware experience                   APPROVED / COMPLETE
 B05 LOCK                                     LOCKED / OPERATOR-RATIFIED
-P9 Screen Contract                           NEXT
-P10 pattern consolidation                    AFTER P9
+P9 Screen Contract                           COMPLETE
+P10 pattern consolidation                    COMPLETE
 ```
 
-B06 remains unopened while P9/P10 prove the locked B05 scope.
+B05 is closed for FP1. B06 may become the next frontend block only through the roadmap gate; this closure itself does not pre-design B06.
