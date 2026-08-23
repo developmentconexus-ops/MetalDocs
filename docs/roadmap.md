@@ -73,16 +73,15 @@ B04   Document Work / Authoring
        P8 / P9 / P10                               COMPLETE
 
 B05   My Work / Work Queues
-       CURRENT / CANDIDATE / NOT LOCKED
+       LOCKED / OPERATOR-RATIFIED
        B05-F1 governance row recognition           CLOSED / OPERATOR-RATIFIED
        B05-F2 neutral governance ordering          SUPERSEDED BY F4
        B05-F3 governance Step deadline             CLOSED / OPERATOR-RATIFIED
        B05-F4 due-aware governance queue           CLOSED / OPERATOR-RATIFIED
-       P7 focused queue A                          APPROVED
-       P8 R1 base structure                        OPERATOR-APPROVED
-       P8 R2 due-aware candidate                   RENDERED / OPERATOR OPERATION+REVIEW
+       P8 R2                                       APPROVED / COMPLETE
+       P9 / P10                                    COMPLETE
 
-B06   Governance Case                              NOT OPEN
+B06   Governance Case                              NEXT / NOT OPEN
 B07   Document History                             NOT OPEN
 B08   Notifications Full Inbox                     NOT OPEN
 B09   Audit                                        NOT OPEN
@@ -105,16 +104,16 @@ Evidência    = audit/evidence
 
 Notifications remains transversal utility chrome, not `Minha Caixa` authority.
 
-## B05 current bounded truth
-
-Planning / P8 evidence:
+## B05 locked references
 
 ```text
 docs/work/current/t11-b05-my-work-r1.md
 docs/work/current/t11-b05-my-work-functional-wireframe.html
+docs/work/current/t11-b05-screen-contract.md
+docs/work/current/t11-b05-pattern-consolidation.md
 ```
 
-Governance deadline law:
+Locked governance deadline law:
 
 ```text
 GovernanceRouteStep.due_in_days?
@@ -125,7 +124,7 @@ GovernanceRouteStep.due_in_days?
 → overdue has no automatic lifecycle effect
 ```
 
-Governance queue law:
+Locked governance queue law:
 
 ```text
 WorkGovernanceItem.due_at?
@@ -147,22 +146,20 @@ relative filters
 
 No manual priority state, generic sort/filter DSL, business-calendar buckets or client-side global re-sort is introduced.
 
-P8 R1 validated the focused-queue composition. P8 R2 now validates deadline-first triage, four bounded filters, no-deadline discoverability, cursor-anchor stability and intentional asymmetry with `Em edição`.
+B05 P9 proves 19/19 material regions/controls with operations 54/55 only and zero invented write/API authority. P10 graduates no new shared pattern; B05 queue/deadline/cursor semantics remain local.
 
 ## Exact next action
 
 ```text
-1. Operator operates B05 P8 R2.
-2. Test due-first scanability and no-deadline discoverability.
-3. Test Todos / Atrasados / Próximas 24h / Próximos 7 dias / Sem prazo.
-4. Advance fixture server time, then Carregar mais: cursor anchor must stay fixed.
-5. Fresh first-page must renew the anchor.
-6. Confirm Em edição remains free of deadline controls.
-7. Iterate only material findings.
-8. Operator-only B05 LOCK.
-9. Then P9 exact Screen Contract + P10 bounded pattern consolidation.
-10. B06+ remain NOT OPEN.
+1. Revalidate exact current HEAD / PR / CI before B06 entry work.
+2. Recover B06 current Governance Case Product/T2/T3/T6/T8-E/T8-F authority.
+3. Recover useful legacy Governance Case ergonomics only as Evidence.
+4. Identify human needs, current read/write/action boundaries and material authority gaps.
+5. Resolve any blocking B06 finding before P7 composition.
+6. Do not design B07+ early.
 ```
+
+B06 remains `NEXT / NOT OPEN` until its entry evidence is coherent; B05 closure does not implicitly open it.
 
 ## Hard stops
 
