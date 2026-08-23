@@ -40,9 +40,11 @@ B01  App Shell + Global IA       LOCKED / OPERATOR-RATIFIED
 B02  Library / discovery         LOCKED / OPERATOR-RATIFIED
 
 B03  Document Official           OPEN / CANDIDATE / NOT LOCKED
-      Discussion/Notifications   D0→D8 OPERATOR-RATIFIED CANDIDATE
+      Discussion/Notifications   D0→D8 OPERATOR-RATIFIED
       Lead GCR Round 2           CONVERGED — MATERIAL=0 / IMPORTANT=0
-      Fresh Fable challenge      CURRENT GATE
+      Fresh Fable                CONVERGED — MATERIAL=0 / IMPORTANT=1 / OPTIONAL=3
+      Fable adjudication         F-1 + O1→O3 ACCEPTED / ROUND 2 NOT JUSTIFIED
+      Upstream consolidation     CURRENT GATE
 
 B04+                             NOT OPEN
 ```
@@ -63,7 +65,7 @@ B03 remains record/ficha-first with a deliberate distinct read-only official-con
 
 ## Current accepted system invariants
 
-Until the Discussion/Notifications reopen is independently challenged, consolidated and promoted, current integrated authority remains:
+Until the Discussion/Notifications reopen is coherently consolidated and promoted across every owning authority, current integrated authority remains:
 
 ```text
 semantic owners                  4 business + Audit supporting
@@ -83,9 +85,9 @@ T8-E-RO  responsible_owner_candidates on getDocument
 B02-LD   first-page Library discovery options
 ```
 
-## Discussion / Mention / Notifications bounded reopen candidate
+## Discussion / Mention / Notifications bounded reopen — converged candidate
 
-Operator-ratified Product/UX/technical candidate:
+Operator-ratified and independently challenged Product/UX/technical result:
 
 ```text
 stable-Document Discussion
@@ -106,7 +108,7 @@ River remains the one durable future-work mechanism
 no generic EventBus / external broker / Redis baseline
 ```
 
-Corrected candidate result:
+Converged candidate result:
 
 ```text
 semantic owners                  4 business + 2 supporting
@@ -118,33 +120,59 @@ ETag read / mutation domains     13 / 13
 exact-byte resources             4
 ```
 
-Lead GCR corrections now binding inside the candidate:
+Converged enforcement precisions:
 
 ```text
 Authorization alone owns final Mention-target ALLOW/DENY
 protected author/target eligibility serializes with offboarding in deterministic user_id order
+one named canonical Discussion-disclosure predicate is reused across read/Mention/presentability
 Notification presentability is composed server-side before public pagination/counts
-batch seen cannot become a disclosure oracle
+batch seen cannot become a disclosure/cardinality oracle
 completed message replay does not rerun historical Mention-target eligibility
 Discussion/Notifications do not duplicate Audit/History truth
+anchor_message_id remains one list operation/filter/cursor authority
+message segment + unique-Mention counts receive explicit executable-wire bounds
 SSE call graph remains transport -> application -> mechanism
 all Notification-changing wake-ups happen only after commit
+transient deploy-overlap wake loss is tolerated because SSE is non-authoritative
 OpenAPI server-side text/event-stream proof remains a closure gate
 ```
 
-These values are still **candidate reopen results, not current integrated authority**.
+These values are still **candidate reopen results, not current integrated authority**, until the current consolidation gate completes.
+
+## Independent review proof
+
+```text
+Lead GCR R1      NOT CONVERGED   MATERIAL=3 / IMPORTANT=6
+operator         accepted all bounded corrections
+Lead GCR R2      CONVERGED       MATERIAL=0 / IMPORTANT=0
+Fable PR #165    CONVERGED       MATERIAL=0 / IMPORTANT=1 / OPTIONAL=3
+operator         F-1 + O1→O3 ACCEPTED
+Fable Round 2    NOT JUSTIFIED
+```
+
+Fable explicitly confirmed survival of 4+2 owners, 11 routes, 16 permissions, 86 operations, 11 Idempotency-Key creations, same-Scope Mention→Notification, presentability-before-paging/counts, Lexical, SSE/in-process wake-up, River-only durable async and absence of generic EventBus/broker/Redis.
 
 ## Exact next action
 
 ```text
-1. Verify corrected candidate HEAD with required CI.
-2. Run fresh independent Fable challenge over the whole coherent D0→D8 + corrected GCR package.
-3. Adjudicate every Fable MATERIAL/IMPORTANT finding; Round 2 only if a real contradiction survives.
-4. Consolidate the smallest approved delta into Product / T1 / Ownership / T3 / T5 / T6 / T8-B→G / T9 / T11 authorities.
-5. Only then promote exact 4+2 / 11 routes / 86 operations / 11 Idempotency-Key creations as current authority.
-6. Render/adjudicate smallest B01 P8 notification delta; only operator may re-LOCK the implicated scope.
-7. Resume B03 P8 with real Discussion/Notification semantics; resolve B03-F1; only operator may LOCK B03.
-8. Do not open B04+, T12, or Product implementation before their normal gates.
+1. Consolidate only the implicated current authorities:
+     Product contract
+     T1 semantic state
+     Ownership
+     T3 Authorization/Audit
+     T5 async/realtime
+     T6 journeys/routes/API meaning
+     T8-B→G
+     T9 validation/golden-flow obligations
+     T11 planning
+     docs/decisions/forward-obligations.md
+     docs/decisions/api-operation-census.md
+2. Re-run whole-package coherence over the consolidated current authorities.
+3. Promote 4+2 / 11 routes / 86 operations / 11 Idempotency-Key creations only when every current authority agrees.
+4. Render/adjudicate smallest B01 P8 notification delta; only operator may re-LOCK the implicated scope.
+5. Resume B03 P8 with real Discussion/Notification semantics; resolve B03-F1; only operator may LOCK B03.
+6. Do not open B04+, T12, or Product implementation before their normal gates.
 ```
 
 ## Hard stops
