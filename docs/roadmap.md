@@ -22,7 +22,7 @@ opening main           cae6ba48df5d611959c0390e0f2b9b8194d62a9d
 
 Current Product/architecture authority lives in `docs/product/**`, `docs/architecture/**`, and `docs/decisions/**`.
 
-Current bounded T11 authorities:
+Current bounded T11 authorities include:
 
 ```text
 docs/decisions/discussion-notifications-launch.md
@@ -33,7 +33,7 @@ docs/decisions/governance-case-step-deadline-read.md
 docs/decisions/governance-review-layer-seam.md
 ```
 
-Current system census remains:
+Current system census:
 
 ```text
 semantic owners                  4 business + 2 supporting
@@ -72,16 +72,11 @@ B04   Document Work / Authoring
 B05   My Work / Work Queues
        LOCKED / OPERATOR-RATIFIED · P8 R2/P9/P10 COMPLETE
 B06   Governance Case
-       OPEN / ACTIVE
+       LOCKED / OPERATOR-RATIFIED
        B06-F1 deadline projection                  CLOSED / OPERATOR-RATIFIED
-       B06-F2 DOCX Review Layer seam               CLOSED / OPERATOR-RATIFIED / FUTURE-SEAM
-       P6                                          COMPLETE
-       P7 H1 Content-first                         OPERATOR-APPROVED
-       P8 R1 functional HTML                       OPERATOR-APPROVED
-       P8 R2 inline review                         NOT REQUIRED FOR CURRENT LAUNCH
-       LOCK                                        READY / AWAITING EXPLICIT OPERATOR LOCK
-       P9 / P10                                    NOT OPEN
-B07   Document History                             NOT OPEN
+       B06-F2 Governance Review Layer seam         CLOSED / OPERATOR-RATIFIED / FUTURE-SEAM
+       P8 R1 / P9 / P10                            COMPLETE
+B07   Document History                             NOT OPEN / NEXT ELIGIBLE
 B08   Notifications Full Inbox                     NOT OPEN
 B09   Audit                                        NOT OPEN
 B10   Organization Administration                 NOT OPEN
@@ -103,60 +98,50 @@ Evidência    = audit/evidence
 
 Notifications remains transversal utility chrome, not `Minha Caixa` authority.
 
-## B06 current gate
+## B06 closure
 
-Current work/evidence:
+Canonical B06 records:
 
 ```text
 docs/work/current/t11-b06-governance-case-r1.md
 docs/work/current/t11-b06-governance-case-functional-wireframe.html
 docs/work/current/t11-b06-f2-docx-review-layer.md
+docs/work/current/t11-b06-screen-contract.md
+docs/work/current/t11-b06-pattern-consolidation.md
 ```
 
-Current B06 Product boundary:
+Locked experience:
 
 ```text
-/work/governance/:attempt_id
-→ exact immutable governed Submission / obsolescence subject
-→ ordered Steps + exact persisted deadline context
-→ bounded GovernanceFeedback
-→ ACCEPT / RETURN_FOR_CHANGES
-→ server-derived allowed_actions; no frontend Authorization authority
+Content-first Governance Workspace
+→ exact immutable governed content dominant
+→ exact Step/deadline context
+→ GovernanceFeedback separate from Decision
+→ deliberate ACCEPT / RETURN_FOR_CHANGES
+→ 409/403 authoritative reconciliation
+→ disclosure-neutral unavailable case
+→ no WorkingContent mutation / frontend Authorization authority
 ```
 
-P8 R1 was operated and approved by the operator on 2026-08-23. The selected shape remains **Content-first Governance Workspace**.
+B06-F2 preserves only a future provider-neutral review seam. It adds no present inline-review controls, operation 87+, Permission, lifecycle state or B04 contract change.
 
-B06-F2 is now durable future-seam authority only:
+P10 reuses:
 
 ```text
-future selected-range review binds to exact immutable reviewed snapshot
-stable Document Discussion != inline governance review
-DRAFT EditorialComment remains separately deferred
-tracked changes/suggestions require separate semantic promotion
-vendor/editor ids never become MetalDocs semantic authority
-RETURN leaves old review context with old immutable Submission
-old anchors never blindly remap onto changed DRAFT
-future B04 remediation needs explicit server-authored review-context identity
+Global App Shell
+Notification Quick Inbox
+Exact Read-Only Content Viewer Shell
 ```
 
-Current no-dormant-capability consequence:
-
-```text
-GovernanceFeedback wire      unchanged
-allowed_actions              accept | return_for_changes | add_feedback
-operations/routes/permissions 86 / 11 / 16
-B04 contract                 unchanged
-P8 R1 controls               unchanged
-P8 R2 inline-review controls absent
-```
+No new shared semantic pattern graduates from B06.
 
 ## Exact next action
 
 ```text
-1. Operator explicitly LOCKS B06 R1 if satisfied with the already-operated/approved experience.
-2. After explicit LOCK, execute B06 P9 Screen Contract.
-3. Then execute B06 P10 pattern consolidation.
-4. Only after B06 P10 closure may B07 open.
+1. B07 Document History is the next eligible FP1 block and remains NOT OPEN.
+2. Open B07 only when the operator chooses to continue FP1.
+3. Do not open B08+ early.
+4. Implementation remains blocked.
 ```
 
 ## Hard stops
