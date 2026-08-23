@@ -11,8 +11,8 @@ summary: Sole mutable MetalDocs stage, gate, implementation-status, and next-act
 
 ```text
 REPOSITORY MODE       CLEAN-SLATE / ARCHITECTURE-FIRST
-T1 → T10              CLOSED / OPERATOR-RATIFIED / INTEGRATED
-T11                   OPEN / ACTIVE CANDIDATE
+T1 → T10              CLOSED / OPERATOR-RATIFIED / INTEGRATED; bounded T11 collaboration amendment CURRENT
+T11                   OPEN / ACTIVE
 T12                   NOT OPEN
 IMPLEMENTATION         BLOCKED
 Draft PR               #162
@@ -20,7 +20,7 @@ branch                 arch/t11-implementation-program
 opening main           cae6ba48df5d611959c0390e0f2b9b8194d62a9d
 ```
 
-Repository-local Product/architecture authority remains in `docs/product/**`, `docs/architecture/**`, and `docs/decisions/**`. `docs/work/current/**` is temporary Draft planning/evidence and cannot survive a merge candidate.
+Repository-local Product/architecture authority lives in `docs/product/**`, `docs/architecture/**`, and `docs/decisions/**`. The bounded current cross-layer Discussion/Notifications amendment is `docs/decisions/discussion-notifications-launch.md`. `docs/work/current/**` remains temporary Draft planning/evidence and cannot survive a merge candidate.
 
 ## Frontend Product Experience gate
 
@@ -34,17 +34,13 @@ Frontend Product Experience Planning Method v2.1
 Current block state:
 
 ```text
-B01  App Shell + Global IA       LOCKED / OPERATOR-RATIFIED
-      notification delta         REOPEN CANDIDATE / OPERATOR-RATIFIED / P8 NOT YET RE-LOCKED
+B01  App Shell + Global IA       LOCKED / OPERATOR-RATIFIED baseline
+      notification delta         CURRENT ARCHITECTURE / P8 NOT YET RE-LOCKED
 
 B02  Library / discovery         LOCKED / OPERATOR-RATIFIED
 
 B03  Document Official           OPEN / CANDIDATE / NOT LOCKED
-      Discussion/Notifications   D0→D8 OPERATOR-RATIFIED
-      Lead GCR Round 2           CONVERGED — MATERIAL=0 / IMPORTANT=0
-      Fresh Fable                CONVERGED — MATERIAL=0 / IMPORTANT=1 / OPTIONAL=3
-      Fable adjudication         F-1 + O1→O3 ACCEPTED / ROUND 2 NOT JUSTIFIED
-      Upstream consolidation     CURRENT GATE
+      Discussion/Notifications   CURRENT / OPERATOR-RATIFIED / GCR+FABLE CONVERGED
 
 B04+                             NOT OPEN
 ```
@@ -59,35 +55,37 @@ Gestão       = system configuration
 Evidência    = audit/evidence
 ```
 
-The notification reopen candidate keeps the sidebar unchanged and adds only utility-header bell/unseen badge, Quick Inbox and stable `/notifications`. A smallest-scope rendered P8 delta is required before the implicated B01 scope may be re-LOCKED.
+The current Notifications amendment keeps the sidebar unchanged and adds only utility-header bell/unseen badge, Quick Inbox and stable `/notifications`. The implicated B01 structural scope still requires the method-mandated rendered P8 delta and explicit operator re-LOCK.
 
-B03 remains record/ficha-first with a deliberate distinct read-only official-content viewer and a stable-Document Discussion surface. B03-F1 remains open for server-derived Document Official `allowed_actions` precision. B04+, T12 and Product implementation remain blocked.
+B03 remains record/ficha-first with a deliberate distinct read-only official-content viewer and stable-Document Discussion. B03-F1 remains open for server-derived Document Official `allowed_actions` precision. B04+, T12 and Product implementation remain blocked.
 
 ## Current accepted system invariants
 
-Until the Discussion/Notifications reopen is coherently consolidated and promoted across every owning authority, current integrated authority remains:
+The Discussion / `@mention` / Notifications bounded reopen is now current repository authority through the routed decision register, ownership/domain authorities, forward-obligation disposition and API census.
 
 ```text
-semantic owners                  4 business + Audit supporting
-stable SPA routes                10
-application operations           78
-operation 79                     ABSENT
-Idempotency-Key creations        10
+semantic owners                  4 business + 2 supporting
+stable SPA routes                11
+PermissionCode values            16
+application operations           86
+Idempotency-Key creations        11
 ETag read / mutation domains     13 / 13
 exact-byte resources             4
 Product implementation           BLOCKED
 ```
 
-Existing operator-approved T11 precisions remain candidate for T11 consolidation:
+`docs/decisions/api-operation-census.md` is the sole current numeric census authority. Earlier `78` / `operation 79 absent` statements are historical stage snapshots or bounded clauses superseded by the T11 current amendment; they do not override the current census.
+
+Existing operator-approved T11 precisions still awaiting final T11 durable absorption/cleanup:
 
 ```text
 T8-E-RO  responsible_owner_candidates on getDocument
 B02-LD   first-page Library discovery options
 ```
 
-## Discussion / Mention / Notifications bounded reopen — converged candidate
+## Current Discussion / Mention / Notifications authority
 
-Operator-ratified and independently challenged Product/UX/technical result:
+Current Product/UX/technical result:
 
 ```text
 stable-Document Discussion
@@ -108,39 +106,26 @@ River remains the one durable future-work mechanism
 no generic EventBus / external broker / Redis baseline
 ```
 
-Converged candidate result:
-
-```text
-semantic owners                  4 business + 2 supporting
-stable SPA routes                11
-PermissionCode values            16
-application operations           86
-Idempotency-Key creations        11
-ETag read / mutation domains     13 / 13
-exact-byte resources             4
-```
-
-Converged enforcement precisions:
+Current enforcement precision:
 
 ```text
 Authorization alone owns final Mention-target ALLOW/DENY
 protected author/target eligibility serializes with offboarding in deterministic user_id order
-one named canonical Discussion-disclosure predicate is reused across read/Mention/presentability
+DocumentDiscussionDisclosure is the one named disclosure composition reused across read/Mention/presentability
 Notification presentability is composed server-side before public pagination/counts
 batch seen cannot become a disclosure/cardinality oracle
 completed message replay does not rerun historical Mention-target eligibility
 Discussion/Notifications do not duplicate Audit/History truth
-anchor_message_id remains one list operation/filter/cursor authority
-message segment + unique-Mention counts receive explicit executable-wire bounds
+anchor_message_id remains one Discussion-list pagination authority
+message bounds = 1..64 segments / <=20 unique Mention targets / <=4096 aggregate Text code points
+batch-seen request <=100 ids
 SSE call graph remains transport -> application -> mechanism
 all Notification-changing wake-ups happen only after commit
 transient deploy-overlap wake loss is tolerated because SSE is non-authoritative
-OpenAPI server-side text/event-stream proof remains a closure gate
+OpenAPI server-side text/event-stream proof remains an implementation-readiness closure gate
 ```
 
-These values are still **candidate reopen results, not current integrated authority**, until the current consolidation gate completes.
-
-## Independent review proof
+## Review / promotion proof
 
 ```text
 Lead GCR R1      NOT CONVERGED   MATERIAL=3 / IMPORTANT=6
@@ -149,6 +134,9 @@ Lead GCR R2      CONVERGED       MATERIAL=0 / IMPORTANT=0
 Fable PR #165    CONVERGED       MATERIAL=0 / IMPORTANT=1 / OPTIONAL=3
 operator         F-1 + O1→O3 ACCEPTED
 Fable Round 2    NOT JUSTIFIED
+Evidence PR #165 CLOSED / UNMERGED
+promotion HEAD   29599eab33a5479adf3ee92741f0a9b5ee8720a9
+promotion CI     #1285 SUCCESS
 ```
 
 Fable explicitly confirmed survival of 4+2 owners, 11 routes, 16 permissions, 86 operations, 11 Idempotency-Key creations, same-Scope Mention→Notification, presentability-before-paging/counts, Lexical, SSE/in-process wake-up, River-only durable async and absence of generic EventBus/broker/Redis.
@@ -156,23 +144,17 @@ Fable explicitly confirmed survival of 4+2 owners, 11 routes, 16 permissions, 86
 ## Exact next action
 
 ```text
-1. Consolidate only the implicated current authorities:
-     Product contract
-     T1 semantic state
-     Ownership
-     T3 Authorization/Audit
-     T5 async/realtime
-     T6 journeys/routes/API meaning
-     T8-B→G
-     T9 validation/golden-flow obligations
-     T11 planning
-     docs/decisions/forward-obligations.md
-     docs/decisions/api-operation-census.md
-2. Re-run whole-package coherence over the consolidated current authorities.
-3. Promote 4+2 / 11 routes / 86 operations / 11 Idempotency-Key creations only when every current authority agrees.
-4. Render/adjudicate smallest B01 P8 notification delta; only operator may re-LOCK the implicated scope.
-5. Resume B03 P8 with real Discussion/Notification semantics; resolve B03-F1; only operator may LOCK B03.
-6. Do not open B04+, T12, or Product implementation before their normal gates.
+1. Run post-promotion whole-current-authority coherence proof and correct only genuine live contradictions.
+2. Render the smallest B01 P8 notification delta:
+     utility-header bell + unseen badge
+     desktop Quick Inbox
+     narrow/mobile transformation
+     transition to /notifications
+3. Operator visually adjudicates and may re-LOCK only the implicated B01 delta.
+4. Resume B03 P8 using the now-current Discussion/Notification semantics.
+5. Resolve B03-F1 before any B03 LOCK.
+6. Only operator may LOCK B03.
+7. Do not open B04+, T12, or Product implementation before their normal gates.
 ```
 
 ## Hard stops
@@ -201,4 +183,4 @@ operator implementation authorization = explicit
 
 ## Reopen law
 
-Accepted Product/R10 decisions reopen only on material evidence under the DevelopmentConexus Engineering Method. The operator-required Discussion/@Mention/Notification capability is valid new-consumer evidence. Preference, sunk cost, framework availability, hypothetical scale or infrastructure fashion are not reopen triggers.
+Accepted Product/R10 decisions reopen only on material evidence under the DevelopmentConexus Engineering Method. Preference, sunk cost, framework availability, hypothetical scale or infrastructure fashion are not reopen triggers.
