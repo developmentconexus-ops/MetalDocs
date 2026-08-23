@@ -11,7 +11,7 @@ summary: Sole mutable MetalDocs stage, gate, implementation-status, and next-act
 
 ```text
 REPOSITORY MODE       CLEAN-SLATE / ARCHITECTURE-FIRST
-T1 → T10              CLOSED / OPERATOR-RATIFIED / INTEGRATED; bounded T11 collaboration amendment CURRENT
+T1 → T10              CLOSED / OPERATOR-RATIFIED / INTEGRATED
 T11                   OPEN / ACTIVE
 T12                   NOT OPEN
 IMPLEMENTATION         BLOCKED
@@ -20,73 +20,9 @@ branch                 arch/t11-implementation-program
 opening main           cae6ba48df5d611959c0390e0f2b9b8194d62a9d
 ```
 
-Current Product/architecture authority lives in `docs/product/**`, `docs/architecture/**`, and `docs/decisions/**`. The bounded current Discussion/Notifications amendment is `docs/decisions/discussion-notifications-launch.md`. `docs/work/current/**` remains temporary Draft planning/evidence and cannot survive a merge candidate.
+Current Product/architecture authority lives in `docs/product/**`, `docs/architecture/**`, and `docs/decisions/**`. Discussion / `@mention` / Notifications is current under `docs/decisions/discussion-notifications-launch.md`.
 
-## Frontend Product Experience gate
-
-Method:
-
-```text
-docs/development/functional-html-wireframe-method.md
-Frontend Product Experience Planning Method v2.1
-```
-
-Current block state:
-
-```text
-B01  App Shell + Global IA       LOCKED / OPERATOR-RATIFIED
-      notification delta         LOCKED / OPERATOR-RATIFIED
-
-B02  Library / discovery         LOCKED / OPERATOR-RATIFIED
-
-B03  Document Official           OPEN / CANDIDATE / P8 RENDERED / OPERATOR ADJUDICATION / NOT LOCKED
-      Discussion/Notifications   CURRENT / OPERATOR-RATIFIED / GCR+FABLE+PROMOTION COHERENT
-
-B04+                             NOT OPEN
-```
-
-B01 preserved mental model:
-
-```text
-Início       = current operational situation
-Minha Caixa  = assigned work
-Documentos   = official document truth / creation
-Gestão       = system configuration
-Evidência    = audit/evidence
-```
-
-The locked Notifications delta keeps the sidebar unchanged and adds only:
-
-```text
-utility-header bell + unseen badge
-desktop Quick Inbox
-narrow/mobile accessible transformation
-stable /notifications full Inbox route
-```
-
-Canonical rendered evidence for the bounded B01 delta:
-
-```text
-docs/work/current/t11-b01-notifications-wireframe.html
-```
-
-B03 is record/ficha-first with a deliberate distinct read-only official-content viewer and stable-Document Discussion. Current rendered P8 evidence:
-
-```text
-docs/work/current/t11-b03-document-official-wireframe.html
-```
-
-The B03 P8 candidate renders exactly three structural states for adjudication:
-
-```text
-1. normal Library entry -> hierarchical Document ficha
-2. Notification/@mention deep-link -> same ficha, Discussion revealed at anchor_message_id
-3. explicit Visualizar documento -> separate B03 read-only content surface
-```
-
-B03-F1 remains open for server-derived Document Official `allowed_actions` and must resolve before any B03 LOCK. B04+, T12 and Product implementation remain blocked.
-
-## Current accepted system invariants
+Current system census:
 
 ```text
 semantic owners                  4 business + 2 supporting
@@ -96,101 +32,143 @@ application operations           86
 Idempotency-Key creations        11
 ETag read / mutation domains     13 / 13
 exact-byte resources             4
-Product implementation           BLOCKED
 ```
 
-`docs/decisions/api-operation-census.md` is the sole current numeric census. Earlier `78` / `operation 79 absent` statements are historical stage snapshots or bounded clauses superseded by the current T11 amendment.
+`docs/decisions/api-operation-census.md` is the sole current numeric census.
 
-Existing operator-approved T11 precisions still awaiting final T11 durable absorption/cleanup:
+## Frontend Product Experience Program
+
+Method:
 
 ```text
-T8-E-RO  responsible_owner_candidates on getDocument
-B02-LD   first-page Library discovery options
+docs/development/functional-html-wireframe-method.md
+Frontend Product Experience Planning Method v2.2
 ```
 
-## Current Discussion / Mention / Notifications authority
-
-Binding result:
+Program mapping:
 
 ```text
-stable-Document Discussion
-immutable DiscussionMessage
-semantic Mention(user_id)
-purpose-built disclosure-safe mention autocomplete
-document.discuss write Permission
-Notifications = second supporting owner
-seen / read-unread / archive-unarchive Inbox
-bell + Quick Inbox + /notifications
-same-Scope accepted Mention -> Notification
-server-side presentability before paging/counts
-Lexical replaceable composer mechanism
-SSE invalidation only
-River remains sole durable future-work mechanism
-no generic EventBus / external broker / Redis baseline
+FP0  Frontend Foundation                         ACTIVE / BOUNDED REBASELINE
+FP1  Block-by-block Product Experience           ACTIVE
+FP2  Integrated Low-Fidelity Product / P11       NOT OPEN
+FP3  Whole-Product Adversarial Review / P12      NOT OPEN
+FP4  Visual Handoff + Readiness / P13-P14        NOT OPEN
 ```
 
-Important precision:
+The v2.2 rebaseline changes the planning method, not Product semantics:
 
 ```text
-DocumentDiscussionDisclosure = one named disclosure composition reused across read/Mention/presentability
-protected author/target eligibility locks in deterministic user_id order
-anchor_message_id stays within one Discussion-list pagination authority
-message: 1..64 segments / <=20 unique Mention targets / <=4096 aggregate Text code points
-batch seen: <=100 ids, bodyless/no cardinality result
-all Notification wake-ups occur post-commit
-transient wake loss is tolerated because SSE is non-authoritative
-OpenAPI server-side text/event-stream remains an implementation-readiness proof gate
+P8  = canonical functional low-fidelity HTML/CSS/JS per interactive block
+P11 = assembled integration of already-LOCKED block prototypes
 ```
 
-## Review / promotion proof
+Static storyboard/mockup HTML may support P7 exploration but cannot receive P8 LOCK for an interactive block.
+
+## FP0 bounded rebaseline
+
+Current Product authority changed during T11 from the prior frontend foundation (`10 routes / 78 operations`) to current `11 / 86` through the independently challenged Discussion/Notifications amendment.
+
+FP0 therefore has one bounded rebaseline obligation:
 
 ```text
-Lead GCR R1      NOT CONVERGED   MATERIAL=3 / IMPORTANT=6
-Lead GCR R2      CONVERGED       MATERIAL=0 / IMPORTANT=0
-Fable PR #165    CONVERGED       MATERIAL=0 / IMPORTANT=1 / OPTIONAL=3
-operator         F-1 + O1→O3 ACCEPTED
-Fable Round 2    NOT JUSTIFIED
-PR #165          CLOSED / UNMERGED
-promotion CI     #1286 SUCCESS
-post-promotion coherence PASS / MATERIAL=0 / IMPORTANT=0
+update frontend flow/coverage/surface/program maps for:
+  stable Document Discussion
+  semantic @Mention
+  in-app Notifications
+  /notifications
+  document.discuss
+  operations 79–86
+
+preserve valid prior frontend LOCKS unless actually falsified
 ```
 
-Post-promotion evidence:
+This does not reopen Product/architecture authority.
+
+## FP1 block roadmap
 
 ```text
-docs/work/current/t11-discussion-notifications-promotion-coherence.md
+B01   App Shell + Global IA + Home                 LOCKED / OPERATOR-RATIFIED
+B01N  Notification global chrome + Quick Inbox     LOCKED / OPERATOR-RATIFIED
+B02   Library / Discovery                          LOCKED / OPERATOR-RATIFIED
+
+B03   Document Official / Ficha + Viewer + Discussion
+       CURRENT / CANDIDATE / NOT LOCKED
+       leading structure A                         OPERATOR-APPROVED DIRECTION
+       prior static HTML P8                        REJECTED — WRONG REPRESENTATION MEDIUM
+       canonical functional P8                     PENDING
+       B03-F1 allowed_actions                       OPEN / MUST CLOSE BEFORE LOCK
+
+B04   Document Work / Authoring                    NOT OPEN
+B05   My Work / Work Queues                        NOT OPEN
+B06   Governance Case                              NOT OPEN
+B07   Document History                             NOT OPEN
+B08   Notifications Full Inbox                     NOT OPEN
+B09   Audit                                        NOT OPEN
+B10   Organization Administration                  NOT OPEN
+B11   Access Administration                        NOT OPEN
+B12   Document Governance Administration           NOT OPEN
 ```
 
-## B01 notification re-LOCK proof
+## Locked global IA preserved
 
 ```text
-architecture/ownership amendment       CURRENT
-B01 Notification P8                    RENDERED
-operator visual adjudication           APPROVED
-Notification P8 delta                  LOCKED / OPERATOR-RATIFIED
-original B01 baseline                  PRESERVED / LOCKED
-sidebar                                UNCHANGED
+Início       = current operational situation
+Minha Caixa  = assigned work
+Documentos   = official document truth / creation
+Gestão       = system configuration
+Evidência    = audit/evidence
 ```
 
-The re-LOCK changes only utility-header Notification chrome, Quick Inbox and responsive transformation. It does not reopen Home, My Work or primary sidebar IA.
+Notifications remains transversal utility chrome, not `Minha Caixa` authority:
+
+```text
+utility-header bell + unseen badge
+desktop Quick Inbox
+narrow/mobile accessible transformation
+stable /notifications full Inbox route
+```
+
+## B03 current direction
+
+Preserved operator-approved direction:
+
+```text
+/documents/:document_id
+= stable Document ficha/record first
+
+Ficha
+→ deliberate Visualizar documento
+→ distinct B03 read-only official-content viewer
+
+Ficha
+→ bounded current work context
+→ management actions from server-derived hints
+→ stable-Document Discussion
+
+Notification DOCUMENT_MENTION
+→ same ficha
+→ Discussion
+→ anchor_message_id target
+```
+
+The rejected B03 artifact does not reject this structure. It was rejected because it rendered static storyboard states instead of the v2.2 canonical functional low-fi block experience.
 
 ## Exact next action
 
 ```text
-1. Operator visually adjudicates the rendered B03 P8 candidate:
-     hierarchical ficha
-     current-work context placement
-     metadata density
-     revisions section
-     management section
-     Discussion placement/density
-     Notification deep-link behavior
-     separate official-content viewer
-2. Iterate only B03 structure if any hierarchy/position/size/discoverability issue is found.
-3. Resolve B03-F1 server-derived `DocumentOfficialView.allowed_actions` before any B03 LOCK.
-4. Only operator may LOCK B03.
-5. After B03 LOCK, complete P9 Screen Contract / bidirectional trace and bounded P10 consolidation.
-6. Do not open B04+, T12, or Product implementation before their normal gates.
+1. Complete FP0 bounded 86/11 frontend rebaseline only where mappings are stale.
+2. Update B03 planning record to v2.2 semantics.
+3. Build canonical B03 functional low-fi HTML/CSS/JS:
+     ficha normal
+     Visualizar documento -> viewer -> voltar
+     Notification/mention -> Discussion anchor
+     local Discussion interactions material to layout
+     explicit boundaries for unopened B04/B07
+4. Operator operates/reviews B03 P8.
+5. Iterate B03 only until operator LOCK.
+6. Resolve B03-F1 before final B03 LOCK if still open.
+7. After LOCK, close P9 Screen Contract / bidirectional trace and bounded P10 pattern pass.
+8. Open B04 only after B03 progression gate permits it.
 ```
 
 ## Hard stops
@@ -198,6 +176,8 @@ The re-LOCK changes only utility-header Notification chrome, Quick Inbox and res
 ```text
 no Product code/schema/OpenAPI implementation/runtime/deploy work
 no T12 work
+no production frontend framework in P8
+no P8 static storyboard accepted as interactive-block lock evidence
 no framework/library allowed to redefine Product semantics
 no generic EventBus/broker/Redis without a named material trigger
 no frontend Authorization matrix
@@ -205,7 +185,7 @@ no legacy implementation restoration by sunk cost
 no merge authorization implied
 ```
 
-## T11 closure / implementation gate
+## T11 / implementation gate
 
 Implementation remains blocked until:
 
@@ -219,4 +199,4 @@ operator implementation authorization = explicit
 
 ## Reopen law
 
-Accepted Product/R10 decisions reopen only on material evidence under the DevelopmentConexus Engineering Method. Preference, sunk cost, framework availability, hypothetical scale or infrastructure fashion are not reopen triggers.
+Accepted Product/R10/frontend LOCK decisions reopen only on material evidence under the DevelopmentConexus Engineering Method. Preference, sunk cost, framework availability or hypothetical scale are not reopen triggers. A methodology correction may invalidate an evidence artifact without invalidating the underlying operator-approved Product/UX direction.
