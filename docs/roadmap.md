@@ -20,7 +20,15 @@ branch                 arch/t11-implementation-program
 opening main           cae6ba48df5d611959c0390e0f2b9b8194d62a9d
 ```
 
-Current Product/architecture authority lives in `docs/product/**`, `docs/architecture/**`, and `docs/decisions/**`. Discussion / `@mention` / Notifications is current under `docs/decisions/discussion-notifications-launch.md`. Document Official management action-hint precision is current under `docs/decisions/document-official-actions-read.md`. My Work governance read precision is current under `docs/decisions/my-work-governance-identification-read.md`.
+Current Product/architecture authority lives in `docs/product/**`, `docs/architecture/**`, and `docs/decisions/**`.
+
+Current bounded T11 authorities include:
+
+```text
+docs/decisions/discussion-notifications-launch.md
+docs/decisions/document-official-actions-read.md
+docs/decisions/my-work-governance-identification-read.md
+```
 
 Current system census:
 
@@ -34,7 +42,7 @@ ETag read / mutation domains     13 / 13
 exact-byte resources             4
 ```
 
-`docs/decisions/api-operation-census.md` is the sole current numeric census.
+`docs/decisions/api-operation-census.md` is the sole numeric census.
 
 ## Frontend Product Experience Program
 
@@ -45,8 +53,6 @@ docs/development/functional-html-wireframe-method.md
 Frontend Product Experience Planning Method v2.2
 ```
 
-Program mapping:
-
 ```text
 FP0  Frontend Foundation                         CLOSED / R1 86/11 REBASELINED
 FP1  Block-by-block Product Experience           ACTIVE
@@ -55,37 +61,7 @@ FP3  Whole-Product Adversarial Review / P12      NOT OPEN
 FP4  Visual Handoff + Readiness / P13-P14        NOT OPEN
 ```
 
-Method meaning:
-
-```text
-P8  = canonical functional low-fidelity HTML/CSS/JS per interactive block
-P11 = assembled integration of already-LOCKED block prototypes
-```
-
-Static storyboard/mockup HTML may support P7 exploration but cannot receive P8 LOCK for an interactive block.
-
-## FP0-R1 closure
-
-Current bounded frontend foundation:
-
-```text
-docs/work/current/t11-frontend-foundation-r1.md
-```
-
-R1 reconciles the pre-reopen frontend map to current authority without reopening existing LOCKs:
-
-```text
-20 accepted human goals mapped
-11 stable Product routes represented
-operations mapped           86 / 86
-operations 79–81            B03 Discussion/Mention
-operations 82–86            B01N + B08 Notifications
-unassigned operations       0
-invented operations         0
-frontend Authorization      absent
-```
-
-Older `t11-frontend-blueprint.md` and `t11-wireframes.md` remain pre-reopen/pre-v2.2 planning evidence; their 78/10 snapshots do not override R1/current authority.
+P8 means browser-operable functional low-fidelity evidence. P11 assembles already-LOCKED blocks; it is not the first functionalization.
 
 ## FP1 block roadmap
 
@@ -95,30 +71,20 @@ B01N  Notification global chrome + Quick Inbox     LOCKED / OPERATOR-RATIFIED
 B02   Library / Discovery                          LOCKED / OPERATOR-RATIFIED
 B03   Document Official / Ficha + Viewer + Discussion
        LOCKED / OPERATOR-RATIFIED
-       P7 historical C Two-column dossier          APPROVED
-       functional low-fi P8 R2                     APPROVED / COMPLETE
-       B03-F1 allowed_actions                       CLOSED / OPERATOR-RATIFIED
-       P9 Screen Contract                          COMPLETE
-       P10 bounded pattern pass                    COMPLETE
+       P8 / P9 / P10                               COMPLETE
 
 B04   Document Work / Authoring
        LOCKED / OPERATOR-RATIFIED
-       content-first workspace P7                  APPROVED
-       DOCX → Eigenpal editable boundary           APPROVED
-       PDF / SUBMITTED read-only boundary          APPROVED
-       right operational rail                      APPROVED
-       B04-F1 hybrid persistence UX                CLOSED / OPERATOR-RATIFIED
-       functional low-fi P8 R1                     APPROVED / COMPLETE
-       P9 Screen Contract                          COMPLETE
-       P10 bounded pattern pass                    COMPLETE
+       B04-F1 hybrid persistence                   CLOSED / OPERATOR-RATIFIED
+       P8 / P9 / P10                               COMPLETE
 
 B05   My Work / Work Queues
        CURRENT / CANDIDATE / NOT LOCKED
        authority + legacy ergonomics recovery      COMPLETE
        B05-F1 governance row RevisionReference     CLOSED / OPERATOR-RATIFIED
        B05-F2 governance queue ordering            CLOSED / OPERATOR-RATIFIED
-       P7 queue composition                        LEADING A / OPERATOR REVIEW
-       functional low-fi P8                        NOT OPEN
+       P7 focused queue A                          APPROVED
+       functional low-fi P8 R1                     RENDERED / OPERATOR OPERATION+REVIEW
 
 B06   Governance Case                              NOT OPEN
 B07   Document History                             NOT OPEN
@@ -134,199 +100,99 @@ B12   Document Governance Administration           NOT OPEN
 ```text
 Início       = current operational situation
 Minha Caixa  = assigned work
+  Para aprovação
+  Em edição
 Documentos   = official document truth / creation
 Gestão       = system configuration
 Evidência    = audit/evidence
 ```
 
-Notifications remains transversal utility chrome, not `Minha Caixa` authority:
+Notifications remains transversal utility chrome, not `Minha Caixa` authority.
+
+## B03 / B04 locked references
 
 ```text
-utility-header bell + unseen badge
-desktop Quick Inbox
-narrow/mobile accessible transformation
-stable /notifications full Inbox route
+B03
+  docs/work/current/t11-b03-document-official-r1.md
+  docs/work/current/t11-b03-document-official-functional-wireframe.html
+  docs/work/current/t11-b03-screen-contract.md
+  docs/work/current/t11-b03-pattern-consolidation.md
+
+B04
+  docs/work/current/t11-b04-document-work-r1.md
+  docs/work/current/t11-b04-document-work-functional-wireframe.html
+  docs/work/current/t11-b04-screen-contract.md
+  docs/work/current/t11-b04-pattern-consolidation.md
 ```
 
-## B03 locked baseline
+B04 remains the exact current open-Revision Work lens; B03 remains the stable Document official/management lens.
 
-Planning/closure records:
+## B05 current candidate
+
+Planning record:
 
 ```text
-docs/work/current/t11-b03-document-official-r1.md
-docs/work/current/t11-b03-document-official-functional-wireframe.html
-docs/work/current/t11-b03-screen-contract.md
-docs/work/current/t11-b03-pattern-consolidation.md
+docs/work/current/t11-b05-my-work-r1.md
 ```
 
-Durable B03 read precision:
+Current governance-work read precision:
 
 ```text
-docs/decisions/document-official-actions-read.md
+WorkGovernanceItem {
+  governance_attempt_id
+  subject_kind
+  document
+  revision: RevisionReference
+  created_at
+}
+
+listGovernanceWork fixed order
+  document.code ASC,
+  governance_attempt_id ASC
 ```
 
-Locked composition:
+The projection remains read-only recognition/navigation truth. B06 remains authority for Governance Case state, Steps, feedback, governed content, allowed actions and decisions.
+
+Operator-approved P7 structure:
 
 ```text
-/documents/:document_id
-= stable Document ficha/record first
-
-Document hero
-↓
-Two-column dossier
-  left
-    current-work context
-    ficha / classification / responsibility
-    server-derived management actions
-
-  right
-    official-content preview
-    exact current official Revision label
-    deliberate Visualizar completo
-↓
-Revisions context — full width
-↓
-Stable-Document Discussion — full width
+Minha Caixa
+→ intent switch
+    Para aprovação | Em edição
+→ one focused full-width queue for the selected intent
+→ dense human-recognizable rows
+→ server cursor order preserved
+→ owner-lens continuation
+→ load-more cursor continuation
 ```
 
-Preview law:
+P8 R1 exercises:
 
 ```text
-contextual recognition only
-never exact-content authority
-never DRAFT substitution
-click -> same separate B03 read-only official viewer
+intent switching
+row selection + keyboard navigation
+cursor/load-more behavior
+stale destination + refresh
+load failure + retry
+empty lane
+B04 handoff boundary
+B06 unopened boundary
+B01N Quick Inbox reuse
+responsive reflow
 ```
 
-Management action law:
-
-```text
-DocumentOfficialView.allowed_actions
--> UX guidance only
--> same canonical predicates as commands
--> commands always recheck current truth
--> no frontend Authorization evaluator
-```
-
-P9 closure:
-
-```text
-material B03 regions/controls traced        15 / 15
-unbound material controls                   0
-invented operations                         0
-screen-shaped APIs                          0
-frontend Authorization evaluator            0
-navigation identities unsourced             0
-material B03 Screen Contract findings       0
-```
-
-P10 closure:
-
-```text
-existing locked shared patterns reused      2
-new shared abstractions created             0
-B03-local semantic patterns retained        7
-false abstractions introduced               0
-```
-
-## B04 locked baseline
-
-Planning/closure records:
-
-```text
-docs/work/current/t11-b04-document-work-r1.md
-docs/work/current/t11-b04-document-work-functional-wireframe.html
-docs/work/current/t11-b04-screen-contract.md
-docs/work/current/t11-b04-pattern-consolidation.md
-```
-
-Locked structure:
-
-```text
-/documents/:document_id/work
-= exact current open Revision Work lens
-
-MetalDocs minimal Work header
-↓
-CONTENT-FIRST WORKSPACE
-  main canvas
-    DOCX DRAFT     → Eigenpal toolbar/chrome + editable DOCX canvas
-    PDF DRAFT      → read-only exact source viewer
-    SUBMITTED      → read-only exact submitted-content view
-
-  right operational rail
-    Trabalho atual
-    Fonte
-    Ações
-    Contexto do documento — collapsed by default
-```
-
-B04-F1 hybrid persistence law:
-
-```text
-local Eigenpal changes become DIRTY immediately
-background autosave coalesces after an implementation-appropriate quiet period
-at most one save pipeline in flight
-Salvar agora / Ctrl+S force the same pipeline
-save accepts new DocumentWorkView + strong DRAFT ETag
-save failure preserves local buffer
-412 stops stale autosave and requires explicit human reconciliation
-no automatic merge / silent LWW
-submit waits for in-flight save and force-flushes remaining local changes
-submit proceeds only against the exact accepted DRAFT ETag
-no IndexedDB/localStorage/offline durable client DRAFT baseline
-```
-
-Work truth laws remain:
-
-```text
-DocumentWorkView + DRAFT ETag = server truth
-local editor buffer            = FORM DRAFT only
-provider PUT success != READY
-READY != WorkingContent
-WorkingContent != Submission
-```
-
-P9 closure:
-
-```text
-material B04 regions/controls traced        18 / 18
-unbound material controls                   0
-invented operations                         0
-operation 87+                               absent
-screen-shaped APIs                          0
-frontend Authorization evaluator            0
-second client DRAFT authority               0
-navigation identities unsourced             0
-material B04 Screen Contract findings       0
-```
-
-P10 closure:
-
-```text
-existing locked shared patterns reused          2
-new shared semantic pattern graduated           1
-B04-local semantic patterns retained            8
-false abstractions introduced                   0
-unexplained duplicate locked semantic patterns  0
-```
-
-Graduated after the second LOCKED consumer:
-
-```text
-Exact Read-Only Content Viewer Shell
-  B03 = exact official source/rendition
-  B04 = exact DRAFT PDF / immutable Submission source
-```
-
-The pattern is planning vocabulary only; it does not create a generic resolver, provider adapter, lifecycle owner or implementation authorization.
+P8 R1 deliberately renders `SUBMITTED` under the currently LOCKED `Em edição` label. This is a test, not a B01 reopen. Reopen B01 terminology only if operator use proves material confusion.
 
 ## Exact next action
 
 ```text
-B05 P7 — operator adjudicates focused queue direction A.
-If approved, build one functional low-fi P8 candidate for B05.
-B06+ remain NOT OPEN.
+1. Operator operates B05 functional P8 R1.
+2. Review only B05 scanability / density / lane switching / pagination / stale recovery / responsive behavior.
+3. Explicitly judge whether SUBMITTED under "Em edição" is understandable.
+4. Iterate only material B05 findings.
+5. Operator-only B05 LOCK.
+6. Then P9 exact Screen Contract + P10 bounded pattern consolidation.
+7. B06+ remain NOT OPEN until normal progression permits them.
 ```
 
 ## Hard stops
@@ -335,12 +201,12 @@ B06+ remain NOT OPEN.
 no Product code/schema/OpenAPI implementation/runtime/deploy work
 no T12 work
 no production frontend framework in P8
-no P8 static storyboard accepted as interactive-block lock evidence
-no framework/library allowed to redefine Product semantics
+no static storyboard accepted as P8 lock evidence
+no framework/library redefines Product semantics
 no generic EventBus/broker/Redis without a named material trigger
 no frontend Authorization matrix
 no unopened downstream block design
-no legacy implementation restoration by sunk cost
+no legacy restoration by sunk cost
 no merge authorization implied
 ```
 
@@ -358,4 +224,4 @@ operator implementation authorization = explicit
 
 ## Reopen law
 
-Accepted Product/R10/frontend LOCK decisions reopen only on material evidence under the DevelopmentConexus Engineering Method. Preference, sunk cost, framework availability or hypothetical scale are not reopen triggers. A methodology correction may invalidate an evidence artifact without invalidating the underlying operator-approved Product/UX direction.
+Accepted Product/R10/frontend LOCK decisions reopen only on material evidence under the DevelopmentConexus Engineering Method. Preference, sunk cost, framework availability or hypothetical scale are not reopen triggers.
