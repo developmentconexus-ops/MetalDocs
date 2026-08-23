@@ -108,7 +108,7 @@ B04   Document Work / Authoring
        PDF / SUBMITTED read-only boundary          OPERATOR-APPROVED
        right operational rail                      OPERATOR-APPROVED
        B04-F1 hybrid persistence UX                CLOSED / OPERATOR-RATIFIED
-       functional low-fi P8 R1                     RENDERED / OPERATOR OPERATION+REVIEW
+       functional low-fi P8 R1                     RENDERED / CI #1320 SUCCESS / OPERATOR OPERATION+REVIEW
 
 B05   My Work / Work Queues                        NOT OPEN
 B06   Governance Case                              NOT OPEN
