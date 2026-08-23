@@ -15,7 +15,7 @@ Stable route:
 /work
 ```
 
-B01 already LOCKED the human mental model and route presentation:
+B01 already LOCKED the human model:
 
 ```text
 Início
@@ -26,9 +26,7 @@ Minha Caixa
   Em edição      -> /work authoring presentation
 ```
 
-Any lane/tab/query key is browser presentation state only and never `/api/v1` semantics.
-
-B05 does **not** redesign the B01 default Home. It owns the detailed work-queue presentations reached from `Minha Caixa`.
+Lane/tab/query state is browser presentation only. B05 does not redesign the B01 default Home.
 
 Current My Work authority:
 
@@ -50,10 +48,10 @@ Authoring row
 Governance row
 -> /work/governance/:attempt_id
 -> B06 NOT OPEN
--> B05 may expose transition semantics only; it does not design B06
+-> B05 may expose only the transition boundary
 ```
 
-## 2. Current read shapes and ordering
+## 2. Current read shapes and canonical order
 
 ```text
 WorkAuthoringItem {
@@ -94,27 +92,27 @@ listGovernanceWork
   document.code ASC, governance_attempt_id ASC
 ```
 
-Both pages remain cursor-paginated recognition/navigation projections. They are never mutation/current-lifecycle authority.
+Both pages remain cursor-paginated recognition/navigation projections, never mutation/current-lifecycle authority.
 
 ## 3. Legacy evidence disposition
 
-Useful ergonomics recovered from the exact legacy `InboxStack` / `InboxApprovalCard`:
+Useful ergonomics retained as Evidence:
 
 ```text
 high-density work list
 human code + title prominence
 selected row / clear focus
-previous / next keyboard-friendly traversal where useful
-clear no-work and stale-row states
-open the owner destination from the selected work item
+keyboard-friendly traversal
+clear no-work / error / stale-row recovery
+owner-destination continuation
 ```
 
-Reject / do not restore:
+Rejected from current baseline:
 
 ```text
 peer Approval owner/workspace
-Approve / Return quick mutations from the queue
-SLA / due date / overdue semantics
+Approve / Return quick mutations
+SLA / due / overdue / priority semantics
 quorum progress
 stage label absent from current authority
 legacy overseer mode
@@ -123,7 +121,7 @@ localStorage view preference baseline
 Template peer lifecycle
 ```
 
-B05 is read-only. Governance decisions belong B06.
+B05 remains read-only. Governance decisions belong B06.
 
 ## 4. Human needs
 
@@ -131,20 +129,20 @@ B05 must let the actor answer:
 
 ```text
 What work is waiting for me?
-Is it work I am authoring or governance work I need to act on?
-Which exact controlled Document/work subject is it?
+Is it authoring work or governance work?
+Which exact Document / Revision subject is it?
 Where should I continue it?
-Did a stale queue row disappear/change before I entered the owner lens?
-Do I have more work beyond the current page?
+Did a stale row change/disappear before destination entry?
+Is there more work beyond the current cursor page?
 ```
 
-B05 must not answer owner-lens questions such as:
+B05 must not answer:
 
 ```text
-What exact governance Step may I decide?       -> B06
-What is the exact DRAFT/source?                -> B04
-What is the full lifecycle/history?            -> B07
-What is currently official?                    -> B03
+exact governance Step / decision -> B06
+exact DRAFT/source               -> B04
+full lifecycle/history           -> B07
+current official truth           -> B03
 ```
 
 ## 5. B05-F1 — governance row recognition — CLOSED / OPERATOR-RATIFIED
@@ -162,23 +160,20 @@ Selected precision:
 WorkGovernanceItem.revision: RevisionReference
 ```
 
-Global Maximum comparison:
+Rejected alternatives:
 
 ```text
-NO CONTRACT CHANGE
-  REJECTED — preserves recognition defect / local maximum
+no contract change
+  -> preserves recognition defect / local maximum
 
 per-row getGovernanceAttempt fan-out
-  REJECTED — N+1 + B05/B06 coupling + partial loading/failure complexity
+  -> N+1 + B05/B06 coupling + partial failure complexity
 
 rich Governance queue DTO
-  REJECTED — pre-designs B06 / unsupported fields
+  -> pre-designs B06 / unsupported fields
 
 generic unified WorkItem
-  REJECTED — invents cross-lane state/order/pagination semantics
-
-existing WorkGovernanceItem + existing RevisionReference
-  SELECTED
+  -> invents cross-lane order/state/pagination semantics
 ```
 
 ## 6. B05-F2 — governance queue ordering — CLOSED / OPERATOR-RATIFIED
@@ -187,7 +182,7 @@ Target invariant:
 
 > A cursor-paginated human work queue has one deterministic server-owned order the actor can understand, without inventing unsupported urgency/priority semantics and without frontend page reordering.
 
-Selected fixed order:
+Selected:
 
 ```text
 document.code ASC,
@@ -198,21 +193,19 @@ Rejected:
 
 ```text
 governance_attempt_id ASC
-  deterministic but human-arbitrary
+  -> deterministic but human-arbitrary
 
 client-side sort
-  false global order over cursor pages
+  -> false global order over cursor pages
 
 created_at ASC/DESC
-  would silently promote FIFO/recency priority semantics
+  -> silently promotes FIFO/recency priority semantics
 
 generic sort/filter DSL
-  unsupported Product capability
+  -> unsupported capability
 ```
 
-Impact remains zero for operations, fields, routes, Permissions, owners and priority/SLA semantics. The cursor simply binds the revised canonical server order.
-
-Binding F1/F2 authority:
+F1/F2 binding authority:
 
 ```text
 ../../decisions/my-work-governance-identification-read.md
@@ -220,95 +213,34 @@ Binding F1/F2 authority:
 
 Current census remains 86 operations / 11 routes / 16 permissions.
 
-## 7. Bounded design constraints for P7
+## 7. P7 — focused queue per selected intent — OPERATOR-APPROVED
 
-```text
-B01 global shell/Minha Caixa IA is reused, not redesigned
-B05 remains read-only
-no queue quick approve/reject
-no due dates / SLA / urgency inference
-no total-count KPI absent an admitted total count
-no generic filters/sort control
-no B06 detail preview requiring getGovernanceAttempt inside B05
-no B04 content preview inside queue
-no frontend Authorization matrix
-no merged cross-lane priority algorithm
-server cursor order remains presentation order
-```
+The operator approved **A — focused queue per selected Minha Caixa intent**.
 
-Potential IA tension to **test**, not silently reopen:
-
-```text
-B01 label "Em edição"
-vs
-WorkAuthoringItem.state = DRAFT | SUBMITTED
-```
-
-B05 P8 must render an explicit SUBMITTED item. Reopen B01 terminology only if operation evidence shows the locked label materially misleads users.
-
-## 8. P7 composition comparison
-
-### A — Focused queue per selected intent — LEADING HYPOTHESIS
-
-```text
-Minha Caixa / Para aprovação
-→ one full-width governance queue
-→ rows optimized for scanability
-→ row click/open -> B06 boundary
-
-Minha Caixa / Em edição
-→ one full-width authoring queue
-→ rows optimized for scanability
-→ row click/continue -> B04
-```
-
-Strengths:
-
-```text
-matches locked sidebar intent directly
-maximizes scan density
-fits independent cursor pagination naturally
-no duplicate Home overview
-no invented cross-lane priority
-responsive transformation is straightforward
-stale row recovery stays local to the selected queue
-```
-
-### B — Two lanes together — REJECTED AS LEADING BASELINE
-
-Would reproduce the B01 Home attention composition rather than add a distinct detailed queue experience. It also creates cross-lane comparison pressure without an admitted cross-lane order/priority model.
-
-### C — Legacy-inspired master/detail — REJECTED AS LEADING BASELINE
-
-The legacy stack made sense because the selected card also carried approval context/actions. Current B05 is read-only and intentionally lacks Step/content/decision truth. A large detail pane would either repeat the selected row or pressure B05 to import B04/B06 facts.
-
-The useful legacy properties survive inside A as dense selectable rows, keyboard/focus behavior and clear continuation actions; the old master/detail shell does not.
-
-## 9. Leading P7 structure
+Locked-for-P8 hypothesis:
 
 ```text
 GLOBAL SHELL — inherited B01
 
-page header
-  Minha Caixa
-  concise intent explanation
-
-intent switch / route-presentation state
-  Para aprovação | Em edição
+Minha Caixa
+  intent switch
+    Para aprovação | Em edição
 
 selected intent
-  focused full-width queue
-  server order preserved
-  dense rows
-  row identity + bounded metadata
-  direct owner-lens continuation
-  load-more cursor continuation
+  one full-width focused queue
+  server cursor order preserved
+  dense human-recognizable rows
+  local row selection / keyboard navigation
+  direct continuation to owner-lens boundary
+  cursor load-more
 
-empty / load failure / stale destination
-  explicit bounded state
+material states
+  empty
+  load failure + retry
+  stale destination + refresh
 ```
 
-Governance row candidate fields:
+Governance row:
 
 ```text
 Document code
@@ -316,10 +248,10 @@ Revision
 Title
 Submission | Obsolescência
 Created at
-Abrir caso
+Abrir caso -> B06 boundary
 ```
 
-Authoring row candidate fields:
+Authoring row:
 
 ```text
 Document code
@@ -328,10 +260,78 @@ Title
 DRAFT | SUBMITTED
 Responsible owner
 Updated at
-Continuar trabalho
+Continuar/Abrir trabalho -> B04
 ```
 
-No preview/detail pane is baseline.
+Alternative B was rejected because a two-lane detailed view duplicates the B01 Home attention composition and pressures cross-lane comparison without a priority model.
+
+Alternative C was rejected because legacy master/detail depended on approval context/actions that current read-only B05 intentionally does not own. Useful legacy density/selection/keyboard properties are retained inside A.
+
+No content/detail preview pane is baseline.
+
+## 8. P8 R1 — RENDERED / OPERATOR OPERATION+REVIEW
+
+Functional low-fidelity R1 is browser-operable HTML/CSS/vanilla JavaScript with deterministic local fixtures.
+
+It exercises:
+
+```text
+Para aprovação <-> Em edição presentation switch
+server-order-preserving governance/authoring lists
+dense row recognition
+row selection
+ArrowUp / ArrowDown navigation
+Enter to open selected row
+cursor-style Carregar mais
+Governance handoff terminates at explicit B06 boundary
+Authoring handoff terminates at B04 LOCKED boundary
+stale destination -> row projection is not authority -> refresh
+list failure -> retry
+empty lane
+B01N Quick Inbox reuse
+responsive list reflow
+```
+
+Review-only controls force stale/error/empty states and are Evidence only, not Product UI.
+
+### IA tension under explicit P8 test
+
+Current accepted Authoring projection admits:
+
+```text
+state = DRAFT | SUBMITTED
+```
+
+while B01's global human label is:
+
+```text
+Em edição
+```
+
+P8 R1 deliberately contains visible SUBMITTED items under `Em edição`.
+
+Disposition:
+
+```text
+DO NOT reopen B01 from theory.
+If operator operation shows the label materially misleads, raise a smallest-scope B01 terminology finding.
+If it remains understandable in context, preserve the existing LOCK.
+```
+
+## 9. Hard constraints preserved
+
+```text
+B05 read-only
+no queue quick approve/reject
+no due/SLA/urgency/priority inference
+no total-count KPI absent total count
+no generic filters/sort control
+no B06 per-row enrichment
+no B04 content preview
+no frontend Authorization matrix
+no merged cross-lane priority algorithm
+server cursor order remains presentation order
+```
 
 ## 10. Current gate
 
@@ -340,19 +340,19 @@ B05 authority recovery                       COMPLETE
 legacy queue ergonomics recovery             COMPLETE
 B05-F1 governance identification precision   CLOSED / OPERATOR-RATIFIED
 B05-F2 governance ordering                   CLOSED / OPERATOR-RATIFIED
-P7 composition                               LEADING A / OPERATOR REVIEW
-P8 functional HTML                           NOT OPEN
+P7 focused queue A                           APPROVED
+P8 functional R1                             RENDERED / OPERATOR OPERATION+REVIEW
 B05 LOCK                                     NO
 ```
 
 Next:
 
 ```text
-operator adjudicates P7 A
-→ build one functional low-fi P8
-→ operator operates / iterates / LOCKs
-→ P9 exact Screen Contract
-→ P10 bounded pattern consolidation
+operator operates P8 R1
+-> iterate only material B05 findings
+-> operator-only B05 LOCK
+-> P9 exact Screen Contract
+-> P10 bounded pattern consolidation
 ```
 
 B06+ remain NOT OPEN.
