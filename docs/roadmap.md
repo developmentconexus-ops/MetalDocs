@@ -77,10 +77,15 @@ B06   Governance Case
        B06-F1 deadline projection                  CLOSED / OPERATOR-RATIFIED
        B06-F2 Governance Review Layer seam         CLOSED / OPERATOR-RATIFIED / FUTURE-SEAM
 B07   Document History
-       LOCKED / OPERATOR-RATIFIED
+       LOCKED / OPERATOR-RATIFIED · P8/P9/P10 COMPLETE
        B07-F1 human-recognizable History read      CLOSED / OPERATOR-RATIFIED
-       P8 R1 / P9 / P10                            COMPLETE
-B08   Notifications Full Inbox                     NOT OPEN / NEXT ELIGIBLE
+B08   Notifications Full Inbox
+       OPEN / ACTIVE
+       entry recovery                              COMPLETE
+       P6                                          COMPLETE
+       B08-F1 human-recognizable Inbox read        DESIGN APPROVED IN CHAT / WRITTEN RATIFICATION PENDING
+       P7 H1 Focused Triage Inbox                  DESIGN APPROVED IN CHAT / WRITTEN RATIFICATION PENDING
+       P8 / LOCK / P9 / P10                        NOT OPEN
 B09   Audit                                        NOT OPEN
 B10   Organization Administration                 NOT OPEN
 B11   Access Administration                       NOT OPEN
@@ -103,73 +108,88 @@ Notifications remains transversal utility chrome, not `Minha Caixa` authority.
 
 ## B07 closure
 
-Canonical authority/work/evidence:
+B07 remains LOCKED. Document History uses server-authored Revision recognition, chronological Revision chapters and exact read-only historical content; History remains distinct from Audit. Its P9/P10 closed with no new operation or generic Timeline/Event abstraction.
+
+## B08 current gate
+
+Canonical written candidate:
 
 ```text
-docs/decisions/document-history-recognition-read.md
-docs/work/current/t11-b07-document-history-r1.md
-docs/work/current/t11-b07-document-history-functional-wireframe.html
-docs/work/current/t11-b07-screen-contract.md
-docs/work/current/t11-b07-pattern-consolidation.md
+docs/work/current/t11-b08-notifications-full-inbox-r1.md
 ```
 
-Locked experience:
+Current Notification boundary remains:
 
 ```text
-Revision Chapters + chronological event spine
-→ exact RevisionIdentity on every event
-→ frozen human Step label on governance Decisions
-→ server chronology remains authoritative
-→ later activity may repeat an older Revision marker
-→ exact historical Submission / Release opens read-only viewer
-→ cursor failure preserves already-loaded facts
-→ exact-content failure never substitutes another/current version
-→ History remains distinct from Audit
-→ no compare / restore / delete / History mutation
+/notifications
+→ op82 listNotifications
+→ op83 updateNotificationEngagement
+→ op84 markNotificationsSeen
+→ op85 markAllNotificationsRead
+→ op86 streamNotificationEvents (invalidation only)
+→ Notifications owner
+→ current DOCUMENT_MENTION source disclosure from Controlled Documents
 ```
 
-P9 closure:
+B01N remains the global bell + Quick Inbox. B08 is the full persistent triage surface and does not become `Minha Caixa` or a second Document/Discussion workspace.
+
+### B08-F1 written candidate
+
+No operation 87+ is proposed. Existing op82 would project enough currently disclosable source context for one row to be independently recognizable:
 
 ```text
-material regions/controls traced        20 / 20
-unbound material controls               0
-invented operations                     0
-operation 87+                           0
-screen-shaped APIs                      0
-frontend historical graph authority     0
-frontend Authorization evaluator        0
-History mutations                       0
-Audit reconstruction dependencies       0
-material findings                       0
+Notification engagement identity/state
++ stable DocumentReference
++ exact message_id
++ author UserReference
++ exact official Revision-at-post reference when one existed
++ bounded server-composed message preview
 ```
 
-P10 closure:
+The source presentation remains read-time composition after current disclosure. Notification persistence continues to own only identities + engagement state; no Document title/message/profile/ACL copy becomes Notification authority.
+
+Fixed list meanings remain:
 
 ```text
-shared patterns reused                  3
-new shared patterns graduated           0
-B07-local patterns                      6
-false abstractions                      0
-History/Audit semantic merges           0
+active    = presentable + non-archived
+unread    = presentable + non-archived + unread
+archived  = presentable + archived
 ```
 
-Shared patterns reused are:
+### P7 H1 written candidate
 
 ```text
-Global App Shell
-Notification Quick Inbox
-Exact Read-Only Content Viewer Shell
+Focused Triage Inbox
+→ heading + unseen/unread summaries
+→ Mark all read
+→ Caixa de entrada / Não lidas / Arquivadas
+→ one chronological Notification list
+→ per-item read/unread + archive/unarchive
+→ exact source open to B03 Discussion anchor
+→ cursor continuation/retry
+→ actual presentation, not mere fetch, drives seen candidates
+→ SSE only invalidates/refetches canonical op82 truth
 ```
 
-B07 does not graduate a generic Timeline/Event/History abstraction.
+Not current B08 scope:
+
+```text
+search / arbitrary filters / saved views
+bulk selection/archive
+snooze / priority / reminders
+preferences / email / push
+Notification delete
+source reply/editor/viewer inside Inbox
+```
 
 ## Exact next action
 
 ```text
-1. B08 Notifications Full Inbox is the next eligible FP1 block and remains NOT OPEN.
-2. Open B08 only when the operator chooses to continue FP1.
-3. Do not open B09+ early.
-4. Implementation remains blocked.
+1. Operator reviews and ratifies the written B08 candidate.
+2. Only after written ratification may B08-F1 become durable authority.
+3. Then open B08 P8 functional HTML for operator use.
+4. Do not open B09+ while B08 is active.
+5. Implementation remains blocked.
 ```
 
 ## Hard stops
@@ -178,10 +198,10 @@ B07 does not graduate a generic Timeline/Event/History abstraction.
 no Product code/schema/OpenAPI/runtime/deploy implementation
 no T12 work
 no production framework in P8
-no frontend History graph as business authority
-no History/Audit semantic merge
-no compare/restore/delete without current Product authority
-no dormant inline-review UI
+no Notifications/Minha Caixa semantic merge
+no frontend source-disclosure matrix or post-filter
+no copied source content/ACL as Notification authority
+no generic Inbox/filter/preferences platform without consumer
 no frontend Authorization matrix
 no unopened downstream block design
 no legacy restoration by sunk cost
