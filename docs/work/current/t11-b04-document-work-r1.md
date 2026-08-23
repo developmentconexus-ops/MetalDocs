@@ -90,7 +90,7 @@ SUBMITTED
   never mounts editable DRAFT controls
 ```
 
-The P7 wireframe represents Eigenpal toolbar zones structurally; it does not freeze vendor button order, visual styling or implementation internals.
+The P7/P8 wireframes represent Eigenpal toolbar zones structurally; they do not freeze vendor button order, visual styling or implementation internals.
 
 ## 4. Right-rail disposition after legacy review
 
@@ -128,7 +128,7 @@ Ver ficha completa → B03
 
 It is orientation, not a second Document Official authority.
 
-## 5. Current P7 interaction/state findings
+## 5. P7/P8 interaction-state laws
 
 Must remain visible/understandable in P8:
 
@@ -149,6 +149,7 @@ WorkingContent != Submission
 
 412 precondition.draft_changed
   preserve unsaved/local human input
+  stop autosave progression
   refetch current server DRAFT
   require explicit reconciliation
   no silent LWW / automatic merge
@@ -159,50 +160,135 @@ state.upload_expired
   never revive the expired upload id
 ```
 
-## 6. Open material decision before P8
+## 6. B04-F1 — DOCX persistence UX — CLOSED / OPERATOR-RATIFIED
 
-### B04-F1 — DOCX persistence UX
+The operator approved the **hybrid persistence** model.
 
-Still **OPEN**:
-
-```text
-manual save
-vs
-autosave
-vs
-hybrid save
-```
-
-The final choice must preserve:
+Contract:
 
 ```text
-DocumentWorkView + strong DRAFT ETag = server truth
-local editor buffer = FORM DRAFT only
-save status is presentation state, not Product lifecycle
-412 preserves local input and forces reconciliation
-submit must never race ahead of unresolved local edits
+local Eigenpal edit
+→ FORM DRAFT becomes DIRTY immediately
+→ after an implementation-appropriate quiet period, coalesce background persistence
+→ at most one save pipeline in flight
+→ additional edits while saving remain DIRTY and schedule the next coalesced save
+
+Salvar agora / Ctrl+S
+→ force the same save pipeline immediately
+
+save pipeline for DOCX body
+→ serialize intended DOCX bytes
+→ allocate/upload/complete admission as required
+→ PATCH exact DRAFT under current If-Match
+→ accept returned DocumentWorkView + new strong ETag
+→ mark clean only for the exact local generation persisted
 ```
 
-Legacy evidence used autosave, but legacy timing/mechanics are evidence only and do not define current Product semantics.
+Timing/debounce duration is implementation tuning, not Product/frontend authority.
 
-## 7. P8 gate
+Visible presentation states:
+
+```text
+saved
+local changes / dirty
+saving
+save failed — local buffer preserved
+conflict / reconciliation required
+```
+
+Concurrency/error law:
+
+```text
+412 precondition.draft_changed
+→ stop normal autosave for that stale base
+→ preserve local human input
+→ refetch authoritative DRAFT
+→ explicit human reconciliation
+→ no automatic merge / silent overwrite
+
+save/dependency failure
+→ preserve local buffer
+→ expose retry
+→ no false "saved" state
+```
+
+Submit law:
+
+```text
+Enviar para análise
+→ if a save is in flight, wait for it to resolve
+→ if local changes remain, force flush through the same save pipeline
+→ require no unresolved save error/conflict/upload attachment
+→ only then createSubmission against the exact current accepted DRAFT ETag
+```
+
+Browser state law:
+
+```text
+local editor buffer = transient FORM DRAFT only
+no IndexedDB/localStorage/offline durable DRAFT baseline
+no second client content authority
+```
+
+## 7. Canonical P8 R1
+
+Current functional evidence:
+
+```text
+t11-b04-document-work-functional-wireframe.html
+```
+
+Medium:
+
+```text
+HTML
+CSS
+vanilla JavaScript
+local deterministic fixtures/state simulation
+```
+
+P8 R1 exercises:
+
+```text
+DOCX Eigenpal-like toolbar + editable canvas
+DIRTY → coalesced autosave → saved/new ETag
+Salvar agora / Ctrl+S
+one-save-in-flight behavior
+save failure + explicit retry opportunity
+412 conflict + local-buffer preservation + manual reconciliation choice
+PDF DRAFT read-only viewer
+source replacement:
+  allocation → provider PUT → completion/READY → DRAFT attach
+expired upload → preserve local file → new allocation / re-upload
+submit forces flush before SUBMITTED
+SUBMITTED read-only gates
+withdraw Submission → same Revision back to DRAFT
+cancel Revision with mandatory reason → no current work
+no-History fallback + explicit return to B03
+collapsed Document context
+locked B01N notification chrome reuse
+responsive rail stacking
+```
+
+Review-only fixture controls may force conflict/failure/expiry states. They are P8 Evidence controls, not Product UI.
+
+## 8. Current gate
 
 ```text
 P7 macro-layout                         OPERATOR-APPROVED
 Eigenpal DOCX / viewer format boundary  OPERATOR-APPROVED
 right-rail composition                  OPERATOR-APPROVED
-B04-F1 persistence UX                   OPEN
-P8 functional HTML                      NOT YET GENERATED
+B04-F1 hybrid persistence UX            CLOSED / OPERATOR-RATIFIED
+P8 functional R1                        RENDERED / OPERATOR OPERATION+REVIEW
 B04 LOCK                                NO
 ```
 
 Next:
 
 ```text
-adjudicate B04-F1
-→ render one functional P8
-→ operator operates / iterates
-→ operator-only LOCK
+operator operates P8 R1
+→ iterate only material B04 layout/interaction findings
+→ operator-only B04 LOCK
 → P9 exact Screen Contract
 → P10 bounded pattern consolidation
 ```
