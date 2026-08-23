@@ -1,18 +1,17 @@
 # T11 — B06 Governance Case R1 — Method v2.2 candidate
 
-> **Status:** OPEN / ACTIVE / ENTRY CLOSED / P7 CANDIDATE.  
+> **Status:** OPEN / ACTIVE / ENTRY CLOSED / P7 OPERATOR-APPROVED / P8 R1 READY FOR OPERATOR USE.  
 > **Block:** B06 — Governance Case.  
 > **Method:** Frontend Product Experience Planning Method v2.2 + DevelopmentConexus Engineering Method.  
 > **Predecessors:** B01 / B01N / B02 / B03 / B04 / B05 LOCKED.  
 > **Current bounded authority:** `../../decisions/governance-case-step-deadline-read.md` + `../../decisions/governance-step-deadline.md`.  
+> **Canonical P8 R1:** `t11-b06-governance-case-functional-wireframe.html`.  
 > **Implementation:** BLOCKED.  
-> **P8:** NOT OPEN.
+> **LOCK:** NOT YET — operator must operate/iterate P8 first.
 
 ## 1. Entry recovery outcome
 
 B06 entry recovery covered current Product/T2/T3/T6/T8-E/T8-F authority plus useful legacy governance ergonomics.
-
-Entry result:
 
 ```text
 Governance Case semantic owner     Controlled Documents lens
@@ -26,13 +25,13 @@ material entry findings            1
 material entry findings remaining  0
 ```
 
-The single entry finding was B06-F1: current Step deadline truth existed in the domain but not in the Governance Case Step projection. It is now CLOSED / OPERATOR-RATIFIED through:
+The one material entry finding was B06-F1: real Step deadline truth existed in Controlled Documents but the Governance Case Step projection did not expose it. It is CLOSED / OPERATOR-RATIFIED through:
 
 ```text
 ../../decisions/governance-case-step-deadline-read.md
 ```
 
-No Product operation, route, Permission, lifecycle state or semantic owner was added.
+No Product operation, stable route, Permission, lifecycle state, semantic owner, SLA engine or deadline mutation was added.
 
 ## 2. Human jobs
 
@@ -60,30 +59,30 @@ I need to ACCEPT or RETURN_FOR_CHANGES deliberately,
 so that one immutable Step Decision is recorded against the exact case.
 ```
 
-RETURN_FOR_CHANGES requires a reason. ACCEPT does not invent a reason requirement.
+`RETURN_FOR_CHANGES` requires a reason. `ACCEPT` does not invent a reason requirement.
 
 ### J4 — communicate without confusing communication with decision
 
 ```text
-When I need to add context or ask/supply information,
+When I need to add context,
 I need to add governance feedback separately from the Step Decision,
-so that discussion does not become an implicit verdict.
+so that communication never becomes an implicit verdict.
 ```
 
-### J5 — recover when current truth changed
+### J5 — recover from stale current truth
 
 ```text
 When another participant or server transition wins first,
-I need the screen to replace my stale assumption with authoritative case truth and explain what happened,
-so that I do not retry a conflicting decision or believe an uncommitted action succeeded.
+I need authoritative case truth to replace my stale assumption,
+so that a conflicting Decision is not silently retried or fabricated as success.
 ```
 
-### J6 — inspect a case with no current action
+### J6 — inspect a disclosed case with no current action
 
 ```text
-When the case is disclosed but no action is currently offered,
-I need to understand the governed subject and current/proven process state,
-so that absence of controls is not mistaken for a broken UI or frontend permission decision.
+When the case is visible but no action is currently offered,
+I still need its exact subject and process context,
+so that absence of controls is not mistaken for a broken UI or frontend Authorization decision.
 ```
 
 ## 3. Exact authority boundary
@@ -95,7 +94,7 @@ so that absence of controls is not mistaken for a broken UI or frontend permissi
    -> GovernanceCaseView
 ```
 
-`GovernanceCaseView` supplies:
+Supplies:
 
 ```text
 governance_attempt_id
@@ -106,7 +105,7 @@ embedded first feedback page
 allowed_actions
 ```
 
-B06-F1 refines `steps` with exact persisted `due_at?` on activated/decided timed Steps.
+B06-F1 refines `GovernanceStepView` with exact persisted `due_at?` on timed ACTIVE/DECIDED Steps; PENDING never receives `due_at`.
 
 ### Supporting reads
 
@@ -115,59 +114,59 @@ B06-F1 refines `steps` with exact persisted `due_at?` on activated/decided timed
    -> cursor continuation beyond embedded first20
 
 70 getGovernanceStepDecision
-   -> exact singleton Decision read when targeted reconciliation needs it
+   -> exact singleton Decision when targeted reconciliation requires it
 
 exact governed subject/source
    -> only through already-admitted owner reads
 ```
 
-Submission source identity:
+Submission:
 
 ```text
-GovernanceCaseView.subject.submission_id
--> exact immutable Submission source read
+subject.submission_id
+-> exact immutable Submission source
 -> never current WorkingContent
 ```
 
-Obsolescence content identity:
+Obsolescence:
 
 ```text
-GovernanceCaseView.subject.target_revision
--> exact target Revision identity must remain the rendered identity
--> supporting official/release reads may resolve bytes only when they match that exact target
--> never substitute a newer/current different Revision merely because it is easier to fetch
+subject.target_revision
+-> exact target Revision identity
+-> supporting official/release reads must match that exact target
+-> never substitute a newer/different Revision
 ```
 
-If a supporting read cannot lawfully resolve the exact target, B06 must fail closed rather than render a different Revision. A proven reachable case with no admitted exact-content resolution is an upstream authority finding; P7/P8 may not repair it with History leakage or client inference.
+If exact target bytes cannot be lawfully resolved, B06 fails closed rather than leaking History or rendering another Revision.
 
 ### Writes
 
 ```text
 69 createGovernanceFeedback
-   body.message
+   message
    one Idempotency-Key per logical feedback creation
 
 71 recordGovernanceStepDecision
    ACCEPT
-   RETURN_FOR_CHANGES + required reason
-   natural singleton PUT; no Idempotency-Key row
+   RETURN_FOR_CHANGES + mandatory reason
+   natural singleton PUT
 ```
 
 ### Local frontend state
 
 ```text
 feedback draft
-decision selection / return reason until accepted
+decision intent / return reason until accepted
 confirmation disclosure
-viewer UI state
-feedback pagination/navigation state
+viewer page/presentation state
+feedback cursor/pagination state
 ```
 
 No durable business truth is created in the browser.
 
-## 4. Action and Authorization law
+## 4. Action / Authorization / deadline law
 
-Current closed action vocabulary:
+Closed action vocabulary:
 
 ```text
 accept
@@ -175,17 +174,15 @@ return_for_changes
 add_feedback
 ```
 
-`allowed_actions` is server-derived guidance only.
-
-B06 may use it to suppress/offer affordances, but:
+`allowed_actions` is server-derived UX guidance only.
 
 ```text
 hidden control != denied authority proof
-shown control != granted authority proof
+shown control  != granted authority proof
 command always rechecks current server truth
 ```
 
-No B06 control exists for:
+B06 owns no control for:
 
 ```text
 publish / release
@@ -201,63 +198,43 @@ manual priority
 edit governed content
 ```
 
-Those are either owned by another lens/current command or absent from Launch.
-
-## 5. Deadline behavior in B06
-
-Current bounded authority:
+Deadline presentation:
 
 ```text
-pending Step
-  no due_at
+PENDING timed/untimed Step
+  no absolute due_at yet
 
-active timed Step
+ACTIVE timed Step
   exact persisted due_at
 
-active untimed Step
-  no due_at
+DECIDED timed Step
+  exact persisted due_at preserved
 
-decided timed Step
-  exact preserved due_at
+now >= due_at
+  may present overdue attention
+  does not change Step/Attempt state, Authorization or allowed_actions by itself
 ```
 
-Presentation may derive:
+B06 re-reads deadline truth from `getGovernanceAttempt`; B05 navigation state is never case authority.
 
-```text
-absolute deadline
-relative wording
-overdue attention when now >= due_at
-```
-
-Presentation must not derive:
-
-```text
-new lifecycle state
-SLA success/failure
-permission
-priority score
-escalation
-```
-
-B06 reloads its own Step deadline from `getGovernanceAttempt`; B05 navigation state is never authority.
-
-## 6. Material failure/recovery branches
+## 5. Material failure / recovery branches
 
 ### Case 404 / disclosure loss
 
 ```text
 getGovernanceAttempt -> 404
--> do not reveal whether the attempt exists outside disclosure
+-> reveal neither existence nor denial reason
 -> terminal case-not-available presentation
--> offer safe return to Minha Caixa
+-> safe return to Minha Caixa
 ```
 
-### Case 403
+### Action 403
 
 ```text
-currently visible request/action but missing authority
--> explain action/context is not permitted now
--> server remains authority
+visible action becomes disallowed at command time
+-> server returns 403
+-> re-read current case
+-> no frontend permission matrix is inferred
 ```
 
 ### Decision conflict
@@ -265,19 +242,18 @@ currently visible request/action but missing authority
 ```text
 recordGovernanceStepDecision
 -> 409 state.governance_step_already_decided
--> refetch current case / exact Decision
--> show the winning authoritative Decision
--> do not silently retry a different outcome
+-> re-read current case / exact Decision
+-> display winning authoritative Decision
+-> never silently retry a different outcome
 ```
-
-If the attempted logical PUT had an ambiguous transport outcome, an exact same outcome/reason retry remains compatible with singleton semantics; a changed outcome/reason is a new conflicting intent and must not reuse the old assumption.
 
 ### Feedback ambiguous outcome
 
 ```text
 createGovernanceFeedback
--> preserve the same logical Idempotency-Key for retry
--> do not create a second message merely because the first response was lost
+-> ambiguous/lost response
+-> preserve same logical message + same Idempotency-Key
+-> retry must not manufacture a duplicate feedback record
 ```
 
 ### Exact-content failure
@@ -286,28 +262,24 @@ createGovernanceFeedback
 integrity/dependency failure
 -> no successful partial exact-content claim
 -> case metadata/process may remain understandable
--> decision surface must not imply the unavailable bytes were successfully reviewed
+-> UX must not suggest the unavailable bytes were successfully reviewed
 ```
 
-The exact interaction treatment is P8 material.
+The exact control treatment is intentionally exercised by P8 and remains operator-adjudicable UX evidence, not new Product authority.
 
-## 7. P6 — bounded reference study
+## 6. P6 — bounded evidence
 
-Reference study is Evidence only; MetalDocs authority remains §§1–6.
-
-### Current legacy archive
-
-Useful observations:
+Useful legacy evidence only:
 
 ```text
-ordered process timeline supports orientation
+ordered process sequence helps orientation
 real due date is useful when present
-persistent/visible decision area reduces action hunting
+visible/persistent decision area reduces action hunting
 explicit retry/error state is useful
-reason entry for change request is materially different from generic comment
+change-request reason is materially distinct from generic feedback
 ```
 
-Rejected legacy semantics:
+Explicitly rejected legacy semantics:
 
 ```text
 ExtendSlaDialog
@@ -318,64 +290,19 @@ legacy passed/failed/cancelled Step ontology
 peer Approval product/workspace
 ```
 
-### Camunda Tasklist — reference observation
-
-Observed pattern:
-
-```text
-task queue -> selected task detail
-context/due date kept near task detail
-process view helps explain where a task sits in a broader flow
-```
-
-Mismatch:
-
-```text
-Camunda is generic task/workflow infrastructure
-priority, follow-up, assignment and process tooling exceed MetalDocs authority
-```
-
-Reference:
-
-```text
-https://docs.camunda.io/docs/components/tasklist/userguide/using-tasklist/
-```
-
-### Veeva Vault document workflow — reference observation
-
-Observed pattern:
-
-```text
-assigned document workflow task -> document workflow viewer
-participant reviews bound document content before verdict
-verdict and comments are distinct concepts
-workflow binds/reviews a specific document version rather than silently following later content
-```
-
-Mismatch:
-
-```text
-multi-document envelopes, task acceptance, eSignature and broader workflow configuration are not MetalDocs Launch requirements
-```
-
-References:
-
-```text
-https://platform.veevavault.help/en/lr/50506
-https://platform.veevavault.help/en/lr/50493
-```
-
-### P6 stop condition
-
-Additional references stopped changing the decision space. Current evidence consistently favors keeping exact governed content and decision context together while avoiding generic workflow machinery.
+External comparative evidence stopped changing the decision space after Camunda Tasklist + Veeva Vault document workflow. It supports keeping exact governed content and verdict context together while rejecting generic workflow breadth, priority, reassignment, task acceptance, eSignature and multi-document envelope concepts.
 
 P6 = COMPLETE.
 
-## 8. P7 — credible layout hypotheses
+## 7. P7 — OPERATOR-APPROVED
 
-The real ambiguity is how much space to give exact content versus case/process context while preserving deliberate decision ergonomics.
+Operator adjudication on 2026-08-23 approved:
 
-### H1 — Content-first Governance Workspace — LEADING CANDIDATE
+```text
+H1 Content-first Governance Workspace
+```
+
+Selected composition:
 
 ```text
 minimal Governance Case header
@@ -386,114 +313,61 @@ minimal Governance Case header
   active Step deadline when present
 
 main workspace
-  dominant content region
+  dominant exact governed-content region
     Exact Read-Only Content Viewer Shell
-    exact immutable Submission / exact obsolescence target
+    immutable Submission or exact obsolescence target
 
   B06-local governance rail
     A. what is being decided
-    B. ordered Steps / active Step / prior Decisions
+    B. ordered Steps / active deadline / prior Decisions
     C. governance feedback
-    D. deliberate decision zone
+    D. deliberate Decision zone
 ```
 
-Decision zone behavior:
+Decision behavior:
 
 ```text
 ACCEPT
-  -> deliberate confirmation
-  -> record singleton Decision
+  -> explicit confirmation
+  -> singleton Decision command
 
 RETURN_FOR_CHANGES
-  -> required reason form
-  -> deliberate confirmation
-  -> record singleton Decision
+  -> required reason
+  -> explicit confirmation
+  -> singleton Decision command
 
 ADD FEEDBACK
-  -> separate feedback composer
+  -> separate composer
   -> never satisfies RETURN reason
 ```
 
-Why it leads:
+Rejected structures:
 
 ```text
-task completion        strongest: content stays present while deciding
-recognition            exact Revision identity can remain continuously visible
-context preservation   strongest: no viewer round-trip before verdict
-backend truth fit      direct mapping to exact governed source + case read
-error recovery         decision conflict can reconcile beside same case context
-accessibility          two semantic regions can reflow linearly
-responsive viability   rail can reflow below content without inventing another route
-product coherence      reuses exact read-only viewer semantics without copying B04 rail authority
+H2 dossier-first + separate viewer
+  REJECTED AS LEADING — forces context switch during content judgment
+
+H3 three-column workflow cockpit
+  REJECTED — density/product-shape mismatch and generic workflow gravity
 ```
 
-Important constraint:
+Important boundary:
 
-> The B06 governance rail is a new block-local semantic composition. B04's `Work operational rail` remains B04-local and is not generalized merely because both happen to sit beside content.
+> The B06 governance rail is B06-local. B04's Work operational rail remains B04-local; geometric similarity does not graduate a shared semantic sidebar.
 
-### H2 — Dossier-first Case + separate full viewer — REJECTED AS LEADING
+P7 authority findings = 0.
+
+## 8. P8 R1 — functional low-fidelity evidence
+
+Canonical file:
 
 ```text
-case summary / timeline / feedback / actions dominant
-small content preview
--> open separate full viewer to inspect exact bytes
--> return to case to decide
+docs/work/current/t11-b06-governance-case-functional-wireframe.html
 ```
 
-Advantages:
+P8 R1 is browser-functional low-fi with deterministic local fixtures/state simulation only. It contains no production React, API integration, client Authorization evaluator or product schema implementation.
 
-```text
-strong process scanability
-close to B03 ficha mental model
-```
-
-Weaknesses:
-
-```text
-forces context switching at the exact moment content judgment matters
-makes a thumbnail/preview too influential for a governed decision
-increases risk of deciding from metadata/process rather than exact content
-```
-
-Disposition:
-
-```text
-REJECTED AS LEADING — task/content fit weaker than H1
-```
-
-### H3 — Three-column workflow cockpit — REJECTED
-
-```text
-left   Step/process navigator
-center exact content
-right  feedback/actions
-```
-
-Advantages:
-
-```text
-maximum simultaneous information on very wide desktop
-```
-
-Weaknesses:
-
-```text
-workflow topology becomes visually co-equal with the governed document
-high horizontal density
-poor narrow-screen transformation
-encourages generic workflow-platform affordances
-legacy cockpit resemblance creates sunk-cost risk
-```
-
-Disposition:
-
-```text
-REJECTED — density/product-shape mismatch
-```
-
-## 9. P7 leading hypothesis — material regions
-
-H1 carries these regions into functional P8 if operator-approved:
+### Material regions exercised
 
 ```text
 R1  Case orientation header
@@ -511,83 +385,89 @@ R12 unavailable/non-disclosable case state
 R13 exact-content unavailable/integrity state
 ```
 
-No B07 History, B08 full Notifications Inbox or generic Approval administration is included.
-
-## 10. P7 required truth check
-
-| Need | Identity/source | Status |
-|---|---|---|
-| Case identity/state | `GovernanceCaseView.governance_attempt_id/state` | PRESENT-IN-AUTHORITY |
-| Exact Document identity | `subject.document` | PRESENT-IN-AUTHORITY |
-| Exact governed Revision/title | Submission `revision + title`; obsolescence `target_revision` | PRESENT-IN-AUTHORITY |
-| Subject actor/time | submitter/submitted_at or initiator/requested_at | PRESENT-IN-AUTHORITY |
-| Obsolescence reason | `subject.reason` | PRESENT-IN-AUTHORITY |
-| Exact Submission bytes | `submission_id` -> admitted exact Submission source read | PRESENT-IN-AUTHORITY |
-| Exact obsolescence target bytes | exact target identity -> admitted matching official/release content reads; never substitute another Revision | PRESENT-IN-AUTHORITY / FAIL-CLOSED MATCH REQUIRED |
-| Step labels/order/state | `GovernanceCaseView.steps` route order | PRESENT-IN-AUTHORITY |
-| Step deadline | B06-F1 `GovernanceStepView.due_at?` | PRESENT-IN-AUTHORITY |
-| Prior Step Decision | decided Step embeds Decision; op70 supports targeted reconciliation | PRESENT-IN-AUTHORITY |
-| Feedback first page | embedded `feedback` first20 | PRESENT-IN-AUTHORITY |
-| Feedback continuation | op68 cursor | PRESENT-IN-AUTHORITY |
-| Add feedback | `allowed_actions` hint + op69 | PRESENT-IN-AUTHORITY |
-| ACCEPT | `allowed_actions` hint + op71 | PRESENT-IN-AUTHORITY |
-| RETURN_FOR_CHANGES | hint + op71 + required reason | PRESENT-IN-AUTHORITY |
-| Decision immutability/conflict | singleton + 409 current contract | PRESENT-IN-AUTHORITY |
-| Pagination scale | feedback cursor only; no total-count requirement | PRESENT-IN-AUTHORITY |
-| Case sorting/filtering | none inside one exact case | PRESENT-IN-AUTHORITY |
-| Frontend AuthZ matrix | forbidden | PRESENT-IN-AUTHORITY — MUST NOT EXIST |
-
-Material P7 authority findings: **0**.
-
-## 11. Responsive / accessibility feasibility for H1
-
-Desktop candidate:
+### Functional fixtures
 
 ```text
-content remains dominant
-rail remains independently understandable
-Decision zone remains reachable without covering governed content
+Submission / timed active Step
+Obsolescence / already-overdue active Step
+Disclosed case with allowed_actions=[]
+Non-disclosable/absent case -> 404-neutral terminal state
+presentation clock +20h crossing due_at without lifecycle change
+exact-content failure + retry
+next Decision -> 409 winner reconciliation
+next Decision -> 403 current-authority reconciliation
+feedback ambiguous response -> same-logical-key retry
+feedback cursor load-more
+viewer page navigation
+Notification Quick Inbox inherited as global chrome only
+B05 return boundary
+responsive reflow
+Escape / modal focus path + aria-live reconciliation announcements
 ```
 
-Narrow candidate:
+### P8-specific hypothesis under operator review
+
+When exact governed bytes are unavailable while decision actions would otherwise be offered, R1 currently makes the Decision zone unavailable and explains that the exact content is not confirmed.
+
+This is intentionally a **P8 UX hypothesis**, not a new Authorization or lifecycle rule:
+
+```text
+content read failure
+-> keep case/process context visible
+-> prevent the prototype from suggesting completed content review
+-> offer content retry
+```
+
+Operator use may accept, revise or reject this treatment without reopening Product unless new evidence proves missing semantic authority.
+
+## 9. Responsive / accessibility structure exercised
+
+Desktop:
+
+```text
+exact content remains dominant
+Governance rail remains independently understandable
+Decision zone stays visible without covering content
+```
+
+Narrow:
 
 ```text
 orientation header
--> subject/deadline summary
+-> compact subject/deadline context
 -> exact content
 -> Steps
 -> feedback
--> decision controls
+-> Decision
 ```
 
-A persistent compact action affordance may be explored in P8 only if it does not hide content, bypass the required reason or create accidental destructive activation.
-
-Structural accessibility obligations:
+Structural obligations represented in R1:
 
 ```text
-Step progression must not rely on color alone
-active/current Step announced semantically
-absolute deadline remains available even when relative label exists
-overdue not color-only
-viewer has explicit semantic identity outside rendered bytes
-feedback and Decision are separately labeled regions
-RETURN reason has explicit required semantics
-confirmation focus/escape/return path must be testable
-409 reconciliation announces authoritative change
+Step state not color-only
+active Step uses semantic aria-current
+absolute deadline retained alongside relative label
+overdue includes explicit text
+exact Revision identity remains outside rendered bytes
+feedback and Decision are separate labeled regions
+RETURN reason is explicitly required
+modal Escape/cancel path exists
+409/403 reconciliation is announced
 ```
 
-## 12. P7 exit gate
-
-Current status:
+## 10. Current P8 gate
 
 ```text
-H1 Content-first Governance Workspace   LEADING CANDIDATE
-H2 Dossier-first + separate viewer      REJECTED AS LEADING
-H3 Three-column workflow cockpit        REJECTED
-blocking authority finding              0
-P8 HTML                                 NOT OPEN
+P7 H1                              OPERATOR-APPROVED
+functional P8 HTML                 EXISTS
+material local interactions        IMPLEMENTED IN R1 FIXTURES
+operator browser operation         REQUIRED NEXT
+operator LOCK                      NOT YET
+P9                                 NOT OPEN
+P10                                NOT OPEN
+B07+                               NOT OPEN
 ```
 
 Next gate:
 
-> Operator reviews/approves or changes H1. Only after that may B06 proceed to functional P8 HTML. No B07+ work is opened by this candidate.
+> Operator operates P8 R1, reports friction/findings, and either requests an R2 iteration or explicitly LOCKS B06. Only after LOCK may P9 then P10 execute.
