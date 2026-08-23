@@ -1,6 +1,6 @@
 # T11 — B04 Document Work R1 — Method v2.2 locked
 
-> **Status:** LOCKED / OPERATOR-RATIFIED.  
+> **Status:** LOCKED / OPERATOR-RATIFIED / P9-P10 COMPLETE.  
 > **Block:** B04 — Document Work / Authoring.  
 > **Method:** Frontend Product Experience Planning Method v2.2.  
 > **Predecessors:** B01 / B01N / B02 / B03 LOCKED.  
@@ -19,7 +19,7 @@ B04-F1 hybrid persistence UX
 functional low-fi P8 R1 after browser operation/review
 ```
 
-No material B04 interaction/layout finding remains open at the operator gate.
+No material B04 interaction/layout finding remains open.
 
 ## 2. Locked Product/architecture boundary
 
@@ -162,7 +162,7 @@ Enviar para análise
 
 Browser local state remains transient FORM DRAFT only; no IndexedDB/localStorage/offline durable DRAFT baseline is introduced.
 
-## 6. Exact-content replacement law represented in the lock
+## 6. Exact-content replacement law
 
 ```text
 local file chosen
@@ -181,14 +181,7 @@ READY != WorkingContent
 WorkingContent != Submission
 ```
 
-Expired upload:
-
-```text
-preserve intended local bytes
-→ allocate a fresh upload
-→ repeat upload/admission
-→ never revive the expired upload_id
-```
+Expired upload preserves intended local bytes, allocates a fresh upload and never revives the expired upload_id.
 
 ## 7. Locked P8 R1 evidence
 
@@ -200,26 +193,7 @@ docs/work/current/t11-b04-document-work-functional-wireframe.html
 
 The operator operated/reviewed the browser-functional prototype and explicitly approved it.
 
-P8 locally exercises:
-
-```text
-DOCX edit → DIRTY → autosave/save-now → new ETag
-coalesced edits while one save is in flight
-save failure with local-buffer preservation
-412 conflict + explicit reconciliation / no auto-merge
-PDF DRAFT read-only viewer
-source replacement allocation → PUT → READY → attach
-expired upload → fresh allocation with same intended local bytes
-submit force-flush → SUBMITTED read-only
-withdraw Submission → same Revision DRAFT
-cancel Revision reason → no-current-work state
-return to B03; no History fallback
-collapsed Document context
-B01N global chrome reuse
-responsive rail stacking
-```
-
-Review-only failure/conflict/expiry controls are Evidence, not Product UI.
+P8 exercises the locked happy and recovery paths for DOCX save, PDF/source replacement, upload expiry, 412 reconciliation, submit force-flush, SUBMITTED read-only, withdrawal, cancellation, no-current-work and B03 return. Review-only failure controls remain Evidence and are not Product UI.
 
 ## 8. State authority
 
@@ -242,13 +216,65 @@ EPHEMERAL UI
 
 No fifth durable/global frontend state class is created.
 
-## 9. Post-LOCK progression
+## 9. P9 Screen Contract — COMPLETE
+
+Record:
 
 ```text
-B04 LOCK                              COMPLETE / OPERATOR-RATIFIED
-P9 exact Screen Contract              NEXT
-P10 bounded pattern consolidation     after P9
-B05                                   NOT OPEN until P9/P10 close
+docs/work/current/t11-b04-screen-contract.md
+```
+
+Closure:
+
+```text
+material B04 regions/controls traced        18 / 18
+unbound material controls                   0
+invented operations                         0
+operation 87+                               absent
+screen-shaped APIs                          0
+frontend Authorization evaluator            0
+second client DRAFT authority               0
+navigation identities unsourced             0
+material B04 Screen Contract findings       0
+```
+
+## 10. P10 bounded pattern consolidation — COMPLETE
+
+Record:
+
+```text
+docs/work/current/t11-b04-pattern-consolidation.md
+```
+
+Closure:
+
+```text
+existing locked shared patterns reused          2
+new shared semantic pattern graduated           1
+B04-local semantic patterns retained            8
+false abstractions introduced                   0
+unexplained duplicate locked semantic patterns  0
+```
+
+The one graduated pattern is:
+
+```text
+Exact Read-Only Content Viewer Shell
+```
+
+It now has two LOCKED semantic consumers: B03 exact official viewing and B04 exact DRAFT-PDF / Submission viewing. It remains a planning pattern, not authorization to implement a generic resolver/provider abstraction.
+
+## 11. Block closure
+
+```text
+B04 P7                                  COMPLETE / OPERATOR-APPROVED
+B04-F1 hybrid persistence               CLOSED / OPERATOR-RATIFIED
+B04 P8 functional R1                    COMPLETE / OPERATOR-APPROVED
+B04 LOCK                                COMPLETE / OPERATOR-RATIFIED
+B04 P9                                  COMPLETE
+B04 P10                                 COMPLETE
+
+B05 My Work / Work Queues               NEXT / NOT OPEN
 ```
 
 Implementation remains blocked by the repository-wide T11/T12/Whole-R10 gate.
