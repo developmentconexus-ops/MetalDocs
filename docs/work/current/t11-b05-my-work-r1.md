@@ -1,9 +1,10 @@
-# T11 — B05 My Work / Work Queues R1 — Method v2.2 entry candidate
+# T11 — B05 My Work / Work Queues R1 — Method v2.2 candidate
 
-> **Status:** PRE-OPEN ENTRY CANDIDATE / EVIDENCE — ROADMAP STILL OWNS `B05 NEXT / NOT OPEN`.  
+> **Status:** CURRENT FP1 BLOCK / CANDIDATE / NOT LOCKED.  
 > **Block:** B05 — My Work / Work Queues.  
 > **Method:** Frontend Product Experience Planning Method v2.2.  
 > **Predecessors:** B01 / B01N / B02 / B03 / B04 LOCKED.  
+> **Current bounded authority:** `../../decisions/my-work-governance-identification-read.md`.  
 > **Implementation:** BLOCKED.
 
 ## 1. Current Product/architecture boundary
@@ -68,11 +69,22 @@ WorkGovernanceItem {
   governance_attempt_id:Uuid,
   subject_kind:GovernanceSubjectKind,
   document:DocumentReference,
+  revision:RevisionReference,
   created_at:UtcInstant
 }
 ```
 
-Both are paginated projections. They are navigation/attention lenses only and never mutation/current-lifecycle authority.
+`WorkGovernanceItem.revision` is the operator-ratified bounded T11 precision in `../../decisions/my-work-governance-identification-read.md`:
+
+```text
+submission
+  -> exact governed Submission Revision/title snapshot
+
+obsolescence
+  -> exact governed target RevisionReference
+```
+
+Both pages remain paginated projections. They are recognition/navigation lenses only and never mutation/current-lifecycle authority.
 
 ## 3. Legacy evidence disposition
 
@@ -116,7 +128,7 @@ Authoring
   code / title / state / owner
 
 Governance
-  code / subject kind / created / open case
+  code / Revision/title / subject kind / created / open case
 ```
 
 The old artifact is evidence, not current P8 authority.
@@ -143,74 +155,53 @@ What is the full lifecycle/history?            -> B07
 What is currently official?                    -> B03
 ```
 
-## 6. B05-F1 — Governance queue identification read symmetry — OPEN
+## 6. B05-F1 — Governance queue identification read symmetry — CLOSED / OPERATOR-RATIFIED
 
-### Trigger
-
-`WorkAuthoringItem` is human-identifiable without another read:
+DevelopmentConexus Method outcome:
 
 ```text
-Document code
-+ title
-+ Revision
-+ state
-+ responsible owner
-+ updated_at
+CURRENT STRUCTURE CONFIRMED
++ bounded read-projection correction
 ```
 
-Current `WorkGovernanceItem` exposes only:
+Target invariant:
+
+> Every My Work row is sufficiently human-recognizable for the actor to distinguish the work and choose its destination without opening the owner lens merely to identify the subject, while the queue itself remains non-authoritative.
+
+Selected precision:
 
 ```text
-Document code
-+ subject kind
-+ governance_attempt_id
-+ created_at
+WorkGovernanceItem.revision: RevisionReference
 ```
 
-The opaque attempt id is navigation identity, not useful human recognition. The row lacks the governed subject title and Revision even though both are already frozen/available in the exact `GovernanceCaseView` subject:
+Global Maximum result:
 
 ```text
-Submission subject
-  revision + title
+NO CONTRACT CHANGE
+  REJECTED — preserves recognition defect / local maximum
 
-Obsolescence subject
-  target_revision = RevisionReference
+per-row getGovernanceAttempt fan-out
+  REJECTED — N+1 + B05/B06 coupling + partial loading/failure complexity
+
+rich Governance queue DTO
+  REJECTED — pre-designs B06 / unsupported fields
+
+generic unified WorkItem
+  REJECTED — invents cross-lane order/state/pagination semantics
+
+existing WorkGovernanceItem + existing RevisionReference
+  SELECTED — fixes root cause at projection owner; additive seam; no duplicate authority
 ```
 
-### Candidate smallest precision
+Structural Inversion survives: even if the current DTO were rich or generic, the governance queue would still need exact governed Revision/title identity but would still not need Steps/feedback/decision/content authority.
 
-Reuse the already-accepted wire component:
+Binding authority:
 
 ```text
-RevisionReference {
-  revision:RevisionIdentity,
-  title:LongText
-}
+../../decisions/my-work-governance-identification-read.md
 ```
 
-and add exactly one member:
-
-```text
-WorkGovernanceItem {
-  governance_attempt_id:Uuid,
-  subject_kind:GovernanceSubjectKind,
-  document:DocumentReference,
-  revision:RevisionReference,
-  created_at:UtcInstant
-}
-```
-
-Semantics:
-
-```text
-subject_kind=submission
-  revision = immutable Submission governed Revision/title snapshot
-
-subject_kind=obsolescence
-  revision = immutable target RevisionReference snapshot
-```
-
-Properties:
+Impact:
 
 ```text
 new operation               0
@@ -222,11 +213,7 @@ new persistence authority   0
 frontend join/read fan-out  0
 ```
 
-The projection remains non-authoritative navigation/recognition data. B06 re-reads the exact Governance Case and remains authority for participation/actions.
-
-Without this precision, a professional queue would force users to identify governance work primarily by code + generic `Submission/Obsolescence`, which is materially weaker than the already-available governed subject truth.
-
-**Status:** OPEN / operator adjudication required before final B05 LOCK. P7 may compare composition using the candidate member, clearly marked as B05-F1.
+Current census remains 86 operations / 11 routes / 16 permissions.
 
 ## 7. Bounded design constraints for P7
 
@@ -247,7 +234,7 @@ Pagination remains owned independently by each current server page/cursor.
 
 ## 8. P7 design question
 
-The remaining material composition question is how the detailed `Minha Caixa` presentation should use the two already-LOCKED intents:
+The material composition question is how the detailed `Minha Caixa` presentation should use the two already-LOCKED intents:
 
 ```text
 A. focused lane / full-width queue per selected sidebar intent
@@ -257,13 +244,28 @@ C. legacy-inspired master/selection queue with a bounded non-authoritative summa
 
 Any selected structure must preserve direct navigation to B04/B06 and avoid turning B05 into a decision/content owner.
 
+P7 comparison criteria:
+
+```text
+task completion
+scanability / recognition
+queue density
+context preservation
+pagination truth fit
+accessibility / keyboard behavior
+responsive viability
+stale-row recovery
+backend truth fit
+cognitive load
+```
+
 ## 9. Current gate
 
 ```text
 B05 authority recovery                       COMPLETE
 legacy queue ergonomics recovery             COMPLETE
-B05-F1 governance identification precision   OPEN
-P7 composition                               OPEN
+B05-F1 governance identification precision   CLOSED / OPERATOR-RATIFIED
+P7 composition                               NEXT / OPEN
 P8 functional HTML                           NOT OPEN
 B05 LOCK                                     NO
 ```
