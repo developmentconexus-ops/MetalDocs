@@ -69,12 +69,13 @@ ASY-02 is therefore no longer a forward DEFERRED obligation and is excluded from
 - **AUD-06 — REOPEN** — No claim of indefinite/statutory Audit retention exists; a future Records/compliance requirement must define retention, pruning, and checkpoint semantics.
 - **MIG-10 — REOPEN** — Detailed imported target families are not frozen; any future migration derives the smallest truthful shape from actual source evidence.
 
-## DEFERRED — 26
+## DEFERRED — 27
 
 - **AUTH-07 — DEFERRED** — Fresh-auth/eSignature evidence has no named Launch consumer; Authentication remains the future owner if promoted.
 - **GOV-09 — DEFERRED** — Fresh-auth per governance Step.
-- **GOV-10 — DEFERRED** — Due dates, SLA, and escalation.
+- **GOV-10 — DEFERRED** — Bounded optional per-Step deadline truth is current under `governance-step-deadline.md`; SLA breach consequences, deadline extension and escalation remain deferred.
 - **GOV-11 — DEFERRED** — Generic reassign/overseer/delegation; current Launch uses only bounded explicit exits.
+- **GOV-12 — DEFERRED** — Anchored selected-range governance review, if promoted, binds to the exact immutable governed snapshot through a provider-neutral anchor; it never mutates Submission or silently remaps to returned DRAFT, and tracked-change/suggestion requires separate semantics. Current seam authority: `governance-review-layer-seam.md`.
 - **DOC-10 — DEFERRED** — DocumentType category/taxonomy platform.
 - **DOC-11 — DEFERRED** — Editable Dictionary/System Value platform.
 - **CNT-12 — DEFERRED** — Structured TemplateSpec platform.
@@ -103,8 +104,8 @@ ASY-02 is therefore no longer a forward DEFERRED obligation and is excluded from
 ```text
 PRESERVE  21
 REOPEN     3
-DEFERRED  26
-TOTAL     50
+DEFERRED  27
+TOTAL     51
 ```
 
-These are the only old registry rows still preserved as a cross-stage forward-obligation set. Current semantic decisions, including the consumed ASY-02 bounded reopen, live in their current authorities; superseded legacy decisions remain deleted.
+These are the current cross-stage forward obligations. Most preserve pre-reset registry decisions; `GOV-12` was added by the operator-ratified T11 B06-F2 future seam. Current semantic decisions live in their owning authorities; superseded legacy decisions remain deleted.
