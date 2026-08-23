@@ -102,15 +102,17 @@ B03   Document Official / Ficha + Viewer + Discussion
        P10 bounded pattern pass                    COMPLETE
 
 B04   Document Work / Authoring
-       CURRENT / CANDIDATE / NOT LOCKED
-       content-first workspace P7                  OPERATOR-APPROVED
-       DOCX → Eigenpal editable boundary           OPERATOR-APPROVED
-       PDF / SUBMITTED read-only boundary          OPERATOR-APPROVED
-       right operational rail                      OPERATOR-APPROVED
+       LOCKED / OPERATOR-RATIFIED
+       content-first workspace P7                  APPROVED
+       DOCX → Eigenpal editable boundary           APPROVED
+       PDF / SUBMITTED read-only boundary          APPROVED
+       right operational rail                      APPROVED
        B04-F1 hybrid persistence UX                CLOSED / OPERATOR-RATIFIED
-       functional low-fi P8 R1                     RENDERED / OPERATOR OPERATION+REVIEW
+       functional low-fi P8 R1                     APPROVED / COMPLETE
+       P9 Screen Contract                          COMPLETE
+       P10 bounded pattern pass                    COMPLETE
 
-B05   My Work / Work Queues                        NOT OPEN
+B05   My Work / Work Queues                        NEXT / NOT OPEN
 B06   Governance Case                              NOT OPEN
 B07   Document History                             NOT OPEN
 B08   Notifications Full Inbox                     NOT OPEN
@@ -220,21 +222,18 @@ B03-local semantic patterns retained        7
 false abstractions introduced               0
 ```
 
-## B04 current P8 candidate
+## B04 locked baseline
 
-Planning record:
+Planning/closure records:
 
 ```text
 docs/work/current/t11-b04-document-work-r1.md
-```
-
-Canonical Method-v2.2 functional evidence:
-
-```text
 docs/work/current/t11-b04-document-work-functional-wireframe.html
+docs/work/current/t11-b04-screen-contract.md
+docs/work/current/t11-b04-pattern-consolidation.md
 ```
 
-Operator-approved P7 structure:
+Locked structure:
 
 ```text
 /documents/:document_id/work
@@ -245,24 +244,14 @@ MetalDocs minimal Work header
 CONTENT-FIRST WORKSPACE
   main canvas
     DOCX DRAFT     → Eigenpal toolbar/chrome + editable DOCX canvas
-    PDF DRAFT      → read-only viewer + source replacement path
+    PDF DRAFT      → read-only exact source viewer
     SUBMITTED      → read-only exact submitted-content view
 
-  right rail
+  right operational rail
     Trabalho atual
     Fonte
     Ações
     Contexto do documento — collapsed by default
-```
-
-Legacy comparison disposition:
-
-```text
-preserve useful context density and visible save state
-reject legacy Work + Approval + History mode-adaptive collapse
-full revision history     -> B07
-approval timeline/actions -> B06
-full ficha                -> B03
 ```
 
 B04-F1 hybrid persistence law:
@@ -291,44 +280,53 @@ READY != WorkingContent
 WorkingContent != Submission
 ```
 
-P8 R1 exercises locally:
+P9 closure:
 
 ```text
-DOCX edit → dirty → autosave/save-now → new ETag
-coalesced edits while save is in flight
-save failure + retry path
-412 conflict + preserved local input + explicit reconciliation
-PDF read-only Work
-source replacement allocation → PUT → READY → attach
-expired upload → same local bytes + new allocation
-submit force-flush → SUBMITTED read-only
-withdraw Submission → same Revision DRAFT
-cancel Revision reason → no-current-work state
-return to B03; no History fallback
-responsive rail reflow
+material B04 regions/controls traced        18 / 18
+unbound material controls                   0
+invented operations                         0
+operation 87+                               absent
+screen-shaped APIs                          0
+frontend Authorization evaluator            0
+second client DRAFT authority               0
+navigation identities unsourced             0
+material B04 Screen Contract findings       0
 ```
 
-Review-only controls that force failure/conflict/expiry are Evidence only, not Product UI.
+P10 closure:
+
+```text
+existing locked shared patterns reused          2
+new shared semantic pattern graduated           1
+B04-local semantic patterns retained            8
+false abstractions introduced                   0
+unexplained duplicate locked semantic patterns  0
+```
+
+Graduated after the second LOCKED consumer:
+
+```text
+Exact Read-Only Content Viewer Shell
+  B03 = exact official source/rendition
+  B04 = exact DRAFT PDF / immutable Submission source
+```
+
+The pattern is planning vocabulary only; it does not create a generic resolver, provider adapter, lifecycle owner or implementation authorization.
 
 ## Exact next action
 
 ```text
-1. Operator operates B04 functional P8 R1 in browser.
-2. Review only B04 layout / discoverability / persistence / recovery behavior:
-     Eigenpal canvas vs rail balance
-     save-state visibility
-     autosave + Salvar agora feel
-     submit force-flush understanding
-     source replacement progression
-     expired-upload recovery
-     412 reconciliation clarity
-     DRAFT vs SUBMITTED separation
-     withdraw/cancel behavior
-     narrow/mobile reflow
-3. Iterate only B04 material findings.
-4. Operator-only B04 LOCK.
-5. Then P9 exact Screen Contract + P10 bounded pattern pass.
-6. B05+ remain NOT OPEN until normal progression permits them.
+B05 My Work / Work Queues is NEXT / NOT OPEN.
+
+When B05 opens:
+  recover only bounded current My Work authority + legacy queue ergonomics evidence
+  execute P6/P7 only where triggered
+  build one functional low-fi P8 candidate
+  operator operates / iterates / LOCKs
+  then P9 / P10
+
+Do not generate B06+ as baseline early.
 ```
 
 ## Hard stops
