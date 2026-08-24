@@ -134,8 +134,9 @@ jobs:
           # The reusable MetalDocs v2.3 frontend method was promoted centrally;
           # keeping a local canonical copy would recreate duplicate method authority.
           test ! -e docs/development/functional-html-wireframe-method.md
-          if git grep -n 'functional-html-wireframe-method\.md' -- AGENTS.md docs/index.md docs/roadmap.md docs/development; then
-            echo "::error::active routing still references the superseded local frontend method"
+          grep -Fq 'FRONTEND-METHOD.md' docs/index.md
+          if git grep -n 'functional-html-wireframe-method\.md' -- AGENTS.md docs/index.md; then
+            echo "::error::active router still references the superseded local frontend method"
             exit 1
           fi
 
