@@ -14,7 +14,7 @@ REPOSITORY MODE       CLEAN-SLATE / ARCHITECTURE-FIRST
 T1 → T10              CLOSED / OPERATOR-RATIFIED / INTEGRATED
 T11                   OPEN / ACTIVE
 T11 checkpoint        B01-B09 ACCEPTED / INTEGRATED
-T11 current block     B10 ORGANIZATION ADMINISTRATION / OPEN / ACTIVE
+T11 current block     B10 ORGANIZATION ADMINISTRATION / LOCKED / P8-P10 COMPLETE
 METHODOLOGY ADOPTION  ACCEPTED / INTEGRATED
 T12                   NOT OPEN
 IMPLEMENTATION         BLOCKED
@@ -87,11 +87,14 @@ B09   Audit                                        LOCKED / P8-P10 COMPLETE
        B09-F1 Audit query/evidence capability      CLOSED / OPERATOR-RATIFIED
        op78 + op87-op89 package                    OPERATOR-RATIFIED / DURABLE
        unresolved BLOCKING / IMPORTANT             0 / 0
-B10   Organization Administration                  OPEN / ACTIVE / P8 CANDIDATE / OPERATOR REVIEW
-       P8 artifact                                 docs/work/current/t11-b10-organization-administration-p8.html
+B10   Organization Administration                  LOCKED / P8-P10 COMPLETE
+       locked P8 blob                              1d1cc7d5cb42e034ab9ee71a21c96918cdcf691d
        structural browser verification             32 / 32 PASS
-       blocking upstream Findings                  0 proven before operator walkthrough
-       B10-A1 paginated-browse sufficiency         OPEN / FALSIFIABLE DURING OPERATOR WALKTHROUGH
+       P9 material regions/controls                 34 / 34 TRACED
+       P9 accepted B10 operations                   24 / 24 BOUND (ops 3-26)
+       operation 27+ consumed                       0
+       B10-A1 paginated-browse sufficiency          VALIDATED FOR CURRENT LAUNCH P8
+       unresolved material B10 Findings             0
 B11   Access Administration                        NOT OPEN
 B12   Document Governance Administration           NOT OPEN
 ```
@@ -107,16 +110,18 @@ evidence/t11-pr162-b01-b09-locks-20260824
 
 The Evidence ref remains exact-SHA checked and non-authoritative.
 
+B10's exact LOCK Evidence is currently branch-local under `docs/work/**` and must receive the same exact-ref + durable-locator treatment before its acceptance candidate removes temporary work.
+
 ## Exact next action
 
 ```text
-1. Operator operates the B10 functional P8 artifact; only the operator may LOCK. Assistant/reviewer may propose REVISE/FINDING but not LOCK.
-2. Explicitly test B10-A1 by locating Rafael Siqueira through paginated Users without fake page-local search and judge whether browse is operationally sufficient.
-3. Exercise Company stale recovery, User creation/provider lookup, Profile/Binding/Eligibility separation, offboarding/re-enable consequence, Area lifecycle and Group dependency-blocked delete.
-4. If operator/P8 Evidence proves paginated browse or another accepted authority materially insufficient, STOP only affected B10 scope and route the smallest UPSTREAM FINDING before continuing.
-5. If operator disposition is REVISE, revise P8 and repeat the affected walkthrough.
-6. Only after explicit B10 LOCK, run P9 bidirectional trace and P10 bounded pattern consolidation before preparing the B10 acceptance candidate.
-7. docs/work/** must be absent from the eventual merge candidate/main.
+1. Prepare B10 as one coherent acceptance increment; do not begin B11.
+2. Open/maintain the B10 PR as Draft while branch-only docs/work/** Evidence is present.
+3. Preserve the exact B10 LOCK/P9/P10 planning tree by an immutable exact Evidence ref and add a durable locator/check before cleanup.
+4. Remove docs/work/** from the B10 merge candidate after preservation; keep Product/architecture semantics unchanged.
+5. Run the repository aggregate gate on the cleaned candidate and resolve any review findings proportionately.
+6. Only after a clean candidate + required review/CI may the PR become Ready.
+7. No merge without explicit operator authorization.
 8. B11-B12 and FP2/P11 remain NOT OPEN. T12 and Product implementation remain BLOCKED.
 ```
 
@@ -133,6 +138,7 @@ no assistant/reviewer LOCK
 no local reusable methodology fork
 no floating methodology main as normative authority
 no methodology sync bot/submodule/generated copies/framework
+no merge without explicit operator authorization
 ```
 
 ## Implementation gate
