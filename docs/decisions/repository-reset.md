@@ -44,13 +44,16 @@ archive/repository-governance-pr132-20260820
 
 evidence/t11-pr162-b01-b09-locks-20260824
 → adf58e448bc5bd3a20cae5b7228d729c031f94ac
+
+evidence/t11-pr170-b10-locks-20260824
+→ b8c607cbd30d61d6bcf6ec1ea734ed1653d2569e
 ```
 
-The first two refs preserve unmerged PR #131/#132 authority/review lineages from the repository reset. The T11 Evidence ref preserves exact operator-LOCKED B01-B09 P8 bytes and supporting temporary planning Evidence required by the current `t11-b01-b09-lock-evidence.md` locator for later P11 reconstruction.
+The first two refs preserve unmerged PR #131/#132 authority/review lineages from the repository reset. The T11 Evidence refs preserve exact operator-LOCKED frontend Evidence required for later P11 reconstruction: B01-B09 are routed by `t11-b01-b09-lock-evidence.md`; B10 P8/P9/P10 is routed by `t11-b10-lock-evidence.md`.
 
-Proof: GitHub compare reports each named ref `identical` to its exact source SHA with `ahead_by=0` and `behind_by=0`.
+Proof: each current Evidence/provenance ref is exact-SHA pinned by the repository aggregate gate. The B10 ref was additionally remotely resolved immediately after creation to the exact pre-cleanup PR #170 HEAD above.
 
-These durable refs MUST NOT be moved or deleted while this page or another current authority names their byte-level provenance as required. The original source branches may be removed only after equivalent reachability has been independently re-proven. Retirement of the T11 Evidence ref additionally follows the explicit retirement law in `t11-b01-b09-lock-evidence.md`.
+These durable refs MUST NOT be moved or deleted while this page or another current authority names their byte-level provenance as required. The original source branches may be removed only after equivalent reachability has been independently re-proven. Retirement of each T11 Evidence ref additionally follows the explicit retirement law in its corresponding Evidence locator.
 
 Git history on `main` preserves the removed legacy implementation; the refs above preserve required **unmerged** authority/review/Evidence lineages.
 
