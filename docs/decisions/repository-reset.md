@@ -31,9 +31,9 @@ The ratified technical posture establishes clean-slate physical freedom, no hist
 
 ## Durable unmerged provenance refs
 
-PR #131 and PR #132 were never merged to `main`; therefore their exact required bytes need explicit reachable refs.
+Some required byte-level Evidence is intentionally preserved outside the live tree because it must remain exactly recoverable without becoming current Product/status authority.
 
-The GitHub connector available to this execution does not expose annotated-tag creation. Repository Standard v1 §10 permits "a durable annotated tag or another explicit durable ref". The following explicit archive refs were therefore created and remotely proven byte-identical to the reviewed heads:
+The GitHub connector available to this execution does not expose annotated-tag creation. Repository Standard v1 §10 permits "a durable annotated tag or another explicit durable ref". The following explicit durable refs were therefore created and remotely proven byte-identical to their exact source heads:
 
 ```text
 archive/r10-pr131-pre-reset-20260820
@@ -41,13 +41,18 @@ archive/r10-pr131-pre-reset-20260820
 
 archive/repository-governance-pr132-20260820
 → b0ebe54cb010e9837a25f7b778f3d9814d283cb8
+
+evidence/t11-pr162-b01-b09-locks-20260824
+→ adf58e448bc5bd3a20cae5b7228d729c031f94ac
 ```
 
-Proof: GitHub compare reports each archive ref `identical` to its exact source SHA with `ahead_by=0` and `behind_by=0`.
+The first two refs preserve unmerged PR #131/#132 authority/review lineages from the repository reset. The T11 Evidence ref preserves exact operator-LOCKED B01-B09 P8 bytes and supporting temporary planning Evidence required by the current `t11-b01-b09-lock-evidence.md` locator for later P11 reconstruction.
 
-These archive refs MUST NOT be deleted while this page or another current authority names their byte-level provenance as required. The original source branches may be removed only after equivalent reachability has been independently re-proven.
+Proof: GitHub compare reports each named ref `identical` to its exact source SHA with `ahead_by=0` and `behind_by=0`.
 
-Git history on `main` preserves the removed legacy implementation; the archive refs above preserve the **unmerged** authority/review lineages.
+These durable refs MUST NOT be moved or deleted while this page or another current authority names their byte-level provenance as required. The original source branches may be removed only after equivalent reachability has been independently re-proven. Retirement of the T11 Evidence ref additionally follows the explicit retirement law in `t11-b01-b09-lock-evidence.md`.
+
+Git history on `main` preserves the removed legacy implementation; the refs above preserve required **unmerged** authority/review/Evidence lineages.
 
 ## What survives
 
