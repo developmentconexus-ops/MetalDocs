@@ -94,9 +94,10 @@ B09   Audit                                        OPEN / ACTIVE
        Audit Query Assist                          OPERATOR-RATIFIED
        Owner-lens cross-link policy                OPERATOR-RATIFIED
        Exact op78 + op87-op89 package              OPERATOR-RATIFIED / DURABLE
-       P7 H1                                       OPERATOR-APPROVED IN CHAT
-       P7 written candidate                        REVIEW REQUIRED
-       P8                                          BLOCKED pending written P7 ratification
+       P7                                          CLOSED / OPERATOR-RATIFIED
+       P8 realization plan                         READY
+       P8                                          ELIGIBLE / NOT STARTED
+       P9-P10                                      NOT OPEN
 B10   Organization Administration                  NOT OPEN
 B11   Access Administration                        NOT OPEN
 B12   Document Governance Administration           NOT OPEN
@@ -124,7 +125,9 @@ numeric authority  docs/decisions/api-operation-census.md
 finding ledger     docs/work/current/t11-b09-audit-upstream-replan.md
 R2 evidence        docs/work/current/t11-b09-audit-capability-decision-candidate-r2.md
 rebaseline proof   docs/work/current/t11-b09-f1-rebaseline-proof.md
-P7 candidate       docs/work/current/t11-b09-audit-r1.md
+P7 design          docs/work/current/t11-b09-audit-r1.md
+P7 clean exit      docs/work/current/t11-b09-p7-exit.md
+P8 plan            docs/work/current/t11-b09-p8-realization-plan.md
 ```
 
 Ratified Audit read surface:
@@ -166,23 +169,25 @@ generic entity/reference-data/deep-link resolver REJECTED
 
 B01-B08 remain preserved; no bounded rebaseline contradiction was found.
 
-P7 candidate result:
+P7 exit result:
 
 ```text
-leading hypothesis    Audit Investigation Ledger
+leading hypothesis    Audit Investigation Ledger / OPERATOR-RATIFIED
 upstream findings     0 unresolved
-P8 eligibility        pending operator ratification of written candidate
+P8 eligibility        YES
+P8 artifact           not created
 ```
 
 ## Exact next action
 
 ```text
-1. Operator reviews docs/work/current/t11-b09-audit-r1.md as the written B09 P7 exit candidate.
-2. If changes are requested, revise P7 before any P8 work.
-3. If the written candidate is operator-ratified, record clean P7 exit and only then begin P8 functional low-fidelity HTML.
-4. Any new material Product/backend insufficiency becomes a new upstream FINDING under Method v2.3.
-5. Do not open B10+ early.
-6. Implementation remains blocked.
+1. Execute docs/work/current/t11-b09-p8-realization-plan.md only after the operator authorizes P8 execution.
+2. Realize one functional low-fidelity HTML artifact with deterministic local fixtures and material B09 interactions.
+3. Verify structure, JavaScript syntax, forbidden scope, P7 falsification matrix, exact repository/chat bytes and fresh exact-HEAD CI.
+4. Deliver the exact .html artifact for operator operation/review.
+5. Do not mark B09 LOCKED or open P9/P10 until the operator approves the operated P8 artifact.
+6. Do not open B10+ early.
+7. Product implementation remains blocked.
 ```
 
 ## Hard stops
@@ -190,7 +195,8 @@ P8 eligibility        pending operator ratification of written candidate
 ```text
 no Product code/schema/OpenAPI/runtime/deploy implementation
 no T12 work
-no B09 P8 until written P7 ratification and clean exit
+no B09 P9/P10 before operated P8 LOCK
+no B09 LOCK without explicit operator approval of operated P8
 no browser-side filtering of incomplete Audit pages as complete truth
 no Audit-to-current-state reconstruction
 no Audit/Document History semantic merge
