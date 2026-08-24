@@ -13,6 +13,7 @@ summary: Sole mutable MetalDocs stage, gate, implementation-status, and next-act
 REPOSITORY MODE       CLEAN-SLATE / ARCHITECTURE-FIRST
 T1 → T10              CLOSED / OPERATOR-RATIFIED / INTEGRATED
 T11                   OPEN / ACTIVE
+T11 current increment B01-B09 CHECKPOINT / CLOSEOUT ACTIVE
 T12                   NOT OPEN
 IMPLEMENTATION         BLOCKED
 Draft PR               #162
@@ -87,7 +88,7 @@ B07   Document History                             LOCKED / OPERATOR-RATIFIED ·
        B07-F1 recognition read                     CLOSED / OPERATOR-RATIFIED
 B08   Notifications Full Inbox                     LOCKED / OPERATOR-RATIFIED · P8/P9/P10 COMPLETE
        B08-F1 recognition read                     CLOSED / OPERATOR-RATIFIED
-B09   Audit                                        OPEN / ACTIVE
+B09   Audit                                        LOCKED / OPERATOR-RATIFIED · P8/P9/P10 COMPLETE
        B09-F1 Audit query/evidence capability      CLOSED / OPERATOR-RATIFIED
        Structured Audit Query                      OPERATOR-RATIFIED
        Human recognition / historical labels      OPERATOR-RATIFIED
@@ -97,9 +98,9 @@ B09   Audit                                        OPEN / ACTIVE
        P7                                          CLOSED / OPERATOR-RATIFIED
        Fable adversarial Method review             COMPLETED / OPERATOR-ADJUDICATED
        Fable unresolved BLOCKING / IMPORTANT       0 / 0
-       P8 realization plan                         EXECUTED
-       P8                                          CANDIDATE / OPERATOR WALKTHROUGH / NOT LOCKED
-       P9-P10                                      NOT OPEN
+       P8                                          LOCKED / OPERATOR-APPROVED
+       P9 Screen Contract                          COMPLETE
+       P10 pattern consolidation                   COMPLETE
 B10   Organization Administration                  NOT OPEN
 B11   Access Administration                        NOT OPEN
 B12   Document Governance Administration           NOT OPEN
@@ -131,6 +132,8 @@ P7 design          docs/work/current/t11-b09-audit-r1.md
 P7 clean exit      docs/work/current/t11-b09-p7-exit.md
 P8 plan            docs/work/current/t11-b09-p8-realization-plan.md
 P8 artifact        docs/work/current/t11-b09-audit-functional-wireframe.html
+P9 contract        docs/work/current/t11-b09-screen-contract.md
+P10 patterns       docs/work/current/t11-b09-pattern-consolidation.md
 Fable review brief docs/work/current/t11-b09-fable-adversarial-review-request.md
 Fable adjudication docs/work/current/t11-b09-fable-review-adjudication.md
 ```
@@ -175,7 +178,7 @@ all-human actor category filter  REJECTED for Launch — no distinct Auditor job
 
 B01-B08 remain preserved; no bounded rebaseline contradiction was found.
 
-P7 / Fable / P8 result:
+P7 / Fable / P8 / P9 / P10 result:
 
 ```text
 leading hypothesis       Audit Investigation Ledger / OPERATOR-RATIFIED
@@ -189,22 +192,30 @@ P8 artifact blob         7daa6054851e617aeacb95a28d907d0d6d4bd3d6
 P8 static proof          HTML parse PASS / duplicate static ids 0 / node --check PASS
 P8 internal behavior     79 / 79 checks PASS
 P8 artifact CI           #1479 required SUCCESS on artifact commit b99ef0aeb24b3b94af5e14c8fcd99f5b5c1c941a
-P8 browser navigation    operator walkthrough required for real refresh / Back / Forward
-P8 operator disposition  PENDING
+P8 operator walkthrough  OPERATED / no material issue reported
+P8 operator disposition  LOCK / APPROVED
+P9 material controls     33 / 33 traced / 0 unbound
+P9 invented operations   0 / operation 90+ absent
+P10 new shared patterns  0
+P10 false abstractions   0
 ```
 
-The sandbox Chromium cannot navigate local/file URLs because its managed URL policy blocks local navigation. Serializer/parser round-trip and History-API failure fallback are proven internally; real refresh / Back / Forward remains intentionally part of the operator browser walkthrough rather than being represented as automated proof.
+The sandbox Chromium could not navigate local/file URLs because its managed URL policy blocks local navigation. Serializer/parser round-trip and History-API failure fallback were proven internally; the operator accepted the exact artifact after the required browser walkthrough gate.
 
 ## Exact next action
 
 ```text
-1. Operator opens and operates the exact B09 P8 artifact bytes with Git blob 7daa6054851e617aeacb95a28d907d0d6d4bd3d6.
-2. Exercise the P7/Fable falsification matrix, including real refresh, browser Back / Forward and a copied/pasted canonical query in a normal browser.
-3. If material friction/failure appears, revise only B09 P8 and repeat the walkthrough.
-4. Only the operator may explicitly LOCK the operated P8 artifact.
-5. Do not open P9/P10 until B09 P8 is operator-LOCKED.
-6. Do not open B10+ early.
-7. Product implementation remains blocked.
+1. Treat B09 as LOCKED; do not reopen it without material Evidence.
+2. Do NOT open B10/B11/B12 in PR #162.
+3. Prepare PR #162 as a bounded B01-B09 T11 acceptance checkpoint rather than continuing the giant branch.
+4. Preserve the exact immutable P8 LOCK evidence identities needed for later P11 before removing temporary work.
+5. Promote only durable Product/architecture/status meaning required after integration; `docs/work/**` remains temporary Evidence.
+6. Remove all `docs/work/**` from the merge candidate as required by repository CI/governance.
+7. Run a whole-checkpoint coherence/adversarial closeout against the exact cleaned candidate.
+8. Require fresh exact-HEAD `required` CI with PR ready-for-review semantics.
+9. Stop for explicit operator merge authorization.
+10. After integration, continue B10+ in a fresh acceptance increment; T11 remains OPEN until its later exit conditions are actually met.
+11. T12 and Product implementation remain blocked.
 ```
 
 ## Hard stops
@@ -212,8 +223,8 @@ The sandbox Chromium cannot navigate local/file URLs because its managed URL pol
 ```text
 no Product code/schema/OpenAPI/runtime/deploy implementation
 no T12 work
-no B09 P9/P10 before operated P8 LOCK
-no B09 LOCK without explicit operator approval of operated P8
+no B10/B11/B12 work in PR #162
+no B09 reopen without material Evidence
 no browser-side filtering of incomplete Audit pages as complete truth
 no Audit-to-current-state reconstruction
 no Audit/Document History semantic merge
@@ -223,7 +234,6 @@ no generic search/export platform without a proven consumer
 no admin-only directory as required Audit filter infrastructure
 no generic entity/reference-data/deep-link resolver
 no frontend Authorization matrix
-no unopened downstream block design
 no legacy restoration by sunk cost
 no merge authorization implied
 ```
