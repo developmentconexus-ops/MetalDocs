@@ -97,8 +97,8 @@ B09   Audit                                        OPEN / ACTIVE
        P7                                          CLOSED / OPERATOR-RATIFIED
        Fable adversarial Method review             COMPLETED / OPERATOR-ADJUDICATED
        Fable unresolved BLOCKING / IMPORTANT       0 / 0
-       P8 realization plan                         READY / NOT AUTHORIZED
-       P8                                          ELIGIBLE / NOT STARTED
+       P8 realization plan                         EXECUTED
+       P8                                          CANDIDATE / OPERATOR WALKTHROUGH / NOT LOCKED
        P9-P10                                      NOT OPEN
 B10   Organization Administration                  NOT OPEN
 B11   Access Administration                        NOT OPEN
@@ -130,6 +130,7 @@ rebaseline proof   docs/work/current/t11-b09-f1-rebaseline-proof.md
 P7 design          docs/work/current/t11-b09-audit-r1.md
 P7 clean exit      docs/work/current/t11-b09-p7-exit.md
 P8 plan            docs/work/current/t11-b09-p8-realization-plan.md
+P8 artifact        docs/work/current/t11-b09-audit-functional-wireframe.html
 Fable review brief docs/work/current/t11-b09-fable-adversarial-review-request.md
 Fable adjudication docs/work/current/t11-b09-fable-review-adjudication.md
 ```
@@ -174,7 +175,7 @@ all-human actor category filter  REJECTED for Launch — no distinct Auditor job
 
 B01-B08 remain preserved; no bounded rebaseline contradiction was found.
 
-P7 / Fable result:
+P7 / Fable / P8 result:
 
 ```text
 leading hypothesis       Audit Investigation Ledger / OPERATOR-RATIFIED
@@ -184,22 +185,26 @@ operator adjudication    I-1 + M-1..M-7 ACCEPTED and incorporated
 current unresolved       0 BLOCKING / 0 IMPORTANT
 upstream reopen          NO
 P8 Method eligibility    YES
-P8 artifact              not created
-P8 execution             NOT AUTHORIZED yet
+P8 artifact blob         7daa6054851e617aeacb95a28d907d0d6d4bd3d6
+P8 static proof          HTML parse PASS / duplicate static ids 0 / node --check PASS
+P8 internal behavior     79 / 79 checks PASS
+P8 artifact CI           #1479 required SUCCESS on artifact commit b99ef0aeb24b3b94af5e14c8fcd99f5b5c1c941a
+P8 browser navigation    operator walkthrough required for real refresh / Back / Forward
+P8 operator disposition  PENDING
 ```
+
+The sandbox Chromium cannot navigate local/file URLs because its managed URL policy blocks local navigation. Serializer/parser round-trip and History-API failure fallback are proven internally; real refresh / Back / Forward remains intentionally part of the operator browser walkthrough rather than being represented as automated proof.
 
 ## Exact next action
 
 ```text
-1. Revalidate exact candidate HEAD, net diff, roadmap, PR #162 and required CI after the Fable adjudication package.
-2. Close Evidence PR #166 UNMERGED once the candidate correction package is verified; its ai-dialog.md never enters the candidate branch/main.
-3. Await explicit operator authorization to execute docs/work/current/t11-b09-p8-realization-plan.md.
-4. After authorization, realize one functional low-fidelity HTML artifact with deterministic local fixtures and material B09 interactions.
-5. Verify the full P7/Fable falsification matrix, exact repository/chat bytes and fresh exact-HEAD CI.
-6. Deliver the exact .html artifact for operator operation/review.
-7. Do not mark B09 LOCKED or open P9/P10 until the operator approves the operated P8 artifact.
-8. Do not open B10+ early.
-9. Product implementation remains blocked.
+1. Operator opens and operates the exact B09 P8 artifact bytes with Git blob 7daa6054851e617aeacb95a28d907d0d6d4bd3d6.
+2. Exercise the P7/Fable falsification matrix, including real refresh, browser Back / Forward and a copied/pasted canonical query in a normal browser.
+3. If material friction/failure appears, revise only B09 P8 and repeat the walkthrough.
+4. Only the operator may explicitly LOCK the operated P8 artifact.
+5. Do not open P9/P10 until B09 P8 is operator-LOCKED.
+6. Do not open B10+ early.
+7. Product implementation remains blocked.
 ```
 
 ## Hard stops
@@ -207,7 +212,6 @@ P8 execution             NOT AUTHORIZED yet
 ```text
 no Product code/schema/OpenAPI/runtime/deploy implementation
 no T12 work
-no B09 P8 before explicit operator execution authorization
 no B09 P9/P10 before operated P8 LOCK
 no B09 LOCK without explicit operator approval of operated P8
 no browser-side filtering of incomplete Audit pages as complete truth
