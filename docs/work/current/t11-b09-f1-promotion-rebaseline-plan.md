@@ -56,7 +56,7 @@ Pre-promotion HEAD:
 bf9d1f77efbbe3265f7b87f54e15c785316d8b74
 ```
 
-Promotion/rebaseline changed only the eight expected paths above. Subsequent verification-record commits touched only this plan file.
+Promotion/rebaseline changed only the eight expected paths above. Later verification-record edits touched only this plan file.
 
 Current authority scan:
 
@@ -70,12 +70,7 @@ P8 current gate                BLOCKED pending P7
 main                            cae6ba48df5d611959c0390e0f2b9b8194d62a9d
 ```
 
-Latest exact-head CI immediately before this record pin:
-
-```text
-run #1462       SUCCESS
-required job    97407897051 SUCCESS
-```
+Exact-head CI is verified externally through the Draft PR / Actions metadata; this work record deliberately does not pin a run number that would become stale after its own metadata-only refresh.
 
 Older `78`/`86` counts remain only as explicitly historical/superseded stage evidence where applicable; they do not override the current numeric authority.
 
