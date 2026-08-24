@@ -20,7 +20,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
 
-      - name: Verify Repository Standard v1 envelope
+      - name: Verify repository envelope
         shell: bash
         env:
           PR_DRAFT: ${{ github.event.pull_request.draft }}
@@ -109,6 +109,35 @@ jobs:
           bootstrap_bytes=$(( $(wc -c < AGENTS.md) + $(wc -c < docs/index.md) + $(wc -c < docs/roadmap.md) ))
           echo "bootstrap_bytes=$bootstrap_bytes"
           [[ "$bootstrap_bytes" -le 20480 ]]
+
+          # Exact organizational methodology consumption is part of bootstrap.
+          methodology_pin='9c7210d1504bef01c0d134a6c3ae8627deebb535'
+          methodology_bootstrap_ok() {
+            local file="$1"
+            grep -Fq 'developmentconexus-ops/conexus-methodology' "$file" &&
+            grep -Fq "$methodology_pin" "$file" &&
+            grep -Fq 'ROUTER.md' "$file"
+          }
+          methodology_bootstrap_ok AGENTS.md
+
+          # Negative-path proof: a moving-main bootstrap must not satisfy the pin guard.
+          cat > /tmp/bad-agents-methodology <<'EOF'
+          developmentconexus-ops/conexus-methodology
+          main
+          ROUTER.md
+          EOF
+          if methodology_bootstrap_ok /tmp/bad-agents-methodology; then
+            echo "::error::methodology pin guard accepted a moving-main bootstrap"
+            exit 1
+          fi
+
+          # The reusable MetalDocs v2.3 frontend method was promoted centrally;
+          # keeping a local canonical copy would recreate duplicate method authority.
+          test ! -e docs/development/functional-html-wireframe-method.md
+          if git grep -n 'functional-html-wireframe-method\.md' -- AGENTS.md docs/index.md docs/roadmap.md docs/development; then
+            echo "::error::active routing still references the superseded local frontend method"
+            exit 1
+          fi
 
           # README/routers cannot become parallel mutable roadmaps.
           if grep -Eiq 'PR #[0-9]+|Current (posture|stage|gate)|Exact next action|T8-[A-Z].*(ACTIVE|PAUSED|CLOSED)|IMPLEMENTATION[[:space:]]+(BLOCKED|ALLOWED)' README.md AGENTS.md docs/index.md; then
