@@ -93,7 +93,8 @@ B09   Audit                                        OPEN / ACTIVE
        Audit export                                 DEFERRED / OPERATOR-RATIFIED
        Structured Audit Query                      OPERATOR-RATIFIED
        Human recognition / historical labels      OPERATOR-RATIFIED
-       Query-construction discovery                NEXT DECISION
+       Audit Query Assist                          OPERATOR-RATIFIED
+       Owner-lens cross-link policy                NEXT DECISION
        P7                                          PAUSED pending B09-F1
        P8                                          BLOCKED pending B09-F1
 B10   Organization Administration                  NOT OPEN
@@ -157,18 +158,19 @@ Structured Audit Query
   optional historical Area narrowing within audit.read authority
   fixed occurred_at DESC,event_id DESC
 
-YAGNI
-  free-text generic Audit search DEFERRED
-  query DSL REJECTED
-  saved searches DEFERRED
-  custom sort REJECTED
-  analytics/dashboard REJECTED as B09 responsibility
-
 Human recognition
   immutable IDs/facts remain Audit evidence authority
   mutable labels are optional current/non-historical enrichment
   immutable human identifiers may be stable recognition
   filter identity remains IDs/enums, never mutable names
+
+Audit Query Assist
+  purpose-built discovery; no admin-directory dependency
+  action = closed AuditOperationCode vocabulary
+  Area = audit.read/historical-visibility bounded candidates
+  actor = Audit-visible stable identities + optional current label
+  resource = resource_kind-first Audit-visible candidate discovery
+  no global entity/reference-data platform
 ```
 
 Binding invariants:
@@ -185,13 +187,12 @@ browser never post-filters incomplete pages as complete evidence truth
 ## Exact next action
 
 ```text
-1. Adjudicate B09-F1 query-construction discovery for actor / Area / resource without admin-directory dependence.
-2. Close owner-lens cross-link policy.
-3. Ratify the smallest exact op78/Product/API/wire refinement required.
-4. Perform bounded FP0/B09 rebaseline if authority changes.
-5. Only then resume B09 P7 and P8 functional HTML.
-6. Do not open B10+ early.
-7. Implementation remains blocked.
+1. Adjudicate B09-F1 owner-lens cross-link policy.
+2. Ratify the smallest exact op78 + Audit Query Assist Product/API/wire refinement required.
+3. Perform bounded FP0/B09 rebaseline if authority changes.
+4. Only then resume B09 P7 and P8 functional HTML.
+5. Do not open B10+ early.
+6. Implementation remains blocked.
 ```
 
 ## Hard stops
@@ -207,6 +208,7 @@ no screen-shaped API by convenience
 no backend-shaped UX suppression by current-plan inertia
 no generic search/export platform without a proven consumer
 no admin-only directory as required Audit filter infrastructure
+no generic entity/reference-data platform for Audit selectors
 no frontend Authorization matrix
 no unopened downstream block design
 no legacy restoration by sunk cost
