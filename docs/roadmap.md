@@ -95,8 +95,9 @@ B09   Audit                                        OPEN / ACTIVE
        Owner-lens cross-link policy                OPERATOR-RATIFIED
        Exact op78 + op87-op89 package              OPERATOR-RATIFIED / DURABLE
        P7                                          CLOSED / OPERATOR-RATIFIED
-       P8 realization plan                         READY
-       P8                                          ELIGIBLE / NOT STARTED
+       P8 realization plan                         READY / NOT AUTHORIZED
+       Fable adversarial Method review             PENDING / BLOCKING P8
+       P8                                          BLOCKED pending Fable + operator adjudication
        P9-P10                                      NOT OPEN
 B10   Organization Administration                  NOT OPEN
 B11   Access Administration                        NOT OPEN
@@ -128,6 +129,7 @@ rebaseline proof   docs/work/current/t11-b09-f1-rebaseline-proof.md
 P7 design          docs/work/current/t11-b09-audit-r1.md
 P7 clean exit      docs/work/current/t11-b09-p7-exit.md
 P8 plan            docs/work/current/t11-b09-p8-realization-plan.md
+Fable review gate  docs/work/current/t11-b09-fable-adversarial-review-request.md
 ```
 
 Ratified Audit read surface:
@@ -173,21 +175,23 @@ P7 exit result:
 
 ```text
 leading hypothesis    Audit Investigation Ledger / OPERATOR-RATIFIED
-upstream findings     0 unresolved
-P8 eligibility        YES
+upstream findings     0 unresolved at P7 exit
+Method P8 eligibility YES
+operator P8 gate      HOLD pending independent Fable adversarial review
 P8 artifact           not created
 ```
 
 ## Exact next action
 
 ```text
-1. Execute docs/work/current/t11-b09-p8-realization-plan.md only after the operator authorizes P8 execution.
-2. Realize one functional low-fidelity HTML artifact with deterministic local fixtures and material B09 interactions.
-3. Verify structure, JavaScript syntax, forbidden scope, P7 falsification matrix, exact repository/chat bytes and fresh exact-HEAD CI.
-4. Deliver the exact .html artifact for operator operation/review.
-5. Do not mark B09 LOCKED or open P9/P10 until the operator approves the operated P8 artifact.
-6. Do not open B10+ early.
-7. Product implementation remains blocked.
+1. Fable independently revalidates repository current authority, Method v2.3, B09 P7 and the P8 realization plan using docs/work/current/t11-b09-fable-adversarial-review-request.md.
+2. Fable returns ordered BLOCKING / IMPORTANT / MINOR findings and one explicit PASS TO P8 or HOLD BEFORE P8 verdict.
+3. Operator adjudicates the independent review. Any material authority insufficiency becomes a new bounded upstream FINDING before P8.
+4. Only after Fable PASS TO P8 (or explicit operator disposition of every blocking/important finding) may P8 execution be authorized.
+5. Then realize one functional low-fidelity HTML artifact with deterministic local fixtures and material B09 interactions.
+6. Do not mark B09 LOCKED or open P9/P10 until the operator approves the operated P8 artifact.
+7. Do not open B10+ early.
+8. Product implementation remains blocked.
 ```
 
 ## Hard stops
@@ -195,6 +199,7 @@ P8 artifact           not created
 ```text
 no Product code/schema/OpenAPI/runtime/deploy implementation
 no T12 work
+no B09 P8 before Fable adversarial review + operator adjudication
 no B09 P9/P10 before operated P8 LOCK
 no B09 LOCK without explicit operator approval of operated P8
 no browser-side filtering of incomplete Audit pages as complete truth
