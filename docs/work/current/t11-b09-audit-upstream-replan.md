@@ -1,6 +1,6 @@
 # T11 — B09-F1 Audit Upstream Capability Replan
 
-> **Status:** OPEN / ACTIVE / UPSTREAM FINDING / AUDITOR JOBS + STRUCTURED QUERY DIRECTION OPERATOR-RATIFIED.  
+> **Status:** OPEN / ACTIVE / UPSTREAM FINDING / AUDITOR JOBS + STRUCTURED QUERY + HUMAN RECOGNITION OPERATOR-RATIFIED.  
 > **Block:** B09 — Audit.  
 > **Method:** Frontend Product Experience Planning Method v2.3.  
 > **Trigger:** frontend/reference evidence exposed a material mismatch between the Auditor job and the current `listAuditEvents` query surface.  
@@ -206,7 +206,7 @@ cursor authenticates
   + seek position
 ```
 
-The final exact parameter vocabulary and wire encoding are intentionally not frozen until B09-F1 human-recognition semantics are resolved.
+The final exact parameter vocabulary and wire encoding are intentionally not frozen until B09-F1 query-construction semantics are resolved.
 
 ### 6.3 Full-text and generic query platform dispositions
 
@@ -221,20 +221,108 @@ export                           DEFERRED by §4.3
 
 The reason to defer free-text is Product semantics, not backend absence. MetalDocs does not yet have one unambiguous searchable Audit corpus whose meaning justifies full-text infrastructure.
 
-Questions such as these are deliberately unresolved rather than guessed:
-
-```text
-should q search current actor name or historical actor name?
-current Document title or title-at-event?
-translated action label or operation_code?
-resource identifiers?
-typed facts?
-text intentionally excluded from Audit evidence?
-```
-
 Structured query satisfies the ratified Launch investigation jobs with higher evidentiary precision and lower semantic ambiguity.
 
-## 7. Remaining capability dispositions
+## 7. Human recognition / historical-label semantics — OPERATOR-RATIFIED
+
+### 7.1 Authority split
+
+Immutable Audit evidence remains identity/fact authority:
+
+```text
+event_id
+occurred_at
+actor USER(user_id) | SYSTEM
+operation_code
+resource_kind
+resource_id
+historical visibility area_id when AREA
+bounded typed facts
+```
+
+Human-readable labels are **presentation enrichment**, not retroactive historical evidence, unless the underlying human identifier is itself accepted immutable authority.
+
+The screen must distinguish these semantics rather than silently presenting a mutable current label as if Audit had snapshotted it at event time.
+
+### 7.2 Actor recognition
+
+For `actor=USER(user_id)`:
+
+```text
+historical evidence authority
+  user_id
+
+optional current recognition
+  current admissible UserReference/display_name when available
+
+lawful profile erasure / missing enrichment
+  preserve user_id
+  render neutral "Nome atual indisponível" or equivalent
+  never rewrite/delete the Audit event
+```
+
+`display_name` is never filter identity. A human selection resolves to exact `user_id` before the canonical Audit query.
+
+For `actor=SYSTEM`, SYSTEM remains the evidence meaning; Launch does not expose an invented system display-profile model.
+
+### 7.3 Area recognition
+
+Historical visibility authority remains the snapshotted `area_id`.
+
+A current mutable Area name may be shown only as current recognition context. A separately accepted immutable human identifier such as immutable Area code may be shown as stable recognition when current authority proves that immutability.
+
+Current Area rename/retirement never rewrites historical visibility attribution.
+
+### 7.4 Resource recognition
+
+`resource_kind + resource_id` remains the evidence identity.
+
+Where an owner already has a stable immutable human identifier, the Audit projection may compose it for recognition without making Audit its owner. Current mutable labels/titles may be composed only when disclosure-safe and explicitly presented as current recognition context.
+
+Examples of the intended distinction:
+
+```text
+Document code
+  may be stable recognition when its immutability is already Product authority
+
+Revision title / User display name / mutable entity name
+  current enrichment only unless a separate historical snapshot is already owned elsewhere
+```
+
+Audit does not create a universal historical-label snapshot merely for presentation.
+
+### 7.5 Filter identity law
+
+Human-facing controls may show names/codes, but canonical query identity remains stable IDs/enums:
+
+```text
+"Marina Costa"
+  → actor_user_id = UUID
+
+"PO-023"
+  → resource_kind=document + resource_id=UUID
+
+friendly action label
+  → exact AuditOperationCode
+```
+
+No query semantics rely on mutable display-name equality.
+
+### 7.6 Explicit YAGNI
+
+Do not introduce by default:
+
+```text
+historical snapshot of display_name
+historical snapshot of email
+universal snapshot of Group/Area/resource mutable names
+copy of current labels into immutable Audit persistence
+generic entity resolver / reference-data platform
+```
+
+Only recognition data proven necessary for Audit investigation may be composed, and that composition never becomes lifecycle/current-state authority.
+
+## 8. Remaining capability dispositions
 
 Already ratified:
 
@@ -250,19 +338,20 @@ historical Area narrowing                RATIFY within current audit.read author
 free-text search                         DEFER
 sort alternatives                        REJECT
 export                                   DEFER
+human-recognition semantics              RATIFY
 ```
 
 Still blocking B09-F1:
 
 ```text
-human-recognition enrichment / historical-label semantics
+query-construction discovery for actor / Area / resource without admin-directory dependence
 owner-lens cross-link policy
 exact op78 query/read projection refinement after those semantics close
 bounded Product/API/wire ratification
 bounded FP0/B09 rebaseline
 ```
 
-## 8. Known non-solutions
+## 9. Known non-solutions
 
 ```text
 browser-side filtering over already-loaded Audit pages
@@ -270,11 +359,12 @@ client reconstruction of current state from event sequences
 client AuthZ/historical-visibility matrix
 arbitrary generic query DSL
 full-text engine before a searchable corpus and job are proven
-copying current User/Profile/Document names into immutable Audit semantics without historical-truth analysis
+copying current labels into immutable Audit semantics as convenience
+using admin-only directories as required Audit filter infrastructure
 using Audit as Document History
 ```
 
-## 9. Current gate
+## 10. Current gate
 
 ```text
 Frontend Method v2.3                         OPERATOR-RATIFIED
@@ -286,7 +376,8 @@ Auditor period + scope review                LAUNCH CORE / OPERATOR-RATIFIED
 Audit export                                 DEFERRED / OPERATOR-RATIFIED
 Structured Audit Query                       OPERATOR-RATIFIED
 Full-text generic Audit search               DEFERRED
-Human recognition / historical labels       NEXT DECISION
+Human recognition / historical labels       OPERATOR-RATIFIED
+Audit query-construction discovery           NEXT DECISION
 B09 P7                                       PAUSED pending B09-F1
 B09 P8                                       BLOCKED pending B09-F1
 B10-B12                                      NOT OPEN
@@ -295,4 +386,4 @@ Product implementation                       BLOCKED
 
 Next step:
 
-> Adjudicate how actors, Areas and resources become human-recognizable without rewriting historical evidence, leaking current-state data, or forcing auditors to work from opaque UUIDs. Only after B09-F1 closes may the exact op78 refinement be ratified and B09 P7/P8 resume.
+> Adjudicate how an Auditor discovers/selects actor, historical Area and resource filter identities without requiring Organization/Access administration screens, leaking entities that have no visible Audit evidence, or creating a generic directory. Then close owner-lens cross-links and the smallest exact op78/read refinement before bounded rebaseline and P7/P8.
