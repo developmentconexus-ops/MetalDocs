@@ -1,233 +1,72 @@
 # T11 — B09-F1 Audit Upstream Capability Replan
 
-> **Status:** OPEN / ACTIVE / UPSTREAM FINDING / AUDITOR JOBS + STRUCTURED QUERY + HUMAN RECOGNITION + QUERY ASSIST + OWNER CROSS-LINK POLICY OPERATOR-RATIFIED.  
+> **Status:** CLOSED / OPERATOR-RATIFIED / DURABLE AUTHORITY PROMOTED.  
 > **Block:** B09 — Audit.  
 > **Method:** Frontend Product Experience Planning Method v2.3.  
-> **Trigger:** frontend/reference evidence exposed a material mismatch between the Auditor job and the current `listAuditEvents` query surface.  
-> **P8:** BLOCKED until B09-F1 is fully adjudicated and any required upstream authority is ratified.  
+> **Durable authority:** `../../decisions/audit-investigation-read.md`.  
+> **Numeric census:** 89 operations.  
+> **Rebaseline proof:** `t11-b09-f1-rebaseline-proof.md`.  
+> **P7:** RESUMED / NEXT.  
+> **P8:** BLOCKED pending clean P7 exit.  
 > **Implementation:** BLOCKED.
 
-## 1. Why this finding exists
+## 1. Why this finding existed
 
-Current Audit application wire:
+B09 initially recovered this accepted Audit baseline:
 
 ```text
 GET /api/v1/audit/events
 operationId: listAuditEvents
 response: AuditEventPage
-order: occurred_at DESC, event_id DESC
+order: occurred_at DESC,event_id DESC
 query: cursor + limit only
 permission: audit.read
 ```
 
-Frontend/reference investigation showed that a raw reverse-chronological feed is insufficient for the ratified Auditor jobs at realistic production scale.
+External/reference and frontend investigation showed that a raw reverse-chronological feed was insufficient for realistic Auditor work at production scale.
 
-Frontend Method v2.3 therefore treats the current wire as a falsifiable baseline, not an immutable UX ceiling.
-
-Forbidden shortcuts remain:
+The initial wrong local-maximum inference was:
 
 ```text
-op78 lacks capability X
-→ omit X from the experience
+op78 lacks search/filter capability
+→ omit it from the experience
+```
 
+Frontend Method v2.3 corrected the process law:
+
+```text
+current Product/backend plan during pre-implementation
+  = falsifiable baseline, not immutable UX ceiling
+
+material user need + insufficient authority
+  = blocking upstream FINDING
+```
+
+The opposite shortcut was also rejected:
+
+```text
 reference product has capability X
 → invent endpoint X
 ```
 
-B09-F1 must prove the human job, choose the Global Maximum, and reopen only the smallest owning Product/backend/wire authority.
+B09-F1 therefore reopened the smallest owning Product/read authority and adjudicated each capability by real human need, Global Maximum and YAGNI.
 
-## 2. Audit invariants preserved
-
-Unless explicitly reopened by evidence:
+## 2. Audit invariants preserved throughout the reopen
 
 ```text
 AuditEvent = semantic action evidence, not current business state
 Audit is append-only evidence, not event sourcing
-Audit does not reconstruct current Document lifecycle
-Document History remains separate Controlled Documents semantic history
+Audit != Document History
 historical visibility is snapshotted at action time
 current grants determine read authorization
 historical visibility determines event inclusion
-historical visibility filtering occurs before pagination
-current relocation/rename does not rewrite historical Audit visibility
+historical visibility filtering precedes pagination
+current relocation/rename never rewrites historical visibility
 Audit remains PII-minimized
-free-form governed reasons/comments/content are not copied into Audit by convenience
+free-form governed reasons/comments/content are not copied by convenience
 ```
 
-Current event evidence includes:
-
-```text
-event_id
-occurred_at
-actor: USER(user_id) | SYSTEM
-operation_code
-resource_kind
-resource_id
-historical visibility: COMPANY | AREA(area_id)
-bounded typed facts where operation/resource identity is insufficient
-```
-
-The current Launch wire has a closed Audit operation-code union and typed facts for the event families that require them.
-
-## 3. B09-F1 target
-
-Determine the smallest globally coherent Audit inspection/query capability that lets an Auditor / Governance Viewer answer real evidence questions efficiently without:
-
-```text
-turning Audit into current-state authority
-merging Audit with Document History
-copying mutable current labels as false historical truth
-post-filtering incomplete cursor pages in the browser
-creating a generic analytics/search platform without a consumer
-```
-
-## 4. Auditor Launch jobs — OPERATOR-RATIFIED
-
-### 4.1 Point investigation — LAUNCH CORE
-
-The Auditor must be able to answer:
-
-```text
-what happened to this Document / User / access decision / configuration?
-who performed the action?
-when did it happen?
-what exact semantic action was recorded?
-what bounded evidence facts belong to that event?
-```
-
-Audit remains evidence. Navigation to a current owner lens is a cross-link only and never means Audit reconstructs current state.
-
-### 4.2 Period + scope review — LAUNCH CORE
-
-The Auditor must be able to answer:
-
-```text
-what relevant actions occurred during this period?
-what occurred within the historically visible Company / Area scope available to me?
-which actors/actions/resources account for the evidence set I am reviewing?
-```
-
-The result must remain complete under server-side current `audit.read` authorization + historical-visibility filtering + cursor pagination.
-
-### 4.3 External evidence export — DEFERRED
-
-Export is not Launch Core merely because mature products expose it.
-
-A future reopen requires a named consumer such as:
-
-```text
-external auditor / certification body / regulator / customer
-+ required evidence package or machine-readable handoff
-+ explicit scope / format / integrity expectations
-```
-
-Until then there is no commitment to CSV/PDF/JSON export, export jobs, governed export artifacts, signatures, hashes or export-specific Audit semantics.
-
-This is Product-scope YAGNI, not a backend limitation.
-
-## 5. Reference evidence direction
-
-Reference products converge on one principle: Audit must be **investigable**, not merely scrollable.
-
-```text
-GitHub Audit Log
-  structured narrowing by time, actor, action and resource context
-
-Microsoft Purview Audit
-  time, activity, user and object narrowing for large evidence sets
-
-Qualio Audit Trail
-  date, user, action and document metadata investigation in a controlled-quality context
-```
-
-MetalDocs deliberately takes the task pattern, not their full feature breadth.
-
-## 6. Structured Audit Query — OPERATOR-RATIFIED
-
-### 6.1 Launch query dimensions
-
-The Global-Maximum/YAGNI direction is a **structured server-side Audit query**, preserving one canonical reverse-chronological result stream.
-
-Launch must support evidence-backed narrowing by:
-
-```text
-time
-  occurred_at bounded interval
-
-actor
-  exact stable USER identity
-  OR SYSTEM
-
-action
-  one or more closed AuditOperationCode values
-
-resource
-  resource_kind
-  + exact resource_id when known
-
-historical scope
-  default = every event currently readable by the caller
-  optional explicit narrowing to a historically attributed Area that is within the caller's current audit.read authority
-
-order
-  occurred_at DESC
-  event_id DESC
-```
-
-Filters are server-side and combine conjunctively across dimensions. Multi-valued action selection is an OR within the action dimension.
-
-The query result must continue to apply:
-
-```text
-current audit.read scope authority
-→ historical Audit visibility admission
-→ structured query predicates
-→ canonical ordering
-→ cursor pagination
-```
-
-No browser-side filtering over incomplete pages may masquerade as complete Audit truth.
-
-### 6.2 Cursor law direction
-
-The existing stateless cursor model remains the preferred architecture:
-
-```text
-first traversal
-  admitted structured filters + optional limit
-
-continuation
-  cursor + optional limit only
-
-cursor authenticates
-  operation identity
-  + normalized query predicates
-  + canonical ordering
-  + seek position
-```
-
-The final exact parameter vocabulary and wire encoding are intentionally not frozen until B09-F1 query-construction semantics are resolved.
-
-### 6.3 Full-text and generic query platform dispositions
-
-```text
-free-text search over Audit      DEFERRED
-query DSL                        REJECTED for Launch
-saved searches                   DEFERRED
-custom sort                      REJECTED for Launch
-analytics/dashboard              REJECTED as B09 responsibility
-export                           DEFERRED by §4.3
-```
-
-The reason to defer free-text is Product semantics, not backend absence. MetalDocs does not yet have one unambiguous searchable Audit corpus whose meaning justifies full-text infrastructure.
-
-Structured query satisfies the ratified Launch investigation jobs with higher evidentiary precision and lower semantic ambiguity.
-
-## 7. Human recognition / historical-label semantics — OPERATOR-RATIFIED
-
-### 7.1 Authority split
-
-Immutable Audit evidence remains identity/fact authority:
+Immutable evidence identity remained:
 
 ```text
 event_id
@@ -236,181 +75,136 @@ actor USER(user_id) | SYSTEM
 operation_code
 resource_kind
 resource_id
-historical visibility area_id when AREA
-bounded typed facts
+historical visibility COMPANY | AREA(area_id)
+bounded typed facts where required
 ```
 
-Human-readable labels are **presentation enrichment**, not retroactive historical evidence, unless the underlying human identifier is itself accepted immutable authority.
+## 3. Reference-study evidence retained
 
-The screen must distinguish these semantics rather than silently presenting a mutable current label as if Audit had snapshotted it at event time.
-
-### 7.2 Actor recognition
-
-For `actor=USER(user_id)`:
+The P6 study used mature Audit products as task-pattern evidence rather than feature checklists:
 
 ```text
-historical evidence authority
-  user_id
+GitHub Audit Log
+  structured narrowing by time, actor, action and resource context
 
-optional current recognition
-  current admissible UserReference/display_name when available
+Microsoft Purview Audit
+  time, activity, user and object narrowing for large evidence sets
 
-lawful profile erasure / missing enrichment
-  preserve user_id
-  render neutral "Nome atual indisponível" or equivalent
-  never rewrite/delete the Audit event
+Veeva Vault
+  structured audit trail/event inspection patterns
+
+Qualio Audit Trail
+  date, user, action and document-oriented investigation in a controlled-quality context
 ```
 
-`display_name` is never filter identity. A human selection resolves to exact `user_id` before the canonical Audit query.
+The bounded conclusion was:
 
-For `actor=SYSTEM`, SYSTEM remains the evidence meaning; Launch does not expose an invented system display-profile model.
+> MetalDocs Audit must be efficiently investigable by real evidence questions; it does not need a generic audit analytics/query platform merely because mature products expose one.
 
-### 7.3 Area recognition
+## 4. Ratified decision sequence
 
-Historical visibility authority remains the snapshotted `area_id`.
+### 4.1 Auditor Launch jobs
 
-A current mutable Area name may be shown only as current recognition context. A separately accepted immutable human identifier such as immutable Area code may be shown as stable recognition when current authority proves that immutability.
-
-Current Area rename/retirement never rewrites historical visibility attribution.
-
-### 7.4 Resource recognition
-
-`resource_kind + resource_id` remains the evidence identity.
-
-Where an owner already has a stable immutable human identifier, the Audit projection may compose it for recognition without making Audit its owner. Current mutable labels/titles may be composed only when disclosure-safe and explicitly presented as current recognition context.
-
-Examples of the intended distinction:
+Operator-ratified Launch Core:
 
 ```text
+A. point investigation / exact evidence question
+B. period + authorized historical-scope review
+```
+
+External evidence export was `DEFERRED` until a named auditor/certification/regulatory/customer handoff proves a concrete evidence package/format/integrity requirement.
+
+### 4.2 Structured Audit Query
+
+Operator-ratified query dimensions:
+
+```text
+occurred_at interval
+exact USER actor identity or SYSTEM
+one-or-more AuditOperationCode values
+resource_kind
+exact resource_id when known
+optional historical Area narrowing within current audit.read authority
+fixed occurred_at DESC,event_id DESC
+```
+
+Server-side predicates combine by AND across dimensions; multiple operation codes are OR inside the action dimension. Browser filtering over incomplete pages is never evidence truth.
+
+Explicit YAGNI:
+
+```text
+free-text Audit search   DEFERRED
+query DSL                REJECTED
+saved searches           DEFERRED
+custom sort              REJECTED
+analytics/dashboard      REJECTED as B09 responsibility
+export                   DEFERRED
+```
+
+### 4.3 Human recognition / historical labels
+
+Operator-ratified authority split:
+
+```text
+immutable IDs/facts
+  = historical Audit evidence authority
+
+current mutable labels
+  = optional non-historical presentation enrichment
+
+accepted immutable human identifiers
+  = stable recognition when already owned as immutable truth
+```
+
+Examples:
+
+```text
+User display_name
+  current enrichment only
+
+Area code
+  stable recognition because Product authority makes code immutable
+
 Document code
-  may be stable recognition when its immutability is already Product authority
-
-Revision title / User display name / mutable entity name
-  current enrichment only unless a separate historical snapshot is already owned elsewhere
+  stable recognition because Product authority makes code immutable
 ```
 
-Audit does not create a universal historical-label snapshot merely for presentation.
+Filter identity remains IDs/enums, never mutable display-name equality. Lawful profile erasure preserves the historical user_id and event.
 
-### 7.5 Filter identity law
+### 4.4 Audit Query Assist
 
-Human-facing controls may show names/codes, but canonical query identity remains stable IDs/enums:
+Operator-ratified purpose-built query construction:
 
 ```text
-"Marina Costa"
-  → actor_user_id = UUID
+Action
+  closed AuditOperationCode vocabulary; frontend may humanize/group
 
-"PO-023"
-  → resource_kind=document + resource_id=UUID
+Area
+  candidates bounded by current audit.read + historically visible Audit evidence
 
-friendly action label
-  → exact AuditOperationCode
+Actor
+  bounded typeahead over Audit-visible USER identities + optional current display name
+  SYSTEM remains a closed actor option
+
+Resource
+  resource_kind first
+  candidates must occur in Audit-visible evidence
+  stable/current recognition only where safely owned
 ```
 
-No query semantics rely on mutable display-name equality.
-
-### 7.6 Explicit YAGNI
-
-Do not introduce by default:
+Rejected:
 
 ```text
-historical snapshot of display_name
-historical snapshot of email
-universal snapshot of Group/Area/resource mutable names
-copy of current labels into immutable Audit persistence
-generic entity resolver / reference-data platform
+admin directories as required Audit selector infrastructure
+manual UUID entry as normal workflow
+generic /reference-data or /entities platform
+client-derived candidate completeness
+mutable label as canonical filter identity
 ```
 
-Only recognition data proven necessary for Audit investigation may be composed, and that composition never becomes lifecycle/current-state authority.
+### 4.5 Owner-lens cross-links
 
-## 8. Audit Query Assist — OPERATOR-RATIFIED
-
-### 8.1 Purpose-built query construction
-
-Launch requires a bounded **Audit Query Assist** capability so an Auditor can construct the ratified structured query without knowing opaque UUIDs and without depending on Organization/Access administration directories.
-
-The capability is Audit-query purpose-built. It is not a generic entity/reference-data platform and it does not transfer semantic ownership of User, Area, Document or other resources to Audit.
-
-### 8.2 Action discovery
-
-`AuditOperationCode` is already a closed vocabulary.
-
-The frontend may group and humanize these codes for selection, but canonical filter identity remains the exact enum value. No server-side action directory is required merely to populate the action selector.
-
-### 8.3 Historical Area discovery
-
-The Area selector must be derived from the caller's current `audit.read` authority and historical Audit visibility, not from an unrestricted Organization-admin directory.
-
-Human-facing Area recognition may use the semantics in §7.3, but canonical query identity remains `area_id`.
-
-The default choice remains "all Audit events currently readable by me". Explicit Area narrowing never grants access beyond current `audit.read` authority.
-
-### 8.4 Actor discovery
-
-Actor selection is a bounded purpose-built typeahead over Audit-relevant actor identities.
-
-Candidate law:
-
-```text
-candidate USER
-  has at least one AuditEvent potentially visible
-  under the caller's current Audit authority
-
-candidate SYSTEM
-  represented by the closed SYSTEM actor meaning
-```
-
-Human recognition may show current admissible `display_name` when available. Lawful erasure or missing profile enrichment leaves the stable `user_id` selectable with neutral recognition text.
-
-Canonical filter identity remains exact `user_id` or SYSTEM. `display_name` equality never becomes query authority.
-
-### 8.5 Resource discovery
-
-Resource selection is closed by `resource_kind` first; MetalDocs does not create a universal global resource search.
-
-For the selected kind, bounded candidate discovery is drawn from resource identities that appear in Audit evidence visible under the caller's Audit authority.
-
-Canonical identity is always:
-
-```text
-resource_kind + resource_id
-```
-
-Stable immutable human identifiers may be shown when already authoritative; current mutable labels may be shown only under the §7 recognition/disclosure law.
-
-When no safe human label exists, a compact kind + stable-id representation remains truthful.
-
-### 8.6 Security / completeness law
-
-Query Assist is server-authored. It must not leak actors, Areas or resources merely because they exist in current administrative directories.
-
-```text
-current audit.read authority
-+ historical Audit visibility
-→ admissible query-assist candidates
-```
-
-The browser never constructs completeness by collecting candidates from already-loaded Audit pages.
-
-A selected human label resolves to stable query identity before `listAuditEvents` execution; changing or erasing the label later does not change the historical identity being filtered.
-
-### 8.7 Explicit non-solutions
-
-```text
-/admin users/areas/documents as required Audit filter infrastructure
-manual UUID entry as the normal workflow
-global /reference-data or /entities search platform
-client-side candidate derivation from loaded Audit pages
-mutable display name as filter identity
-Audit persistence copy of current labels merely to support selectors
-```
-
-The exact count and wire shape of any auxiliary read operation(s) remain deliberately unchosen until the remaining B09-F1 semantics close.
-
-## 9. Owner-lens cross-link policy — OPERATOR-RATIFIED
-
-### 9.1 Audit-native investigation remains universal
-
-Every evidence item may continue investigation inside Audit using the already-ratified structured query:
+Operator-ratified universal follow-up remains Audit-native:
 
 ```text
 same actor
@@ -418,157 +212,137 @@ same resource
 same action
 ```
 
-This is the universal next-step capability. An owner-lens link is secondary and optional.
-
-### 9.2 Owner handoff admission
-
-A current owner-lens cross-link may be offered only when all are true:
+Secondary handoffs are allowed only when an already-accepted route and exact admitted routing identity exist:
 
 ```text
-an accepted stable owner route already exists
-the exact routing identity is already present in admitted Audit evidence/facts
-the destination meaning is unambiguous
-navigation does not imply current access or current-state truth
-```
-
-The destination always performs its own current Authorization/disclosure check. Historical Audit visibility never grants access to the current owner resource.
-
-Audit does not persist URLs, invent a generic resource resolver or derive current domain state to construct navigation.
-
-### 9.3 Current admitted cross-links
-
-```text
-Document resource event
-  resource_kind=document + resource_id=document_id
+Document resource
   → /documents/:document_id
-  → Document Official current-owner lens
 
-Release / revision cancellation / obsolescence events
-  typed facts already expose document_id
+release / revision cancellation / obsolescence with admitted document_id
   → /documents/:document_id/history
-  → Document History semantic lens
 
-Governance Decision event
-  GovernanceDecisionAuditFacts already expose governance_attempt_id
+governance Decision with admitted governance_attempt_id
   → /work/governance/:governance_attempt_id
-  → exact Governance Case lens
 ```
 
-The link meaning is a handoff from historical action evidence to the appropriate owner lens; it never means Audit and that lens share authority.
+Every destination rechecks current AuthZ/disclosure. B10/B11/B12 admin deep-links remain deferred until those blocks define their own detail-route semantics.
 
-### 9.4 Deferred admin-owned destinations
+## 5. Final ratified Product/API/wire package
 
-Exact deep-links for current User / Area / Group / RoleAssignment / DocumentType administration are **DEFERRED** until B10/B11/B12 establish and lock their own route/detail semantics.
+The written R2 package was operator-ratified and promoted into `../../decisions/audit-investigation-read.md`.
 
-B09 records the future seam but does not design unopened administration blocks or guess routes now.
-
-### 9.5 Insufficient routing identity
-
-When an Audit event does not already expose the exact identity required by an accepted owner route, Launch does not add new Audit facts merely for navigation by convenience.
-
-Example:
+Exact operation surface:
 
 ```text
-revision.created
-  resource_id = revision_id
-  no currently admitted document_id routing fact
-  → no fabricated Document/History link
-  → same-resource Audit investigation remains available
+78  GET /api/v1/audit/events
+    listAuditEvents
+    REFINED
+
+87  GET /api/v1/audit/query-areas
+    listAuditQueryAreas
+    SAFE_READ
+
+88  GET /api/v1/audit/query-actors
+    searchAuditQueryActors
+    SAFE_READ
+
+89  GET /api/v1/audit/query-resources
+    searchAuditQueryResources
+    SAFE_READ
 ```
 
-A later functional/proven user need may reopen the smallest owning read composition, but navigation convenience alone is insufficient.
-
-### 9.6 Access drift / unavailable destination
+Current census:
 
 ```text
-historical Audit event remains legitimately visible
-+ current owner resource is absent or non-disclosable
-→ Audit evidence remains visible and unchanged
-→ destination owner returns its ordinary current non-disclosing result
-→ Audit does not explain hidden current access/state
+application operations           89
+stable SPA routes                11
+PermissionCode values            16
+Idempotency-Key creations        11
+ETag read / mutation domains     13 / 13
+exact-byte resources             4
+semantic owners                  4 business + 2 supporting
+new writes                       0
 ```
 
-No failed owner handoff mutates or suppresses historical Audit evidence.
+No Audit detail endpoint, full-text engine, generic entity resolver, generic search platform, URL/links authority or new mutation was added.
 
-### 9.7 Explicit non-solutions
+## 6. op78 closure laws
+
+First-page structured query:
 
 ```text
-every resource_kind automatically links somewhere
-generic resource/deep-link resolver
-URLs persisted inside AuditEvent
-Audit-generated current-state projection
-historical visibility treated as current owner access
-new Audit facts added solely to fabricate navigation
-B10-B12 route/detail design inside B09
+occurred_at_from?     inclusive UtcInstant
+occurred_at_before?   exclusive UtcInstant
+actor_kind?           user | system
+actor_user_id?        exact Uuid only with actor_kind=user
+operation_codes?      closed unique AuditOperationCode set
+resource_kind?
+resource_id?          only with resource_kind
+visibility_area_id?
+limit?                1..100; default 20
 ```
 
-## 10. Remaining capability dispositions
+`operation_codes` wire form is comma-separated `form/explode=false`, unique, max 37, canonicalized into closed enum order for cursor authority.
 
-Already ratified:
+Binding evaluation remains:
 
 ```text
-chronological inspection baseline        PRESENT-IN-AUTHORITY
-exact event detail / typed facts         PRESENT-IN-AUTHORITY conceptually; UX projection still to close
-time-range narrowing                     RATIFY
-operation/action filtering               RATIFY
-actor filtering                          RATIFY
-resource-kind filtering                  RATIFY
-exact resource-id lookup                 RATIFY
-historical Area narrowing                RATIFY within current audit.read authority
-free-text search                         DEFER
-sort alternatives                        REJECT
-export                                   DEFER
-human-recognition semantics              RATIFY
-Audit Query Assist                       RATIFY
-owner-lens cross-link policy             RATIFY
+Organization current subject
+→ Authorization.AuthorizedScopes(audit.read)
+→ Audit historical visibility admission
+→ structured predicates
+→ occurred_at DESC,event_id DESC
+→ cursor seek
+→ page selection
+→ optional recognition composition
 ```
 
-Still blocking B09-F1:
+Cursor remains stateless and authenticates operation + normalized predicates + order + seek position. Current `audit.read` is rechecked on every page.
+
+`AuditEventView` remains immutable evidence; `AuditInspectionItem` wraps evidence with optional recognition so mutable labels never participate in filtering, ordering, cursor position or historical truth.
+
+## 7. Bounded supersession / rebaseline result
+
+Current bounded authority supersedes only conflicting current-tense Audit read clauses in:
 
 ```text
-exact op78 structured-query/read projection refinement
-smallest Audit Query Assist wire realization
-bounded Product/API/wire ratification
-bounded FP0/B09 rebaseline
+docs/product/journeys.md
+docs/architecture/interfaces.md
+docs/architecture/wire-contract.md
+docs/architecture/frontend.md
+docs/decisions/api-operation-census.md
 ```
 
-## 11. Known non-solutions
+Large ratified authorities were not rewritten wholesale. Current routing is through `../../decisions/audit-investigation-read.md` and the decision register.
+
+Rebaseline result:
 
 ```text
-browser-side filtering over already-loaded Audit pages
-client reconstruction of current state from event sequences
-client AuthZ/historical-visibility matrix
-arbitrary generic query DSL
-full-text engine before a searchable corpus and job are proven
-copying current labels into immutable Audit semantics as convenience
-using admin-only directories as required Audit filter infrastructure
-generic entity/reference-data platform for Audit selectors
-generic resource/deep-link resolver
-using Audit as Document History
+Product/T6                    PASS
+T8-C internal read contract   PASS
+T8-E wire/census              PASS
+T8-F / FP0 coverage           PASS
+B01-B08 lock preservation     PASS
+material contradictions       0
 ```
 
-## 12. Current gate
+## 8. Closure gate
 
 ```text
 Frontend Method v2.3                         OPERATOR-RATIFIED
 B01-B08                                      LOCKED / OPERATOR-RATIFIED
 B09                                          OPEN / ACTIVE
-B09-F1 upstream Audit capability replan      OPEN / BLOCKING FINDING
-Auditor point investigation                  LAUNCH CORE / OPERATOR-RATIFIED
-Auditor period + scope review                LAUNCH CORE / OPERATOR-RATIFIED
-Audit export                                 DEFERRED / OPERATOR-RATIFIED
-Structured Audit Query                       OPERATOR-RATIFIED
-Full-text generic Audit search               DEFERRED
-Human recognition / historical labels       OPERATOR-RATIFIED
-Audit Query Assist                           OPERATOR-RATIFIED
-Owner-lens cross-link policy                 OPERATOR-RATIFIED
-Exact Product/API/wire refinement            NEXT DECISION
-B09 P7                                       PAUSED pending B09-F1
-B09 P8                                       BLOCKED pending B09-F1
+B09-F1 upstream Audit capability replan      CLOSED / OPERATOR-RATIFIED
+Durable Audit investigation authority        PROMOTED
+Current application census                   89
+B09 P7                                       RESUMED / NEXT
+B09 P8                                       BLOCKED pending P7
 B10-B12                                      NOT OPEN
 Product implementation                       BLOCKED
+T12                                          NOT OPEN
+Merge                                        NOT AUTHORIZED
 ```
 
 Next step:
 
-> Ratify the smallest exact `listAuditEvents` + Audit Query Assist Product/API/wire refinement that realizes the already-ratified B09-F1 semantics without generic search/reference infrastructure. Then perform the bounded B09 rebaseline and only afterward resume B09 P7/P8.
+> Resume B09 P7 under the ratified structured-query, Query Assist, recognition and cross-link authority. Do not generate P8 functional HTML until P7 exits with no unresolved upstream finding.
