@@ -116,3 +116,84 @@ VERDICT                LEAD RESPONSE REQUIRED
 ```
 
 The cleaned 21-file candidate is otherwise a coherent, truth-preserving, YAGNI-bounded B01–B09 acceptance checkpoint: it does not falsely close T11, creates no Product/runtime authority, preserves every lock byte-exactly today, and its census/authority routing is internally consistent. The single IMPORTANT finding concerns the durability mechanism of the lock evidence after integration, not the content of any settled Product decision. No settled decision is reopened by this review.
+
+## 7. Lead adjudication
+
+> **Role:** Lead.  
+> **Reviewed candidate:** `30486a93602622ed4eed5828584aa59a5441a9ce`.  
+> **Corrected candidate:** `621af98eef80249540bf3d9e718603a1ba4e5332`.  
+> **Correction scope:** exactly `.github/workflows/ci.yml`, `docs/decisions/repository-reset.md`, `docs/decisions/api-operation-census.md`.  
+> **Fresh corrected-candidate CI:** #1494 / job `required` 97548343824 / SUCCESS.
+
+### F1 — IMPORTANT — ACCEPT / CLOSED
+
+The Challenger identified a real underengineering gap in the durability mechanism, not a Product-semantic defect.
+
+Applied the exact smallest remedy proposed by the Challenger:
+
+```text
+.github/workflows/ci.yml
+  + reads refs/heads/evidence/t11-pr162-b01-b09-locks-20260824
+  + requires exact SHA adf58e448bc5bd3a20cae5b7228d729c031f94ac
+
+repository-reset.md
+  + registers the T11 Evidence ref beside other required unmerged provenance refs
+  + names its exact SHA and current P11 consumer
+  + preserves the existing locator retirement law
+```
+
+The aggregate `required` gate now fails if the ref is absent or moves to any other SHA. CI #1494 passed against the expected current ref, proving the positive path; the equality predicate itself is the same already-operational negative-path mechanism used by the two existing archive pins.
+
+No new archive framework, database, sync mechanism or Product authority was introduced.
+
+**Disposition:** CLOSED.
+
+### F2 — MINOR — ACCEPT / CLOSED
+
+Added one explicit category to `api-operation-census.md`:
+
+```text
+current T11 bounded-decision census/proof blocks that predate a later T11 bounded reopen
+```
+
+This removes ambiguity around stage-accurate `86` counts without rewriting historically truthful bounded decisions.
+
+**Disposition:** CLOSED.
+
+### F3 — MINOR — ACKNOWLEDGE / NO CHANGE REQUIRED
+
+The Challenger correctly identified stage residue, but also established that the sole status authority already proves the B01/B01N re-LOCK obligation discharged and the exact B01N P8 blob is preserved.
+
+Changing historical wording now would add no current semantic protection. Leave it truthful as stage-era prose and rely on current roadmap/locator authority.
+
+**Disposition:** CLOSED / no candidate change.
+
+### F4 — UNSUPPORTED PREFERENCE — REJECT
+
+No conflicting numeric authority exists. `api-operation-census.md` remains sole authority for its enumerated operation/idempotency/ETag/exact-byte census, while owner/route/Permission counts remain current where explicitly owned. The review provided no concrete failure caused by the wording.
+
+**Disposition:** REJECTED / UNSUPPORTED PREFERENCE.
+
+## 8. Lead convergence result
+
+Corrected-candidate delta from exact reviewed HEAD:
+
+```text
+3 commits
+3 files
+.github/workflows/ci.yml                 +3 / -1
+docs/decisions/api-operation-census.md  +1 / -0
+docs/decisions/repository-reset.md       +10 / -5
+```
+
+No Product, UX, architecture-owner, B01-B09 LOCK, operation, route, permission, runtime or implementation semantics changed.
+
+```text
+MATERIAL open               0
+IMPORTANT open              0
+MINOR blocking progression  0
+```
+
+A second Challenger round is not justified by the current Evidence: the sole IMPORTANT finding supplied its exact bounded remedy, that remedy was implemented without semantic expansion, and the corrected candidate passed the aggregate gate.
+
+**R1 CONVERGED — no MATERIAL or IMPORTANT finding remains open.**
