@@ -1,18 +1,10 @@
----
-id: repository-home
-kind: landing
-owner: engineering
-summary: MetalDocs repository landing page.
----
-
 # MetalDocs
 
-MetalDocs is the governed document and knowledge-management product for Metal Nobre.
+MetalDocs is a controlled-document product being rebuilt from its ratified Product and architecture authorities after a deliberate clean-slate repository reset.
 
-Start with:
+## Navigate
 
-1. [Agent bootstrap](AGENTS.md)
-2. [Documentation index](docs/index.md)
-3. [Roadmap](docs/roadmap.md)
+- [Agent bootstrap](AGENTS.md)
+- [Documentation index](docs/index.md)
 
-Product, architecture, current-stage and implementation authority live in the routed documents above; this README is a landing page only.
+Historical implementation and review provenance remains in Git only when a current authority names it as required evidence. The live tree contains current Product/architecture knowledge and repository governance, not the superseded application.
