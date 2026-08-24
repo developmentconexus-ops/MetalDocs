@@ -13,12 +13,9 @@ summary: Sole mutable MetalDocs stage, gate, implementation-status, and next-act
 REPOSITORY MODE       CLEAN-SLATE / ARCHITECTURE-FIRST
 T1 → T10              CLOSED / OPERATOR-RATIFIED / INTEGRATED
 T11                   OPEN / ACTIVE
-T11 current increment B01-B09 CHECKPOINT / CLEANED MERGE-CANDIDATE CLOSEOUT
+T11 checkpoint        B01-B09 ACCEPTED / INTEGRATED
 T12                   NOT OPEN
 IMPLEMENTATION         BLOCKED
-PR                     #162
-branch                 arch/t11-implementation-program
-opening main           cae6ba48df5d611959c0390e0f2b9b8194d62a9d
 ```
 
 Current Product/architecture authority lives in `docs/product/**`, `docs/architecture/**`, and `docs/decisions/**`.
@@ -35,7 +32,7 @@ ETag read / mutation domains     13 / 13
 exact-byte resources             4
 ```
 
-`docs/decisions/api-operation-census.md` is the sole numeric census.
+`docs/decisions/api-operation-census.md` is the sole current application-operation / Idempotency / ETag / exact-byte census authority.
 
 ## Frontend Product Experience Program
 
@@ -73,8 +70,6 @@ B10   Organization Administration                  NOT OPEN
 B11   Access Administration                        NOT OPEN
 B12   Document Governance Administration           NOT OPEN
 ```
-
-No B10/B11/B12 work is part of PR #162.
 
 ## Locked global IA
 
@@ -141,27 +136,37 @@ Exact locked B01-B09 P8 identities and the pre-cleanup temporary planning tree a
 
 ```text
 docs/decisions/t11-b01-b09-lock-evidence.md
+
+evidence/t11-pr162-b01-b09-locks-20260824
+→ adf58e448bc5bd3a20cae5b7228d729c031f94ac
 ```
 
-The temporary `docs/work/**` tree is intentionally absent from the merge candidate. Its exact Evidence commit is preserved by the locator; it does not become a second Product authority.
+The Evidence ref is exact-SHA pinned by the repository aggregate verification and is non-authoritative. `docs/work/**` remains absent from accepted main.
 
-## PR #162 bounded checkpoint
+## B01-B09 checkpoint result
 
-The cleaned candidate contains only durable Product/architecture decisions, repository governance/CI, the current local frontend-planning method, routing/status updates, and the exact LOCK Evidence locator.
+The accepted checkpoint contains only durable Product/architecture decisions, repository governance/CI, the current local frontend-planning method, routing/status authority, and the exact LOCK Evidence locator.
 
-This checkpoint does **not** close T11. It integrates the accepted B01-B09 work so B10+ can continue later from a fresh branch instead of extending the giant PR.
+This checkpoint does **not** close T11. It establishes a clean accepted base from which later T11 increments continue.
+
+Independent whole-checkpoint adversarial review converged with:
+
+```text
+MATERIAL open   0
+IMPORTANT open  0
+```
 
 ## Exact next action
 
 ```text
-1. Revalidate the cleaned PR #162 exact HEAD and net diff.
-2. Run fresh exact-HEAD Draft CI.
-3. Perform a whole-checkpoint adversarial review of the cleaned 21-file candidate; do not reopen settled Product decisions without material Evidence.
-4. Resolve any MATERIAL/IMPORTANT findings against the smallest owning authority.
-5. When converged, mark PR #162 ready for review and require fresh ready-state `required` CI.
-6. Stop for explicit operator squash-merge authorization.
-7. After integration, adopt the accepted central DevelopmentConexus methodology in a separate repository-governance increment before resuming B10+.
-8. T11 remains OPEN; T12 and Product implementation remain BLOCKED.
+1. Revalidate accepted main after the B01-B09 checkpoint integration.
+2. Adopt the accepted central DevelopmentConexus methodology in a separate repository-governance acceptance increment:
+   developmentconexus-ops/conexus-methodology
+   @ 9c7210d1504bef01c0d134a6c3ae8627deebb535
+3. Do not mix that methodology adoption with Product/frontend/architecture progression.
+4. After the methodology adoption is independently accepted/integrated, recover current authority again before opening B10+.
+5. T11 remains OPEN; B10-B12 remain NOT OPEN until explicitly opened by later authority.
+6. T12 and Product implementation remain BLOCKED.
 ```
 
 ## Hard stops
@@ -169,7 +174,7 @@ This checkpoint does **not** close T11. It integrates the accepted B01-B09 work 
 ```text
 no Product code/schema/OpenAPI/runtime/deploy implementation
 no T12 work
-no B10/B11/B12 work in PR #162
+no B10/B11/B12 work until a later explicit acceptance increment opens it
 no B01-B09 reopen without material Evidence
 no Audit-to-current-state reconstruction
 no Audit/Document History semantic merge
@@ -177,7 +182,6 @@ no screen-shaped API by convenience
 no backend-shaped UX suppression by current-plan inertia
 no generic search/export/reference/deep-link platform without a proven consumer
 no frontend Authorization matrix
-no merge authorization implied
 ```
 
 ## Implementation gate
