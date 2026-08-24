@@ -14,7 +14,7 @@ REPOSITORY MODE       CLEAN-SLATE / ARCHITECTURE-FIRST
 T1 → T10              CLOSED / OPERATOR-RATIFIED / INTEGRATED
 T11                   OPEN / ACTIVE
 T11 checkpoint        B01-B09 ACCEPTED / INTEGRATED
-METHODOLOGY ADOPTION  CANDIDATE / R1 CONVERGED
+METHODOLOGY ADOPTION  ACCEPTED / INTEGRATED
 T12                   NOT OPEN
 IMPLEMENTATION         BLOCKED
 ```
@@ -35,15 +35,13 @@ exact-byte resources             4
 
 `docs/decisions/api-operation-census.md` owns the current application-operation / Idempotency / ETag / exact-byte census.
 
-## Methodology adoption
+## Organizational methodology baseline
 
-The exact organizational methodology pin and selection route are owned by `AGENTS.md`. This increment adopts that AGENTS-owned pin; selection starts at its pinned `ROUTER.md`. Frontend planning selects `METHOD.md + FRONTEND-METHOD.md`; repository operation selects `REPOSITORY-STANDARD.md`.
+The exact accepted organizational methodology pin and method-selection route are owned by `AGENTS.md`. Method selection starts at that pin's `ROUTER.md`.
 
-The central `FRONTEND-METHOD.md` explicitly consolidates the reusable MetalDocs lineage through local v2.3. Therefore the local reusable `docs/development/functional-html-wireframe-method.md` is superseded and removed; MetalDocs-specific P8 HTML Evidence handling remains in `docs/development/engineering-rules.md`.
+The reusable local Frontend Product Experience Planning Method v2.3 was superseded by the central `FRONTEND-METHOD.md`, whose lineage explicitly consolidates the MetalDocs v2.3 generation. MetalDocs-specific P8 rendered-Evidence handling remains local in `docs/development/engineering-rules.md`.
 
-Aggregate verification proves the concrete bootstrap properties it encodes: the methodology repository + exact SHA + `ROUTER.md` are present in `AGENTS.md`, a moving-main bootstrap without that pin is rejected, the superseded known frontend-method file stays absent, and active routers do not point to it. It does **not** claim exhaustive semantic detection of every possible renamed methodology fork or simultaneous floating-main reference; those broader duplicate-authority defects remain explicit hard stops and adversarial-review concerns.
-
-Impact sweep:
+Adoption impact sweep:
 
 ```text
 B01-B09 protected structure / Screen Contracts  UNAFFECTED
@@ -54,19 +52,9 @@ FP2 / P11                                        NOT OPEN
 B10-B12                                          NOT OPEN
 ```
 
-No Product/backend authority changed and no current durable Evidence identifies a material OPEN assumption that falsifies an existing LOCK. Stronger central small-delta, assumption, LOCK-impact, and P11-fidelity rules govern future affected work; they do not by themselves reopen valid B01-B09 LOCKs.
+The independent methodology-adoption review converged with `MATERIAL=0` and `IMPORTANT=0`. Methodology adoption did not reopen Product/architecture/frontend LOCKs and did not authorize implementation.
 
-Independent methodology-adoption review:
-
-```text
-PR #169        CLOSED / UNMERGED
-R1             CONVERGED
-MATERIAL open  0
-IMPORTANT open 0
-MINOR          2 / adjudicated by bounded roadmap precision only
-```
-
-R1-F1 was refined by narrowing the proof claim to what CI actually detects; no brittle catch-all grep machinery was added. R1-F2 was accepted by removing the duplicate SHA from this roadmap: `AGENTS.md` remains the bootstrap pin owner.
+Aggregate verification enforces the concrete bootstrap properties it owns, including the exact AGENTS methodology pin/ROUTER presence, context budget, temporary-work hygiene, known local-method removal, active-router de-reference, and existing exact Evidence-ref protections. Broader semantic duplicate-authority defects remain hard stops/review concerns rather than falsely claimed as exhaustively grep-detectable.
 
 ## Frontend Product Experience Program
 
@@ -117,24 +105,25 @@ The Evidence ref remains exact-SHA checked and non-authoritative.
 ## Exact next action
 
 ```text
-1. Run fresh exact-HEAD Draft CI after the R1 minor adjudication.
-2. If green, mark PR #168 Ready for Review and require fresh non-Draft `required` CI.
-3. Confirm no open review conversation and no Product/frontend/architecture delta.
-4. Stop for explicit operator squash-merge authorization.
-5. After integration, recover current authority before opening B10+ in a separate increment.
-6. T11 remains OPEN; T12 and Product implementation remain BLOCKED.
+1. Revalidate accepted main and recover authority through AGENTS → docs/index → docs/roadmap → pinned ROUTER.
+2. Select METHOD + FRONTEND-METHOD for the next frontend-planning increment.
+3. Revalidate the smallest authority pack and forward obligations before deciding whether B10 is ready to open.
+4. Do not treat B10 as opened merely because methodology adoption is integrated.
+5. T11 remains OPEN; B10-B12 remain NOT OPEN until explicitly opened by later authority.
+6. FP2/P11 remains NOT OPEN until the block program reaches its accepted assembly boundary.
+7. T12 and Product implementation remain BLOCKED.
 ```
 
 ## Hard stops
 
 ```text
 no Product code/schema/OpenAPI/runtime/deploy implementation
-no T12 or B10-B12 work in this increment
+no T12 work
+no B10-B12 work until a later explicit acceptance increment opens it
 no B01-B09 reopen without material Evidence
 no local reusable methodology fork
 no floating methodology main as normative authority
 no methodology sync bot/submodule/generated copies/framework
-no merge authorization implied
 ```
 
 ## Implementation gate
