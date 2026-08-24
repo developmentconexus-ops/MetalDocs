@@ -9,7 +9,7 @@ summary: Preserves the unresolved, deferred, and proof-backed future obligations
 
 This page is the compact durable successor to the pre-reset Rebaseline Decision Registry **only for decisions that still carry forward work or constraints**.
 
-It deliberately does **not** copy the old registry's `CURRENT` rows: current truth lives in the semantic Product/T1→T8-D authorities. It deliberately does **not** copy `SUPERSEDED` rows: superseded implementation has been removed and receives no inheritance right.
+It deliberately does **not** copy the old registry's `CURRENT` rows: current truth lives in the semantic Product/T1→T8 authorities plus bounded current decisions routed by `docs/decisions/index.md`. It deliberately does **not** copy `SUPERSEDED` rows: superseded implementation has been removed and receives no inheritance right.
 
 Source provenance: PR #131, `wiki/architecture/rebaseline-decision-registry.md`, commit `d8b1c6d31e704e9552a14faa7764c634a29b081d`.
 
@@ -26,6 +26,18 @@ read current owning authorities
 ```
 
 A later ratified authority wins over an older forward-obligation wording and must update this page when it closes or materially refines that obligation.
+
+## Consumed during T11 bounded reopen
+
+```text
+ASY-02
+  prior: DEFERRED — Notifications had no concrete Launch consumer
+  trigger: stable-Document @Mention + persistent in-app Inbox became operator-required Launch V1
+  current disposition: consumed / refined into current Launch authority
+  authority: discussion-notifications-launch.md
+```
+
+ASY-02 is therefore no longer a forward DEFERRED obligation and is excluded from the counts below. Email/push/preferences remain deferred inside the new bounded authority; only persistent in-app Mention Notifications/Inbox are current Launch scope.
 
 ## PRESERVE — 21
 
@@ -61,17 +73,17 @@ A later ratified authority wins over an older forward-obligation wording and mus
 
 - **AUTH-07 — DEFERRED** — Fresh-auth/eSignature evidence has no named Launch consumer; Authentication remains the future owner if promoted.
 - **GOV-09 — DEFERRED** — Fresh-auth per governance Step.
-- **GOV-10 — DEFERRED** — Due dates, SLA, and escalation.
+- **GOV-10 — DEFERRED** — Bounded optional per-Step deadline truth is current under `governance-step-deadline.md`; SLA breach consequences, deadline extension and escalation remain deferred.
 - **GOV-11 — DEFERRED** — Generic reassign/overseer/delegation; current Launch uses only bounded explicit exits.
+- **GOV-12 — DEFERRED** — Anchored selected-range governance review, if promoted, binds to the exact immutable governed snapshot through a provider-neutral anchor; it never mutates Submission or silently remaps to returned DRAFT, and tracked-change/suggestion requires separate semantics. Current seam authority: `governance-review-layer-seam.md`.
 - **DOC-10 — DEFERRED** — DocumentType category/taxonomy platform.
 - **DOC-11 — DEFERRED** — Editable Dictionary/System Value platform.
 - **CNT-12 — DEFERRED** — Structured TemplateSpec platform.
-- **CNT-13 — DEFERRED** — DRAFT EditorialComment platform; SubmissionFeedback remains the current governed feedback concept.
+- **CNT-13 — DEFERRED** — DRAFT EditorialComment platform; stable-Document Discussion is current but does not alter the deferred DRAFT/editor-comment concept.
 - **CNT-15 — DEFERRED** — Realtime Yjs/CRDT; the seam remains WorkingContent concurrency.
 - **REL-04 — DEFERRED** — Scheduled/future-dated Release.
 - **OBS-05 — DEFERRED** — Separate obsolescence route; current Launch reuses the DocumentType governance route.
 - **OBS-06 — DEFERRED** — Reactivation of an OBSOLETE document.
-- **ASY-02 — DEFERRED** — Notifications remain a delivery-projection concept only; no Launch inbox/email/push machinery without a concrete consumer.
 - **AUD-05 — DEFERRED** — Generic Audit export permission/capability.
 - **STO-09 — DEFERRED** — Application-layer Company DEK/crypto-erasure is not a default absent a named target-data/assurance requirement.
 - **STO-19 — DEFERRED** — Whole-Submission canonical JCS/composite digest until a named signing/export/non-repudiation consumer exists.
@@ -96,4 +108,4 @@ DEFERRED  27
 TOTAL     51
 ```
 
-These are the only old registry rows preserved as a cross-stage forward-obligation set. Current semantic decisions remain in their owning authorities; superseded legacy decisions remain deleted.
+These are the current cross-stage forward obligations. Most preserve pre-reset registry decisions; `GOV-12` was added by the operator-ratified T11 B06-F2 future seam. Current semantic decisions live in their owning authorities; superseded legacy decisions remain deleted.

@@ -1,16 +1,13 @@
 # R10-T1 — Semantic State & Invariants
 
 > **Status:** ACTIVE / OPERATOR-RATIFIED TECHNICAL AUTHORITY  
-> **Ratified:** 2026-08-18  
-> **Post-T5 Fable bounded amendment:** 2026-08-18 — Revision-governed title metadata  
+> **Ratified baseline:** 2026-08-18  
+> **T11 bounded reopen:** 2026-08-22 — stable-Document Discussion / `@mention` / Notifications; Lead GCR + Fable CONVERGED  
 > **Revision convention:** `REV000` initial issuance / `REV001` first revision  
 > **Repository:** `developmentconexus-ops/MetalDocs`  
-> **Branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131  
-> **Product authority:** `wiki/architecture/launch-v1-product-contract.md`  
-> **Ownership authority:** `wiki/architecture/launch-v1-ownership-topology.md`  
 > **Implementation:** BLOCKED
 
-This page records the operator-ratified T1 conclusions plus bounded completeness amendments ratified through the post-T5 independent-review checkpoint. No semantic owner or lifecycle state family is reopened.
+This page records the current semantic state families. The T11 bounded reopen adds only the proven Discussion/Mention and Notifications families; all unrelated T1 semantics remain unchanged.
 
 ## 1. Accepted semantic owners and families
 
@@ -44,7 +41,7 @@ product Permission vocabulary
 RoleAssignment
 ```
 
-Role/Permission semantics are product-owned, not customer-defined platform data. RoleAssignment is current grant truth over `User | Group` and `Company | Area` scopes. Exact Launch roles, permissions, bundles and check sites belong T3. No role is a domain-governance bypass.
+Role/Permission semantics are product-owned, not customer-defined platform data. RoleAssignment is current grant truth over `User | Group` and `Company | Area` scopes. Exact current roles, permissions, bundles and check sites belong T3. No role is a domain-governance bypass.
 
 ### Controlled Documents
 
@@ -64,9 +61,15 @@ Release
 OfficialRendition only when required
 Obsolescence request/result semantics
 native/imported provenance seam
+DocumentDiscussionMessage
+Mention
 ```
 
 The stable Document identity is not silently retitled in place. Human-readable title belongs to the Revision being governed. Therefore a newer DRAFT/SUBMITTED Revision may carry a new title while ordinary readers continue seeing the title of the current EFFECTIVE Revision. Historical Revisions preserve their own governed titles.
+
+`DocumentDiscussionMessage` belongs to the stable Document across Revisions. It is not WorkingContent, DRAFT EditorialComment, SubmissionFeedback or governance feedback. Accepted Launch messages are immutable; a message may optionally reference one earlier message in the same Document Discussion. `Mention` binds a stable Organization `User` identity and never grants access.
+
+A DiscussionMessage may snapshot the exact official Revision identity present at acceptance when one exists. That reference is contextual provenance only; Discussion ownership remains at the stable Document.
 
 ### Audit
 
@@ -75,6 +78,48 @@ AuditEvent
 ```
 
 Audit is append-only supporting semantic evidence and never current domain state. Deployment-wide `AuditChainHead` / global hash-chain serialization is not a Launch requirement absent a concrete assurance trigger.
+
+### Notifications
+
+```text
+Notification
+```
+
+Notification is persistent recipient attention state about an already-valid source fact.
+
+Current Launch source union:
+
+```text
+DOCUMENT_MENTION
+  document_id
+  message_id
+```
+
+Semantic minimum:
+
+```text
+notification_id
+recipient_user_id
+kind
+closed source identity
+created_at
+seen_at?
+read_at?
+archived_at?
+```
+
+Binding laws:
+
+```text
+seen_at is monotonic
+read_at absent/present = unread/read; read may return to unread
+archived_at absent/present = active/archived; archive is reversible
+READ => SEEN
+archive/unarchive preserves read/seen
+Notification read != Document read/acknowledgement/governance evidence
+Notification never grants/preserves source access
+source presentation is resolved under current disclosure, not copied as Notification authority
+```
 
 ## 2. Binding lifecycle/content laws
 
@@ -102,6 +147,15 @@ Search never establishes effectivity/access
 storage/provider identity never becomes semantic content identity
 native history != imported history
 future contexts attach by reference rather than duplicate core authority
+
+Document Discussion belongs to stable Document, never DRAFT/Submission/Governance authority
+DiscussionMessage accepted state is immutable in Launch
+Mention identity = stable User id, never reparsed display text
+reply reference cannot cross Document Discussion
+explicit accepted Mention requires one persistent Notification per unique target/message in the same local transaction
+Notification persistence != current presentability
+Notification presentability always rechecks current source disclosure
+Notification engagement never becomes Read & Acknowledge
 ```
 
 ## 3. `NoHumanApproval` obsolescence
@@ -132,6 +186,8 @@ DocumentTypeCategory taxonomy
 generic Dictionary/System Value platform
 TemplateSpec platform
 DRAFT EditorialComment platform
+message editing/version/tombstone platform
+Notification email/push/preferences/digest state
 Periodic Review state
 Distribution / acknowledgement state
 Dossier / Evidence / Records Governance
@@ -139,28 +195,30 @@ generic Interchange / governed export / repository receipt state
 global AuditChainHead/hash chain
 business WorkingSnapshot history
 EditorSession as business authority
+generic EventBus/EventStore state
 ```
 
-These are deferred/future/mechanism unless a named consumer later reopens them.
+Stable-Document Discussion and persistent in-app Mention Notifications are current Launch; their richer adjacent platforms remain absent.
 
 ## 6. Future-evolution anchors
 
 ```text
-Distribution         → Release + effective Revision + User/Group
-Periodic Review      → Document + current EFFECTIVE Revision
-Dossier              → stable Document identity
-Evidence             → Organization/AuthZ + future shared exact-content mechanism
-Records              → stable governed identities + immutable lifecycle history
-Governed Export      → stable semantic relationships + exact-content facts
-Repository connector → target-owner seams + exact-content snapshots
-Training/LMS         → released/effective document + future Distribution
-Change Control       → stable Document/Revision lifecycle seams
-pooled tenancy       → stable Company identity + reopenable substrate
-CRDT                 → replaceable WorkingContent concurrency mechanism
+Notification channels → persistent Notification intent + named T5 durable delivery effect; channel never owns Notification truth
+Distribution          → Release + effective Revision + User/Group
+Periodic Review       → Document + current EFFECTIVE Revision
+Dossier               → stable Document identity
+Evidence              → Organization/AuthZ + future shared exact-content mechanism
+Records               → stable governed identities + immutable lifecycle history
+Governed Export       → stable semantic relationships + exact-content facts
+Repository connector  → target-owner seams + exact-content snapshots
+Training/LMS          → released/effective document + future Distribution
+Change Control        → stable Document/Revision lifecycle seams
+pooled tenancy        → stable Company identity + reopenable substrate
+CRDT                  → replaceable WorkingContent concurrency mechanism
 ```
 
 Binding law:
 
 > **Defer the capability; preserve the evolution seam. Prepare the seam, not the dormant implementation.**
 
-T1 is closed and may reopen only on a material counterexample that invalidates a specific accepted invariant.
+T1 may reopen only on a material counterexample that invalidates a specific accepted invariant. Current bounded cross-layer details are routed by `docs/decisions/discussion-notifications-launch.md`.

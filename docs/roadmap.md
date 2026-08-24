@@ -10,167 +10,185 @@ summary: Sole mutable MetalDocs stage, gate, implementation-status, and next-act
 ## Current state
 
 ```text
-REPOSITORY MODE                       CLEAN-SLATE / ARCHITECTURE-FIRST
-REPOSITORY RESET                      MERGED / OPERATOR-RATIFIED
-REPOSITORY STANDARD V1 ALIGNMENT      MERGED
-PRODUCT / OWNERSHIP                   OPERATOR-APPROVED
-T1 → T10                              CLOSED / OPERATOR-RATIFIED / INTEGRATED
-T11                                   NEXT / NOT STARTED
-T12                                   NOT OPEN
-IMPLEMENTATION                        BLOCKED
-LEGACY IMPLEMENTATION                 ABSENT FROM LIVE TREE
+REPOSITORY MODE       CLEAN-SLATE / ARCHITECTURE-FIRST
+T1 → T10              CLOSED / OPERATOR-RATIFIED / INTEGRATED
+T11                   OPEN / ACTIVE
+T11 checkpoint        B01-B09 ACCEPTED / INTEGRATED
+T12                   NOT OPEN
+IMPLEMENTATION         BLOCKED
 ```
 
-## Current gate
+Current Product/architecture authority lives in `docs/product/**`, `docs/architecture/**`, and `docs/decisions/**`.
 
-T10 — Transition / Cutover is **CLOSED / OPERATOR-RATIFIED / INTEGRATED** as of 2026-08-22 after bounded independent Fable convergence and authorized squash integration.
-
-Durable T10 authority:
+Current authoritative system census:
 
 ```text
-architecture/transition.md
+semantic owners                  4 business + 2 supporting
+stable SPA routes                11
+PermissionCode values            16
+application operations           89
+Idempotency-Key creations        11
+ETag read / mutation domains     13 / 13
+exact-byte resources             4
 ```
 
-Immutable ratification evidence:
+`docs/decisions/api-operation-census.md` is the sole current application-operation / Idempotency / ETag / exact-byte census authority.
+
+## Frontend Product Experience Program
 
 ```text
-decisions/t10-ratification.md
+FP0  Frontend Foundation                         CLOSED / 89 operations / 11 routes REBASELINED
+FP1  Block-by-block Product Experience           ACTIVE
+FP2  Integrated Low-Fidelity Product / P11       NOT OPEN
+FP3  Whole-Product Adversarial Review / P12      NOT OPEN
+FP4  Visual Handoff + Readiness / P13-P14        NOT OPEN
 ```
 
-Current progression, implementation permission and exact next action remain owned here.
+Current local frontend-planning method: `docs/development/functional-html-wireframe-method.md` v2.3, operator-ratified on 2026-08-23.
 
-## T10 integrated proof
+## FP1 block status
 
 ```text
-opening main                           fc7030e98021bdb55fa806df68821cf19ed1a40c
-candidate PR                           #158
-operator-approved original Lead        0b90f26690b2b2bbf627f0c72283ff14c0ce9b84
-original Lead required CI              #1153 SUCCESS
-Round-1 Evidence PR                    #159 CLOSED / UNMERGED
-Round-1 final review HEAD              0f47dfc2365433b5950fccac4b48106e7a7fa453
-Round-1 review CI                      #1155 SUCCESS
-Round-1 verdict                        NOT CONVERGED / MATERIAL=3
-technical correction commit            7c5bb3e0106657c6e0db993afbe8d646b0ac09d1
-independently reviewed candidate HEAD  c1afc292bc94f48bfd2146c3b4374342ff5c2701
-corrected candidate required CI        #1157 SUCCESS
-Round-2 Evidence PR                    #160 CLOSED / UNMERGED
-Round-2 final review HEAD              937aebf9688516d1b0b1245eb014c0a6c03d6e7e
-Round-2 review CI                      #1159 SUCCESS
-Round-2 verdict                        CONVERGED / MATERIAL=0
-Round 3                                NOT JUSTIFIED
-post-review status carrier             aadb2a81136dcf5020804c86738dc84c263d52f8
-status-carrier required CI             #1160 SUCCESS
-operator ratification                  EXPLICIT / 2026-08-22
-closure candidate HEAD                 cc408964e4e9e4719e9bc0808b9ec49a076df89f
-Draft required CI                      #1166 SUCCESS
-merge authorization                    EXPLICIT / 2026-08-22
-merge-candidate required CI            #1167 SUCCESS
-candidate tree                         c3de41e73ee153278e0869ac80640cc945ae26b2
-squash merge / integrated main         e8f415ec16df9cc2d4623981412e1ac21c3c6647
-integrated main tree                   c3de41e73ee153278e0869ac80640cc945ae26b2
-T10 integration                        VERIFIED
+B01   App Shell + Global IA + Home                 LOCKED / OPERATOR-RATIFIED
+B01N  Notification global chrome + Quick Inbox     LOCKED / OPERATOR-RATIFIED
+B02   Library / Discovery                          LOCKED / OPERATOR-RATIFIED
+B03   Document Official                            LOCKED / P8-P10 COMPLETE
+B04   Document Work                                LOCKED / P8-P10 COMPLETE
+B05   My Work                                      LOCKED / P8 R2-P10 COMPLETE
+B06   Governance Case                              LOCKED / P8-P10 COMPLETE
+       B06-F1 deadline projection                  CLOSED / OPERATOR-RATIFIED
+       B06-F2 Governance Review Layer seam         CLOSED / FUTURE-SEAM
+B07   Document History                             LOCKED / P8-P10 COMPLETE
+       B07-F1 recognition read                     CLOSED / OPERATOR-RATIFIED
+B08   Notifications Full Inbox                     LOCKED / P8-P10 COMPLETE
+       B08-F1 recognition read                     CLOSED / OPERATOR-RATIFIED
+B09   Audit                                        LOCKED / P8-P10 COMPLETE
+       B09-F1 Audit query/evidence capability      CLOSED / OPERATOR-RATIFIED
+       op78 + op87-op89 package                    OPERATOR-RATIFIED / DURABLE
+       unresolved BLOCKING / IMPORTANT             0 / 0
+B10   Organization Administration                  NOT OPEN
+B11   Access Administration                        NOT OPEN
+B12   Document Governance Administration           NOT OPEN
 ```
 
-The squash merge integrated the exact authorized closure tree: candidate `cc408964...` and integrated `main @ e8f415ec...` both resolve to tree `c3de41e73ee153278e0869ac80640cc945ae26b2`.
-
-Round-1 corrections remained bounded to T10. No T1→T9 authority reopened.
-
-## Ratified T10 result
+## Locked global IA
 
 ```text
-B0  source truth classified
-B1  target privately prepared
-B2  exact production candidate proven + verified clean seal
-B3  first post-seal authoritative R10 Product mutation / point of no return
-B4  authoritative recovery point exists + disposable serving estate fenced + canonical R10 serving activated
+Início       = current operational situation
+Minha Caixa  = assigned work
+  Para aprovação
+  Em edição
+Documentos   = official document truth / creation
+Gestão       = system configuration
+Evidência    = audit/evidence
 ```
 
-Core transition law:
+Notifications remains transversal utility chrome, not `Minha Caixa` authority.
+
+## B09 closure
+
+Durable authority:
 
 ```text
-one-way greenfield activation
-proof before authority
-operations/provenance clean seal, never Product activation state
-first authoritative Product commit = point of no return
-authoritative recovery point before ordinary serving
-DEV/test user-serving paths fenced before ordinary serving
-single business authority
-post-B3 forward recovery only
+docs/decisions/audit-investigation-read.md
+docs/decisions/api-operation-census.md
 ```
 
-Explicitly absent:
+Ratified Audit read family:
 
 ```text
-historical business migration
-generic ETL/import framework
-dual write
-dual Product authority
-legacy read fallback
-schema/API compatibility bridge
-Product activation marker/table/endpoint
-operation 79
+78  listAuditEvents                REFINED
+87  listAuditQueryAreas            SAFE_READ
+88  searchAuditQueryActors         SAFE_READ
+89  searchAuditQueryResources      SAFE_READ
 ```
 
-## Preserved integrated baseline
+Binding laws remain:
 
 ```text
-accepted application operations      78
-orphaned operations                  0
-invented application operations      0
-operation 79                         absent
-Idempotency-Key creations            exact 10
-ETag read / mutation domains         13 / 13
-exact-byte resources                 exact 4
-stable SPA route meanings            exact accepted T6 route set
-frontend semantic owner added        none
-frontend Authorization engine        absent
-parallel global server store         absent
-one modular-monolith application runtime
-one PostgreSQL product-state database
-River workers in-process
-one active ManagedContentStore
-private conditional renderer + MalwareInspector
-verified ephemeral exact-byte spool
-Redis / BFF / realtime / external Search / generic event bus absent
-Product implementation               BLOCKED
+AuditEvent = immutable semantic action evidence, not current state
+Audit != Document History
+historical visibility is snapshotted at action time
+current authorization + historical visibility filter before pagination
+structured query filters server-side complete evidence
+mutable recognition labels are optional current/non-historical context
+filter identity remains stable IDs/enums
+Audit Query Assist is purpose-built and Audit-visible-only
+owner links are secondary and destination rechecks current AuthZ/disclosure
 ```
 
-T7 remains binding: Launch has no historical business corpus to migrate. Any contrary concrete evidence triggers the smallest bounded reopen rather than silent preservation or compatibility machinery.
+Closure proof:
+
+```text
+P7 upstream findings       0 unresolved
+Fable unresolved           0 BLOCKING / 0 IMPORTANT
+P8 artifact blob           7daa6054851e617aeacb95a28d907d0d6d4bd3d6
+P8 static proof            PASS
+P8 internal behavior       79 / 79 PASS
+P8 operator disposition    LOCK / APPROVED
+P9 material controls       33 / 33 traced / 0 unbound
+P9 invented operations     0 / operation 90+ absent
+P10 new shared patterns    0
+P10 false abstractions     0
+```
+
+Exact locked B01-B09 P8 identities and the pre-cleanup temporary planning tree are preserved by:
+
+```text
+docs/decisions/t11-b01-b09-lock-evidence.md
+
+evidence/t11-pr162-b01-b09-locks-20260824
+→ adf58e448bc5bd3a20cae5b7228d729c031f94ac
+```
+
+The Evidence ref is exact-SHA pinned by the repository aggregate verification and is non-authoritative. `docs/work/**` remains absent from accepted main.
+
+## B01-B09 checkpoint result
+
+The accepted checkpoint contains only durable Product/architecture decisions, repository governance/CI, the current local frontend-planning method, routing/status authority, and the exact LOCK Evidence locator.
+
+This checkpoint does **not** close T11. It establishes a clean accepted base from which later T11 increments continue.
+
+Independent whole-checkpoint adversarial review converged with:
+
+```text
+MATERIAL open   0
+IMPORTANT open  0
+```
 
 ## Exact next action
 
 ```text
-operator authorization to open T11 — Implementation Program & Execution Graph
-→ if authorized, start fresh from the then-current integrated main containing this T10 closeout; revalidate its exact SHA before work
-→ derive the smallest bounded implementation work graph and proof obligations from accepted T1→T10 authority
-→ preserve the exact 78-operation census and operation-79 absence
-→ do not begin T12
-→ do not implement Product code while the roadmap implementation gate remains BLOCKED
+1. Revalidate accepted main after the B01-B09 checkpoint integration.
+2. Adopt the accepted central DevelopmentConexus methodology in a separate repository-governance acceptance increment:
+   developmentconexus-ops/conexus-methodology
+   @ 9c7210d1504bef01c0d134a6c3ae8627deebb535
+3. Do not mix that methodology adoption with Product/frontend/architecture progression.
+4. After the methodology adoption is independently accepted/integrated, recover current authority again before opening B10+.
+5. T11 remains OPEN; B10-B12 remain NOT OPEN until explicitly opened by later authority.
+6. T12 and Product implementation remain BLOCKED.
 ```
 
-T11 is **NEXT / NOT STARTED** and is not open without separate explicit operator authorization. T12 remains closed. Product implementation remains blocked.
-
-## Remaining architecture program
-
-| Stage | Owns | Opens / exits |
-|---|---|---|
-| T8-E — Executable Wire Contract | Exact OpenAPI application wire, schemas, headers, problems, ETags, idempotency, pagination, upload/exact-byte contract, generated Go/TypeScript boundaries | CLOSED / OPERATOR-RATIFIED / INTEGRATED |
-| T8-F — Frontend Realization | Route tree, feature/package topology, generated transport consumption, query/state behavior, read-model consumption, editor/viewer boundaries | CLOSED / OPERATOR-RATIFIED / INTEGRATED |
-| T8-G — Runtime / Process / Deployment | Binaries/processes, River workers, renderer/scanner/provider boundaries, startup/readiness/shutdown, configuration/secrets, trust/network boundaries, observability, recovery/runtime profiles | CLOSED / OPERATOR-RATIFIED / INTEGRATED |
-| T8-H — Whole-T8 Global Coherence Review | Cross-check backend, persistence, wire, frontend, runtime and accepted upstream authorities as one system | CLOSED / OPERATOR-RATIFIED / INTEGRATED |
-| T9 — Golden Flows & Validation Baseline | Falsifiable composed-system flows and proof classes | CLOSED / OPERATOR-RATIFIED / INTEGRATED |
-| T10 — Transition / Cutover | Real current→target transition, authority edge, recovery and rollback barriers | CLOSED / OPERATOR-RATIFIED / INTEGRATED |
-| T11 — Implementation Program & Execution Graph | Bounded work graph and proof obligations | NEXT / NOT STARTED; requires separate operator authorization |
-| T12 — Adversarial Implementation-Readiness | Independent implementation-readiness attack | NOT OPEN; opens after T11 |
-
-## Final implementation gate
-
-Implementation remains blocked until all are true:
+## Hard stops
 
 ```text
-T8  CLOSED / OPERATOR-RATIFIED / INTEGRATED
-T9  CLOSED / OPERATOR-RATIFIED / INTEGRATED
-T10 CLOSED / OPERATOR-RATIFIED / INTEGRATED
+no Product code/schema/OpenAPI/runtime/deploy implementation
+no T12 work
+no B10/B11/B12 work until a later explicit acceptance increment opens it
+no B01-B09 reopen without material Evidence
+no Audit-to-current-state reconstruction
+no Audit/Document History semantic merge
+no screen-shaped API by convenience
+no backend-shaped UX suppression by current-plan inertia
+no generic search/export/reference/deep-link platform without a proven consumer
+no frontend Authorization matrix
+```
+
+## Implementation gate
+
+Implementation remains blocked until:
+
+```text
 T11 CLOSED / OPERATOR-RATIFIED
 T12 CLOSED / OPERATOR-RATIFIED
 Integrated Whole-R10 coherence = PASS
@@ -180,4 +198,4 @@ operator implementation authorization = explicit
 
 ## Reopen law
 
-Completed Product/R10 decisions reopen only on material evidence defined by the owning authority or the DevelopmentConexus Engineering Method. Preference, sunk cost, old implementation shape, hypothetical future capability or generic infrastructure fashion are not reopen triggers.
+Accepted Product/R10/frontend LOCK decisions reopen only on material Evidence under the DevelopmentConexus Engineering Method. Preference, sunk cost, framework availability or hypothetical scale alone are not reopen triggers.
