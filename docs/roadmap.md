@@ -94,7 +94,8 @@ B09   Audit                                        OPEN / ACTIVE
        Structured Audit Query                      OPERATOR-RATIFIED
        Human recognition / historical labels      OPERATOR-RATIFIED
        Audit Query Assist                          OPERATOR-RATIFIED
-       Owner-lens cross-link policy                NEXT DECISION
+       Owner-lens cross-link policy                OPERATOR-RATIFIED
+       Exact Product/API/wire refinement           NEXT DECISION
        P7                                          PAUSED pending B09-F1
        P8                                          BLOCKED pending B09-F1
 B10   Organization Administration                  NOT OPEN
@@ -171,6 +172,15 @@ Audit Query Assist
   actor = Audit-visible stable identities + optional current label
   resource = resource_kind-first Audit-visible candidate discovery
   no global entity/reference-data platform
+
+Owner-lens cross-links
+  Audit-native same-actor/resource/action investigation is universal
+  owner links are secondary and require accepted route + exact routing identity
+  Document events may hand off to Document Official
+  release/cancellation/obsolescence with document_id may hand off to History
+  governance Decision with governance_attempt_id may hand off to Governance Case
+  B10-B12 admin destinations are deferred until those blocks lock
+  destination always rechecks current disclosure/AuthZ
 ```
 
 Binding invariants:
@@ -187,12 +197,11 @@ browser never post-filters incomplete pages as complete evidence truth
 ## Exact next action
 
 ```text
-1. Adjudicate B09-F1 owner-lens cross-link policy.
-2. Ratify the smallest exact op78 + Audit Query Assist Product/API/wire refinement required.
-3. Perform bounded FP0/B09 rebaseline if authority changes.
-4. Only then resume B09 P7 and P8 functional HTML.
-5. Do not open B10+ early.
-6. Implementation remains blocked.
+1. Ratify the smallest exact op78 + Audit Query Assist Product/API/wire refinement required.
+2. Perform bounded FP0/B09 rebaseline if authority changes.
+3. Only then resume B09 P7 and P8 functional HTML.
+4. Do not open B10+ early.
+5. Implementation remains blocked.
 ```
 
 ## Hard stops
@@ -209,6 +218,7 @@ no backend-shaped UX suppression by current-plan inertia
 no generic search/export platform without a proven consumer
 no admin-only directory as required Audit filter infrastructure
 no generic entity/reference-data platform for Audit selectors
+no generic resource/deep-link resolver
 no frontend Authorization matrix
 no unopened downstream block design
 no legacy restoration by sunk cost
