@@ -1,17 +1,19 @@
-# T11 — B09 Audit R1 — P7 Written Candidate
+# T11 — B09 Audit R1 — P7 Ratified Design
 
-> **Status:** CANDIDATE / P7 H1 OPERATOR-APPROVED IN CHAT / WRITTEN REVIEW REQUIRED.  
+> **Status:** OPERATOR-RATIFIED / FABLE-ADJUDICATED CLARIFICATIONS.  
 > **Block:** B09 — Audit.  
 > **Method:** Frontend Product Experience Planning Method v2.3 + DevelopmentConexus Engineering Method.  
 > **Predecessors:** B01–B08 LOCKED / OPERATOR-RATIFIED; B09-F1 CLOSED / OPERATOR-RATIFIED.  
 > **Durable authority:** `../../decisions/audit-investigation-read.md`.  
 > **Finding ledger:** `t11-b09-audit-upstream-replan.md`.  
-> **P8:** BLOCKED until this written P7 candidate is operator-ratified.  
+> **P7 clean exit:** `t11-b09-p7-exit.md`.  
+> **Fable adjudication:** `t11-b09-fable-review-adjudication.md`.  
+> **P8:** ELIGIBLE / NOT STARTED; explicit operator execution authorization still required.  
 > **Implementation:** BLOCKED.
 
 ## 1. P7 purpose and exit posture
 
-This document records the operator-approved B09 P7 leading hypothesis after the bounded Audit capability reopen and 89-operation FP0 rebaseline.
+This document records the operator-ratified B09 P7 leading hypothesis after the bounded Audit capability reopen and 89-operation FP0 rebaseline.
 
 Binding Method v2.3 law:
 
@@ -21,9 +23,11 @@ material user need
 = blocking UPSTREAM FINDING
 ```
 
-P7 may exit only when the leading hypothesis has no unresolved material authority gap. This candidate therefore records the chosen structure, the credible alternatives rejected, the exact authority dependencies, responsive/accessibility behavior, scale assumptions, failure behavior and the required P7 disposition matrix before any P8 HTML exists.
+P7 exits only when the leading hypothesis has no unresolved material authority gap. This ratified design records the chosen structure, the credible alternatives rejected, the exact authority dependencies, responsive/accessibility behavior, scale assumptions, failure behavior and the required P7 disposition matrix before any P8 HTML exists.
 
-No Product code, schema, OpenAPI, runtime, deployment or T12 work is authorized by this candidate.
+The independent Fable review found no P7 architecture failure or upstream reopen need. The operator accepted its bounded clarifications M-1, M-2, M-5 and M-6 here; they remove ambiguity without changing Product/API authority.
+
+No Product code, schema, OpenAPI, runtime, deployment or T12 work is authorized by this design.
 
 ## 2. Human jobs and Product boundary
 
@@ -198,6 +202,24 @@ remove chip
 → replace results
 ```
 
+Chip granularity follows semantic query dimensions, not individual wire members. Dependent predicates are one compound chip and removal clears the whole dimension:
+
+```text
+Período
+  occurred_at_from + occurred_at_before
+  = one chip
+
+Ator USER
+  actor_kind=user + actor_user_id
+  = one chip
+
+Recurso exato
+  resource_kind + resource_id
+  = one chip
+```
+
+This prevents chip removal from constructing wire-invalid combinations such as `resource_id` without `resource_kind` or `actor_user_id` without `actor_kind=user`.
+
 The known-empty recovery action `Limpar filtros` likewise immediately applies the unfiltered query.
 
 No undo stack, autosaved draft, query-history subsystem or revert button is introduced.
@@ -229,6 +251,8 @@ Hoje
 Últimos 30 dias
   local start of the calendar day 29 days before today -> apply-time instant
 ```
+
+Preset names are draft-editor conveniences only. Once applied, URL authority is the exact canonical `from/before` interval. A chip reconstructed from a refreshed or copied URL renders that exact interval in local presentation time; it must not re-label the interval as `Hoje`/`Últimos 7 dias`/`Últimos 30 dias` based on a later clock date.
 
 Custom whole-day selection uses local calendar boundaries and an exclusive next-day upper bound. Custom time selection converts the chosen local instants directly to UTC.
 
@@ -290,6 +314,10 @@ actor_kind=system
 
 Typed text that is not selected never becomes an applied actor predicate. Query Assist loading, known-empty and failure states are distinct.
 
+When op88 returns exactly its max-20 result set, the UI may state only a bounded refinement hint such as `Mostrando até 20 opções. Refine a busca para localizar outro resultado.` It must not claim that additional results definitely exist because the response carries no `has_more` authority.
+
+A category filter for “all human actors” (`actor_kind=user` without `actor_user_id`) is not part of Launch. It is explicitly REJECTED because neither ratified Auditor job requires human-vs-system category analysis: point investigation uses an exact USER identity, while SYSTEM is itself the closed system actor. A future proven comparative automation-vs-human job may reopen this decision.
+
 ### 7.4 Action
 
 Action is a local multi-select over the closed 37-value `AuditOperationCode` vocabulary.
@@ -314,6 +342,8 @@ Resource construction is kind-first:
 Changing resource kind clears any draft exact resource identity that belonged to the previous kind.
 
 Query Assist uses only op89 candidates admitted by Audit-visible evidence. No admin directory, generic entity platform or loaded-page-derived completeness is used.
+
+When op89 returns exactly its max-20 result set, the same non-claiming refinement hint applies: the UI may say it is showing up to 20 options and invite a more specific search, but it may not invent `has_more`.
 
 ## 8. Applied URL state
 
@@ -704,12 +734,14 @@ investigation case management          DEFERRED — new subsystem unproven
 | Area Query Assist | PRESENT-IN-AUTHORITY | op87 |
 | USER actor identity | PRESENT-IN-AUTHORITY | `actor_kind=user` + `actor_user_id` + op88 |
 | SYSTEM actor | PRESENT-IN-AUTHORITY | closed actor enum + frontend option |
+| All-human actor category filter | REJECTED — Product reason | no distinct Launch Auditor job requires human-vs-system category analysis; exact USER identity + SYSTEM cover ratified jobs |
 | Multi-action narrowing | PRESENT-IN-AUTHORITY | `operation_codes[]` |
 | Human action labels/grouping | PRESENT-IN-AUTHORITY | closed frontend mapping over enum |
 | Resource-kind narrowing | PRESENT-IN-AUTHORITY | `resource_kind` |
 | Exact resource narrowing | PRESENT-IN-AUTHORITY | `resource_id` + op89 |
 | Optional safe recognition | PRESENT-IN-AUTHORITY | `AuditEventRecognition` |
 | Recognition fallback | PRESENT-IN-AUTHORITY | evidence kind + stable identity |
+| Query Assist max-20 refinement affordance | PRESENT-IN-AUTHORITY | op88/op89 bounded max-20 response; UI may invite refinement without asserting `has_more` |
 | Typed facts | PRESENT-IN-AUTHORITY | closed `AuditEventView` evidence union |
 | Detail inspection | PRESENT-IN-AUTHORITY | loaded `AuditInspectionItem`; no new endpoint |
 | Same actor/resource/action | PRESENT-IN-AUTHORITY | new op78 query |
@@ -763,19 +795,19 @@ browser filtering as evidence truth          0
 Audit/current-state reconstruction            0
 ```
 
-Therefore the P7 H1 hypothesis is eligible for operator ratification as the written B09 P7 exit candidate.
+The independent Fable review confirmed that P7 itself stands: no architecture-level blocker or upstream reopen is required. The operator adjudicated all Fable findings before P8 execution.
 
-## 21. Gate after written review
-
-Until the operator reviews and ratifies this written candidate:
+## 21. Gate after Fable adjudication
 
 ```text
-B09 P7   WRITTEN CANDIDATE / REVIEW REQUIRED
-B09 P8   BLOCKED
+B09 P7   CLOSED / OPERATOR-RATIFIED
+Fable    ADJUDICATED
+B09 P8   ELIGIBLE / NOT STARTED; explicit execution authorization required
+B09 P9-P10 NOT OPEN
 B10-B12  NOT OPEN
 T12      NOT OPEN
 Product implementation BLOCKED
 merge    NOT AUTHORIZED
 ```
 
-If ratified, the next methodological step is P8 functional low-fidelity HTML using deterministic local fixtures and material interactions only. P8 remains Evidence, not production implementation, and must be operated by the operator before any B09 LOCK.
+The next methodological step, only after explicit operator authorization, is P8 functional low-fidelity HTML using deterministic local fixtures and material interactions. P8 remains Evidence, not production implementation, and must be operated by the operator before any B09 LOCK.
