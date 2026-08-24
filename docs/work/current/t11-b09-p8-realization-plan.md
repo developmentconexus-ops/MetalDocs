@@ -1,5 +1,6 @@
 # B09 Audit P8 Functional Evidence Realization Plan
 
+> **Review status:** FABLE-ADJUDICATED / I-1 + M-1..M-7 INCORPORATED / P8 NOT STARTED.  
 > **For agentic workers:** REQUIRED SUB-SKILL: use the repository P8 method. This plan realizes disposable frontend-planning evidence only; it MUST NOT be treated as Product implementation authorization.
 
 **Goal:** Produce one browser-operable low-fidelity HTML wireframe that lets the operator falsify or confirm the operator-ratified B09 Audit Investigation Ledger structure.
@@ -8,7 +9,7 @@
 
 **Tech Stack:** HTML5, CSS, vanilla JavaScript, deterministic local fixtures/state, browser History API only for prototype query-state simulation.
 
-**Spec:** `docs/work/current/t11-b09-audit-r1.md` + `docs/work/current/t11-b09-p7-exit.md` + `docs/decisions/audit-investigation-read.md`.
+**Spec:** `docs/work/current/t11-b09-audit-r1.md` + `docs/work/current/t11-b09-p7-exit.md` + `docs/work/current/t11-b09-fable-review-adjudication.md` + `docs/decisions/audit-investigation-read.md`.
 
 ## Global Constraints
 
@@ -20,7 +21,12 @@
 - Canonical order remains `occurred_at DESC,event_id DESC`; no alternate sort.
 - Main query dimensions are exactly Period, Historical Scope, Actor, Action and Resource.
 - Draft filter state is distinct from the applied query; URL/chips/ledger represent applied truth only.
+- Applied URL state must round-trip: initial load, refresh, browser back/forward and pasted canonical query strings reconstruct the same applied investigation from stable IDs/enums/UTC instants.
+- Applied chips are semantic-dimension atoms: Period clears `from+before`, USER Actor clears `actor_kind+actor_user_id`, and exact Resource clears `resource_kind+resource_id` together.
+- Relative period preset names exist only in the draft editor. A refreshed/copied URL reconstructs an exact interval label, never a newly evaluated `Hoje`/`Últimos 7 dias`/`Últimos 30 dias` label.
 - Query Assist is simulated as server-authored bounded options; loaded Audit rows never become selector completeness authority.
+- op88/op89 max-20 results may show a non-claiming refine-search hint but must not invent `has_more`.
+- `actor_kind=user` without exact `actor_user_id` is not a Launch Product filter; the ratified P7 disposition rejects an all-human actor category filter.
 - Evidence and current recognition remain structurally distinct.
 - Detail uses the already-loaded inspection item; no detail endpoint or route exists.
 - Cursor continuation appends older events; no infinite scroll, page numbers or total count.
@@ -90,6 +96,8 @@ at least one continuation page crossing into an older local day
 
 Create enough rows for two deterministic op78 windows of 20 events each plus a final short page so `Load older events` and end-of-results behavior are both operable.
 
+Every Area offered later by the simulated op87 selector MUST have at least one corresponding historically visible fixture event. If the selector offers `COM`, `FIN` and `RH`, the fixture set must contain admitted Area evidence for all three; the prototype must not demonstrate an op87 option impossible under the ratified candidate law.
+
 - [ ] **Step 3: Keep fixture-only review controls out of Product truth**
 
 Review flags may exist only under one object such as:
@@ -98,6 +106,7 @@ Review flags may exist only under one object such as:
 const reviewMode = {
   failNextMainQuery: false,
   failNextContinuation: false,
+  failAreaAssist: false,
   failActorAssist: false,
   failResourceAssist: false,
   forceKnownEmpty: false,
@@ -135,7 +144,7 @@ let appliedQuery = emptyQuery();
 let draftQuery = emptyQuery();
 ```
 
-- [ ] **Step 2: Implement canonical query serialization**
+- [ ] **Step 2: Implement canonical query serialization and visible canonical evidence**
 
 Serialize only applied stable IDs/enums/UTC instants. Multiple operation codes must serialize in the closed local enum order, never in user click order.
 
@@ -154,9 +163,59 @@ function serializeAppliedQuery(q) {
 }
 ```
 
-Use `history.pushState`/`replaceState` only to prove refresh/back-forward/query-copy structure inside the prototype; no production routing authority is implied.
+Always render the canonical query string in a clearly review-only evidence region so the operator can compare the applied question with `location.search`.
 
-- [ ] **Step 3: Implement Apply and explicit unapplied-changes state**
+History API use is defensive P8 evidence, not routing authority:
+
+```js
+function writePrototypeUrl(q, mode = 'push') {
+  const search = serializeAppliedQuery(q);
+  renderCanonicalQueryEvidence(search);
+  const url = `${location.pathname}${search ? `?${search}` : ''}${location.hash}`;
+  try {
+    const fn = mode === 'replace' ? 'replaceState' : 'pushState';
+    history[fn]({ auditQuery: search }, '', url);
+  } catch (error) {
+    announceReviewStatus('Não foi possível atualizar a URL local; a consulta canônica continua visível nesta evidência P8.');
+  }
+}
+```
+
+- [ ] **Step 3: Implement URL deserialization on initial load and `popstate`**
+
+The P8 artifact MUST prove the reverse direction, not merely write a decorative URL.
+
+```js
+function parseCanonicalQuery(search) {
+  const p = new URLSearchParams(search);
+  const q = emptyQuery();
+  q.occurredAtFrom = p.get('occurred_at_from');
+  q.occurredAtBefore = p.get('occurred_at_before');
+  q.actorKind = p.get('actor_kind');
+  q.actorUserId = p.get('actor_user_id');
+  q.operationCodes = canonicalizeCodes((p.get('operation_codes') || '').split(',').filter(Boolean));
+  q.resourceKind = p.get('resource_kind');
+  q.resourceId = p.get('resource_id');
+  q.visibilityAreaId = p.get('visibility_area_id');
+  return q;
+}
+
+function restoreAppliedQueryFromLocation() {
+  const next = parseCanonicalQuery(location.search);
+  appliedQuery = cloneQuery(next);
+  draftQuery = cloneQuery(next);
+  closeDetailIfOpen();
+  resetLoadedPages();
+  renderCanonicalQueryEvidence(serializeAppliedQuery(next));
+  runFirstPageQuery({ writeHistory: false });
+}
+
+window.addEventListener('popstate', restoreAppliedQueryFromLocation);
+```
+
+On initial boot, call `restoreAppliedQueryFromLocation()` before rendering canonical results. This is the proof path for refresh and pasted/copied query strings. Parsing must preserve the ratified dependency laws; the prototype must not manufacture an applied `resource_id` without `resource_kind` or `actor_user_id` without `actor_kind=user`.
+
+- [ ] **Step 4: Implement Apply and explicit unapplied-changes state**
 
 `Aplicar` must:
 
@@ -174,9 +233,28 @@ validate draft
 
 Invalid period (`from >= before`) remains draft-only with inline error and leaves applied URL/chips/ledger unchanged.
 
-- [ ] **Step 4: Implement immediate applied-chip removal**
+- [ ] **Step 5: Implement immediate applied-chip removal as semantic-dimension clearing**
 
 Removing a chip must alter the applied query immediately, update the canonical prototype URL and trigger a new first-page query without requiring a second Apply click.
+
+Dependent predicates are indivisible chip dimensions:
+
+```js
+function clearAppliedDimension(dimension) {
+  if (dimension === 'period') {
+    appliedQuery.occurredAtFrom = null;
+    appliedQuery.occurredAtBefore = null;
+  }
+  if (dimension === 'actor') {
+    appliedQuery.actorKind = null;
+    appliedQuery.actorUserId = null;
+  }
+  if (dimension === 'resource') {
+    appliedQuery.resourceKind = null;
+    appliedQuery.resourceId = null;
+  }
+}
+```
 
 `Limpar edição` resets only draft controls to the currently applied query. `Limpar filtros` from a known-empty result immediately applies the unfiltered query.
 
@@ -202,7 +280,9 @@ Hoje
 Personalizado: from date/time + to date/time
 ```
 
-No preset is selected by default. Whole-day custom input converts to local start boundaries with an exclusive next-day upper bound. Show the human chip label separately from canonical UTC URL values.
+No preset is selected by default. Whole-day custom input converts to local start boundaries with an exclusive next-day upper bound.
+
+Preset names are only draft-editor conveniences. After Apply, the authoritative value is the exact canonical UTC interval. If state is reconstructed from `location.search`, render the applied chip as that exact interval in local presentation time; never recalculate and label an old canonical interval as `Hoje` on a later date.
 
 - [ ] **Step 2: Historical Scope selector using simulated op87 options**
 
@@ -216,11 +296,23 @@ const areaOptions = [
 ];
 ```
 
-Default means all currently auditable evidence. Do not add a Company-only filter.
+Default means all currently auditable evidence. Do not add a Company-only filter. Each option must be backed by at least one historically visible fixture event from Task 1.
+
+The selector must expose review-operable `loading`, `known-empty` and `failure + retry` states using `reviewMode.failAreaAssist` without turning failure into an empty option set.
 
 - [ ] **Step 3: Actor Query Assist**
 
 Expose `Sistema` as a closed local option. USER search uses a deterministic simulated op88 result list with separate `loading`, `known-empty` and `failure + retry` review paths. Typed text that is never selected must not become an actor predicate.
+
+Do not offer `Todos os usuários` or any equivalent `actor_kind=user` category filter; it is explicitly REJECTED for Launch because no ratified Auditor job requires human-vs-system category analysis.
+
+If the simulated op88 response returns exactly 20 items, display a non-claiming hint equivalent to:
+
+```text
+Mostrando até 20 opções. Refine a busca para localizar outro resultado.
+```
+
+Do not say that more results definitely exist and do not invent pagination/`has_more`.
 
 - [ ] **Step 4: Action multi-select**
 
@@ -229,6 +321,8 @@ Represent the closed 37-value action vocabulary in human groups. The local searc
 - [ ] **Step 5: Resource kind-first Query Assist**
 
 Require resource kind before exact resource selection. Simulated op89 results must vary by selected kind. Changing kind clears any previous exact resource id. Show an exact-UUID search result path and recognition-unavailable fallback. Do not offer a universal resource search.
+
+If the simulated op89 response returns exactly 20 items, use the same non-claiming refinement hint as Actor. Do not invent `has_more` or Query Assist pagination.
 
 ---
 
@@ -367,9 +461,17 @@ Do not claim that no history exists.
 
 Keep applied URL/chips and render `Não foi possível consultar as evidências` + `Tentar novamente`. Do not display an empty ledger as if the query succeeded.
 
-- [ ] **Step 4: Query Assist failures**
+- [ ] **Step 4: Query Assist loading/empty/failure for all three server-authored assists**
 
-Actor/resource/area assist must separately expose `Buscando…`, `Nenhuma opção encontrada` and `Não foi possível buscar… / Tentar novamente`.
+Area/Actor/Resource assist must separately expose:
+
+```text
+Buscando…
+Nenhuma opção encontrada
+Não foi possível buscar… / Tentar novamente
+```
+
+Use `failAreaAssist`, `failActorAssist` and `failResourceAssist` independently. A failed assist must never be rendered as a known-empty result.
 
 - [ ] **Step 5: Route authorization review state**
 
@@ -448,6 +550,7 @@ operational mutation
 raw JSON/developer mode
 generic resource resolver
 admin-directory browsing
+all-human actor category filter
 ```
 
 Review-only scenario toggles must be visibly separated from Product controls.
@@ -461,12 +564,18 @@ recent-first unfiltered entry with no hidden period
 draft filters do not alter ledger/chips/URL
 Apply changes query and replaces rows through loading
 invalid period remains draft-only
-chip removal applies immediately
+compound Period/Actor/Resource chip removal clears the whole semantic dimension
 Period presets + custom interval
+reloaded/copied period renders exact interval, not a newly evaluated relative preset label
 Scope op87-style selection
-Actor SYSTEM + USER typeahead + empty/failure
+all op87 options correspond to historically visible fixture evidence
+Area Query Assist loading + known-empty + failure/retry
+Actor SYSTEM + exact USER typeahead + empty/failure
+no all-human actor category filter
+Actor exactly-20 response shows non-claiming refine-search hint
 Action multi-select + local 37-label search
 Resource kind-first + op89-style search + kind change clears exact id
+Resource exactly-20 response shows non-claiming refine-search hint
 human recognition + unavailable fallbacks
 AREA + COMPANY historical-scope presentation
 local-day separators
@@ -475,6 +584,11 @@ detail exact evidence + typed facts + current recognition separation
 same actor/resource/action immediate investigation
 bounded owner handoff boundaries
 known-empty vs first-page failure
+refresh preserves applied query
+browser back/forward navigates applied queries
+pasted canonical query string reproduces the investigation
+visible canonical query evidence matches applied URL/query state
+History API failure guard preserves operable in-page canonical evidence
 mobile filter sheet + full-surface detail
 keyboard/focus/escape restoration
 ```
