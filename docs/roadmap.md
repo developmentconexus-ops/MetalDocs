@@ -14,6 +14,7 @@ REPOSITORY MODE       CLEAN-SLATE / ARCHITECTURE-FIRST
 T1 → T10              CLOSED / OPERATOR-RATIFIED / INTEGRATED
 T11                   OPEN / ACTIVE
 T11 checkpoint        B01-B09 ACCEPTED / INTEGRATED
+METHODOLOGY ADOPTION  ACTIVE / BOUNDED REPOSITORY-GOVERNANCE INCREMENT
 T12                   NOT OPEN
 IMPLEMENTATION         BLOCKED
 ```
@@ -34,6 +35,50 @@ exact-byte resources             4
 
 `docs/decisions/api-operation-census.md` is the sole current application-operation / Idempotency / ETag / exact-byte census authority.
 
+## Organizational methodology adoption
+
+Target organizational methodology authority:
+
+```text
+developmentconexus-ops/conexus-methodology
+@ 9c7210d1504bef01c0d134a6c3ae8627deebb535
+```
+
+Selection begins at the pinned `ROUTER.md`. Relevant current organizational methods include:
+
+```text
+METHOD.md                 DevelopmentConexus Engineering Method v1.1.0
+REPOSITORY-STANDARD.md    DevelopmentConexus Repository Standard v1.1.0
+FRONTEND-METHOD.md        DevelopmentConexus Frontend Product Experience Method v1.0.0
+```
+
+The organizational `FRONTEND-METHOD.md` explicitly consolidates the reusable MetalDocs frontend-method lineage through the operator-ratified local v2.3 generation. Therefore `docs/development/functional-html-wireframe-method.md` is superseded reusable authority and is removed in this increment rather than maintained as a parallel fork.
+
+MetalDocs-specific frontend Evidence handling remains in `docs/development/engineering-rules.md`.
+
+## Methodology-adoption impact boundary
+
+This increment changes methodology ownership/routing, not Product/backend/frontend structure.
+
+```text
+B01-B09 protected Product/UX structure      UNAFFECTED
+B01-B09 Screen Contracts / LOCK meaning      UNAFFECTED
+Product/architecture authorities             UNAFFECTED
+89-operation / 11-route census               UNAFFECTED
+Evidence ref / exact P8 LOCK blobs           UNAFFECTED
+FP2 / P11                                    NOT OPEN
+B10-B12                                      NOT OPEN
+```
+
+Basis:
+
+- the central frontend method declares the MetalDocs v2.3 lineage as an input to its consolidation;
+- no Product/backend authority changes in this adoption;
+- no current durable repository authority identifies a material OPEN frontend assumption that falsifies an existing LOCK;
+- strengthened central rules for future small-delta handling, lock-impact sweeps, lock-time assumptions, and P11 fidelity apply prospectively to the next affected work/reopen/assembly and do not by themselves falsify prior LOCK structure.
+
+If future Evidence identifies a specific prior LOCK whose protected structure depends on a still-OPEN material assumption, apply the pinned frontend method's smallest-scope `REVALIDATE`/`REOPEN` law then; do not preemptively restart B01-B09.
+
 ## Frontend Product Experience Program
 
 ```text
@@ -44,7 +89,7 @@ FP3  Whole-Product Adversarial Review / P12      NOT OPEN
 FP4  Visual Handoff + Readiness / P13-P14        NOT OPEN
 ```
 
-Current local frontend-planning method: `docs/development/functional-html-wireframe-method.md` v2.3, operator-ratified on 2026-08-23.
+Frontend planning now selects the organizational `METHOD.md + FRONTEND-METHOD.md` from the exact methodology pin in `AGENTS.md`; there is no repository-local reusable frontend-method authority.
 
 ## FP1 block status
 
@@ -141,32 +186,20 @@ evidence/t11-pr162-b01-b09-locks-20260824
 → adf58e448bc5bd3a20cae5b7228d729c031f94ac
 ```
 
-The Evidence ref is exact-SHA pinned by the repository aggregate verification and is non-authoritative. `docs/work/**` remains absent from accepted main.
-
-## B01-B09 checkpoint result
-
-The accepted checkpoint contains only durable Product/architecture decisions, repository governance/CI, the current local frontend-planning method, routing/status authority, and the exact LOCK Evidence locator.
-
-This checkpoint does **not** close T11. It establishes a clean accepted base from which later T11 increments continue.
-
-Independent whole-checkpoint adversarial review converged with:
-
-```text
-MATERIAL open   0
-IMPORTANT open  0
-```
+The Evidence ref is exact-SHA pinned by the repository aggregate verification and is non-authoritative. `docs/work/**` remains absent from accepted main/merge candidates except temporary lawful Draft/review transport.
 
 ## Exact next action
 
 ```text
-1. Revalidate accepted main after the B01-B09 checkpoint integration.
-2. Adopt the accepted central DevelopmentConexus methodology in a separate repository-governance acceptance increment:
-   developmentconexus-ops/conexus-methodology
-   @ 9c7210d1504bef01c0d134a6c3ae8627deebb535
-3. Do not mix that methodology adoption with Product/frontend/architecture progression.
-4. After the methodology adoption is independently accepted/integrated, recover current authority again before opening B10+.
-5. T11 remains OPEN; B10-B12 remain NOT OPEN until explicitly opened by later authority.
-6. T12 and Product implementation remain BLOCKED.
+1. Complete the bounded methodology-adoption candidate only; do not open B10+.
+2. Prove AGENTS exposes the exact accepted methodology SHA and routes through pinned ROUTER.md.
+3. Prove repository-local reusable frontend methodology has been removed without losing MetalDocs-specific controls.
+4. Run the repository aggregate verification and prove its methodology-pin/duplicate-authority negative guards can fire.
+5. Perform a fresh independent adversarial review using the pinned ADVERSARIAL-REVIEW-METHOD.md because this increment changes governing methodology consumption.
+6. Resolve any MATERIAL/IMPORTANT finding against the smallest owning authority.
+7. Require fresh Ready/non-Draft `required` CI and explicit operator squash-merge authorization.
+8. Only after this adoption is integrated, recover current authority again before explicitly opening B10+ in a separate acceptance increment.
+9. T11 remains OPEN; T12 and Product implementation remain BLOCKED.
 ```
 
 ## Hard stops
@@ -174,14 +207,18 @@ IMPORTANT open  0
 ```text
 no Product code/schema/OpenAPI/runtime/deploy implementation
 no T12 work
-no B10/B11/B12 work until a later explicit acceptance increment opens it
+no B10/B11/B12 work in this methodology-adoption increment
 no B01-B09 reopen without material Evidence
+no local reusable methodology fork
+no floating methodology main as normative authority
+no methodology sync bot/submodule/generated copies/framework
 no Audit-to-current-state reconstruction
 no Audit/Document History semantic merge
 no screen-shaped API by convenience
 no backend-shaped UX suppression by current-plan inertia
 no generic search/export/reference/deep-link platform without a proven consumer
 no frontend Authorization matrix
+no merge authorization implied
 ```
 
 ## Implementation gate
@@ -198,4 +235,4 @@ operator implementation authorization = explicit
 
 ## Reopen law
 
-Accepted Product/R10/frontend LOCK decisions reopen only on material Evidence under the DevelopmentConexus Engineering Method. Preference, sunk cost, framework availability or hypothetical scale alone are not reopen triggers.
+Accepted Product/R10/frontend LOCK decisions reopen only on material Evidence under the pinned DevelopmentConexus Engineering Method. Preference, sunk cost, framework availability, methodology migration ceremony, or hypothetical futures alone are not reopen triggers.
