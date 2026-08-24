@@ -35,7 +35,7 @@ docs/decisions/governance-review-layer-seam.md
 docs/decisions/document-history-recognition-read.md
 ```
 
-Current system census remains:
+Current authoritative system census remains:
 
 ```text
 semantic owners                  4 business + 2 supporting
@@ -47,7 +47,7 @@ ETag read / mutation domains     13 / 13
 exact-byte resources             4
 ```
 
-`docs/decisions/api-operation-census.md` is the sole numeric census.
+`docs/decisions/api-operation-census.md` is the sole numeric census. The B09 written candidate proposes `86 → 89`, but that count is **not authority until written ratification and durable promotion**.
 
 ## Frontend Product Experience Program
 
@@ -95,7 +95,8 @@ B09   Audit                                        OPEN / ACTIVE
        Human recognition / historical labels      OPERATOR-RATIFIED
        Audit Query Assist                          OPERATOR-RATIFIED
        Owner-lens cross-link policy                OPERATOR-RATIFIED
-       Exact Product/API/wire refinement           NEXT DECISION
+       Exact op78 + op87-op89 package              IN-CHAT DESIGN OPERATOR-APPROVED
+       Written decision candidate R2               WRITTEN / OPERATOR RATIFICATION PENDING
        P7                                          PAUSED pending B09-F1
        P8                                          BLOCKED pending B09-F1
 B10   Organization Administration                  NOT OPEN
@@ -119,89 +120,94 @@ Notifications remains transversal utility chrome, not `Minha Caixa` authority.
 
 ## Locked-block evidence routing
 
-Detailed closed-block evidence remains in `docs/work/current/**` while this roadmap owns only mutable stage/gate state.
+Detailed block evidence remains in `docs/work/current/**` while this roadmap owns mutable stage/gate state.
 
 ```text
 B07 → docs/work/current/t11-b07-document-history-r1.md
 B08 → docs/work/current/t11-b08-notifications-full-inbox-r1.md
-B09 → docs/work/current/t11-b09-audit-upstream-replan.md
+B09 finding → docs/work/current/t11-b09-audit-upstream-replan.md
+B09 written candidate → docs/work/current/t11-b09-audit-capability-decision-candidate-r2.md
 ```
 
-B07 History remains distinct from Audit. B08 keeps op82 as its single Inbox list authority. Neither closure changes the current system census.
+B07 History remains distinct from Audit. B08 keeps op82 as its single Inbox list authority. B01-B08 remain preserved unless later material evidence specifically falsifies a lock.
 
 ## B09 current gate — Audit upstream replan
 
-Current baseline:
+Current authoritative baseline remains:
 
 ```text
-GET /api/v1/audit/events
-listAuditEvents
-AuditEventPage
-occurred_at DESC, event_id DESC
-cursor + limit only
-audit.read
+78 GET /api/v1/audit/events
+   listAuditEvents
+   AuditEventPage
+   cursor + limit only
+   occurred_at DESC,event_id DESC
+   audit.read
+
+current application census = 86
 ```
 
-Ratified B09-F1 direction:
+Operator-approved design package now written in R2 for documentary ratification:
 
 ```text
-Launch jobs
-  point investigation / exact evidence question
-  period + authorized historical-scope review
-  export DEFERRED
+op78
+  preserve operation identity
+  structured server-side time/actor/action/resource/historical-Area narrowing
+  evidence/recognition response split
+  same reverse chronology + stateless cursor
+  no Audit detail endpoint
 
-Structured Audit Query
-  occurred_at interval
-  exact USER actor identity or SYSTEM
-  one-or-more AuditOperationCode values
-  resource_kind
-  exact resource_id when known
-  optional historical Area narrowing within audit.read authority
-  fixed occurred_at DESC,event_id DESC
+op87
+  listAuditQueryAreas
 
-Human recognition
-  immutable IDs/facts remain Audit evidence authority
-  mutable labels are optional current/non-historical enrichment
-  immutable human identifiers may be stable recognition
-  filter identity remains IDs/enums, never mutable names
+op88
+  searchAuditQueryActors
 
-Audit Query Assist
-  purpose-built discovery; no admin-directory dependency
-  action = closed AuditOperationCode vocabulary
-  Area = audit.read/historical-visibility bounded candidates
-  actor = Audit-visible stable identities + optional current label
-  resource = resource_kind-first Audit-visible candidate discovery
-  no global entity/reference-data platform
+op89
+  searchAuditQueryResources
 
-Owner-lens cross-links
-  Audit-native same-actor/resource/action investigation is universal
-  owner links are secondary and require accepted route + exact routing identity
-  Document events may hand off to Document Official
-  release/cancellation/obsolescence with document_id may hand off to History
-  governance Decision with governance_attempt_id may hand off to Governance Case
-  B10-B12 admin destinations are deferred until those blocks lock
-  destination always rechecks current disclosure/AuthZ
+candidate census
+  86 → 89 operations
+  routes / permissions / writes / idempotency / ETag / byte / owner counts unchanged
 ```
 
-Binding invariants:
+Ratified B09-F1 Product laws remain:
 
 ```text
-AuditEvent = semantic action evidence, not current state
+AuditEvent = immutable semantic action evidence, not current state
 Audit != Document History
 historical visibility is snapshotted at action time
 current authorization + historical visibility filter before pagination
 Audit remains PII-minimized
-browser never post-filters incomplete pages as complete evidence truth
+mutable recognition labels are current/non-historical and never query identity
+Audit Query Assist is purpose-built and Audit-visible-only
+Audit-native same actor/resource/action investigation is universal
+owner links are secondary and destinations recheck current AuthZ/disclosure
+```
+
+Explicit YAGNI remains:
+
+```text
+free-text generic Audit search   DEFERRED
+query DSL                        REJECTED
+saved searches                   DEFERRED
+custom sort                      REJECTED
+analytics/dashboard              REJECTED as B09 responsibility
+export                           DEFERRED
+admin-directory selector dependency REJECTED
+generic entity/reference-data resolver REJECTED
 ```
 
 ## Exact next action
 
 ```text
-1. Ratify the smallest exact op78 + Audit Query Assist Product/API/wire refinement required.
-2. Perform bounded FP0/B09 rebaseline if authority changes.
-3. Only then resume B09 P7 and P8 functional HTML.
-4. Do not open B10+ early.
-5. Implementation remains blocked.
+1. Operator reviews and ratifies or revises t11-b09-audit-capability-decision-candidate-r2.md.
+2. If ratified, promote one durable bounded B09 Audit investigation authority.
+3. Update sole API numeric census 86→89 and bounded Product/T8-C/T8-E/T8-F authority clauses.
+4. Perform bounded FP0/B09 rebaseline and consistency proof.
+5. Close B09-F1 only after that proof.
+6. Then resume B09 P7; P8 remains blocked until P7 exits cleanly.
+7. Do not open B10+ early.
+8. Implementation remains blocked.
 ```
 
 ## Hard stops
@@ -210,6 +216,7 @@ browser never post-filters incomplete pages as complete evidence truth
 no Product code/schema/OpenAPI/runtime/deploy implementation
 no T12 work
 no B09 P8 while B09-F1 is unresolved
+no treating candidate 89-operation count as authority before promotion
 no browser-side filtering of incomplete Audit pages as complete truth
 no Audit-to-current-state reconstruction
 no Audit/Document History semantic merge
