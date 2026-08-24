@@ -13,29 +13,15 @@ summary: Sole mutable MetalDocs stage, gate, implementation-status, and next-act
 REPOSITORY MODE       CLEAN-SLATE / ARCHITECTURE-FIRST
 T1 → T10              CLOSED / OPERATOR-RATIFIED / INTEGRATED
 T11                   OPEN / ACTIVE
-T11 current increment B01-B09 CHECKPOINT / CLOSEOUT ACTIVE
+T11 current increment B01-B09 CHECKPOINT / CLEANED MERGE-CANDIDATE CLOSEOUT
 T12                   NOT OPEN
 IMPLEMENTATION         BLOCKED
-Draft PR               #162
+PR                     #162
 branch                 arch/t11-implementation-program
 opening main           cae6ba48df5d611959c0390e0f2b9b8194d62a9d
 ```
 
 Current Product/architecture authority lives in `docs/product/**`, `docs/architecture/**`, and `docs/decisions/**`.
-
-Current bounded T11 authorities include:
-
-```text
-docs/decisions/discussion-notifications-launch.md
-docs/decisions/notification-inbox-recognition-read.md
-docs/decisions/document-official-actions-read.md
-docs/decisions/my-work-governance-identification-read.md
-docs/decisions/governance-step-deadline.md
-docs/decisions/governance-case-step-deadline-read.md
-docs/decisions/governance-review-layer-seam.md
-docs/decisions/document-history-recognition-read.md
-docs/decisions/audit-investigation-read.md
-```
 
 Current authoritative system census:
 
@@ -54,57 +40,41 @@ exact-byte resources             4
 ## Frontend Product Experience Program
 
 ```text
-FP0  Frontend Foundation                         CLOSED / R2 89/11 REBASELINED
+FP0  Frontend Foundation                         CLOSED / 89 operations / 11 routes REBASELINED
 FP1  Block-by-block Product Experience           ACTIVE
 FP2  Integrated Low-Fidelity Product / P11       NOT OPEN
 FP3  Whole-Product Adversarial Review / P12      NOT OPEN
 FP4  Visual Handoff + Readiness / P13-P14        NOT OPEN
 ```
 
-Method: `docs/development/functional-html-wireframe-method.md` v2.3 — OPERATOR-RATIFIED on 2026-08-23.
+Current local frontend-planning method: `docs/development/functional-html-wireframe-method.md` v2.3, operator-ratified on 2026-08-23.
 
-Binding v2.3 law:
-
-```text
-NO screen-shaped backend
-NO backend-shaped UX
-current pre-implementation Product/backend plan = falsifiable baseline
-material user need + insufficient authority = blocking UPSTREAM FINDING before P8
-```
-
-## FP1 block roadmap
+## FP1 block status
 
 ```text
 B01   App Shell + Global IA + Home                 LOCKED / OPERATOR-RATIFIED
 B01N  Notification global chrome + Quick Inbox     LOCKED / OPERATOR-RATIFIED
 B02   Library / Discovery                          LOCKED / OPERATOR-RATIFIED
-B03   Document Official                            LOCKED / OPERATOR-RATIFIED · P8/P9/P10 COMPLETE
-B04   Document Work                                LOCKED / OPERATOR-RATIFIED · P8/P9/P10 COMPLETE
-B05   My Work                                      LOCKED / OPERATOR-RATIFIED · P8 R2/P9/P10 COMPLETE
-B06   Governance Case                              LOCKED / OPERATOR-RATIFIED · P8/P9/P10 COMPLETE
+B03   Document Official                            LOCKED / P8-P10 COMPLETE
+B04   Document Work                                LOCKED / P8-P10 COMPLETE
+B05   My Work                                      LOCKED / P8 R2-P10 COMPLETE
+B06   Governance Case                              LOCKED / P8-P10 COMPLETE
        B06-F1 deadline projection                  CLOSED / OPERATOR-RATIFIED
-       B06-F2 Governance Review Layer seam         CLOSED / OPERATOR-RATIFIED / FUTURE-SEAM
-B07   Document History                             LOCKED / OPERATOR-RATIFIED · P8/P9/P10 COMPLETE
+       B06-F2 Governance Review Layer seam         CLOSED / FUTURE-SEAM
+B07   Document History                             LOCKED / P8-P10 COMPLETE
        B07-F1 recognition read                     CLOSED / OPERATOR-RATIFIED
-B08   Notifications Full Inbox                     LOCKED / OPERATOR-RATIFIED · P8/P9/P10 COMPLETE
+B08   Notifications Full Inbox                     LOCKED / P8-P10 COMPLETE
        B08-F1 recognition read                     CLOSED / OPERATOR-RATIFIED
-B09   Audit                                        LOCKED / OPERATOR-RATIFIED · P8/P9/P10 COMPLETE
+B09   Audit                                        LOCKED / P8-P10 COMPLETE
        B09-F1 Audit query/evidence capability      CLOSED / OPERATOR-RATIFIED
-       Structured Audit Query                      OPERATOR-RATIFIED
-       Human recognition / historical labels      OPERATOR-RATIFIED
-       Audit Query Assist                          OPERATOR-RATIFIED
-       Owner-lens cross-link policy                OPERATOR-RATIFIED
-       Exact op78 + op87-op89 package              OPERATOR-RATIFIED / DURABLE
-       P7                                          CLOSED / OPERATOR-RATIFIED
-       Fable adversarial Method review             COMPLETED / OPERATOR-ADJUDICATED
-       Fable unresolved BLOCKING / IMPORTANT       0 / 0
-       P8                                          LOCKED / OPERATOR-APPROVED
-       P9 Screen Contract                          COMPLETE
-       P10 pattern consolidation                   COMPLETE
+       op78 + op87-op89 package                    OPERATOR-RATIFIED / DURABLE
+       unresolved BLOCKING / IMPORTANT             0 / 0
 B10   Organization Administration                  NOT OPEN
 B11   Access Administration                        NOT OPEN
 B12   Document Governance Administration           NOT OPEN
 ```
+
+No B10/B11/B12 work is part of PR #162.
 
 ## Locked global IA
 
@@ -120,25 +90,16 @@ Evidência    = audit/evidence
 
 Notifications remains transversal utility chrome, not `Minha Caixa` authority.
 
-## B09 bounded authority and proof
+## B09 closure
+
+Durable authority:
 
 ```text
-durable authority  docs/decisions/audit-investigation-read.md
-numeric authority  docs/decisions/api-operation-census.md
-finding ledger     docs/work/current/t11-b09-audit-upstream-replan.md
-R2 evidence        docs/work/current/t11-b09-audit-capability-decision-candidate-r2.md
-rebaseline proof   docs/work/current/t11-b09-f1-rebaseline-proof.md
-P7 design          docs/work/current/t11-b09-audit-r1.md
-P7 clean exit      docs/work/current/t11-b09-p7-exit.md
-P8 plan            docs/work/current/t11-b09-p8-realization-plan.md
-P8 artifact        docs/work/current/t11-b09-audit-functional-wireframe.html
-P9 contract        docs/work/current/t11-b09-screen-contract.md
-P10 patterns       docs/work/current/t11-b09-pattern-consolidation.md
-Fable review brief docs/work/current/t11-b09-fable-adversarial-review-request.md
-Fable adjudication docs/work/current/t11-b09-fable-review-adjudication.md
+docs/decisions/audit-investigation-read.md
+docs/decisions/api-operation-census.md
 ```
 
-Ratified Audit read surface:
+Ratified Audit read family:
 
 ```text
 78  listAuditEvents                REFINED
@@ -147,7 +108,7 @@ Ratified Audit read surface:
 89  searchAuditQueryResources      SAFE_READ
 ```
 
-Binding B09 laws:
+Binding laws remain:
 
 ```text
 AuditEvent = immutable semantic action evidence, not current state
@@ -158,64 +119,49 @@ structured query filters server-side complete evidence
 mutable recognition labels are optional current/non-historical context
 filter identity remains stable IDs/enums
 Audit Query Assist is purpose-built and Audit-visible-only
-Audit-native same actor/resource/action investigation is universal
 owner links are secondary and destination rechecks current AuthZ/disclosure
 ```
 
-Explicit YAGNI:
+Closure proof:
 
 ```text
-free-text generic Audit search   DEFERRED
-query DSL                        REJECTED
-saved searches                   DEFERRED
-custom sort                      REJECTED
-analytics/dashboard              REJECTED as B09 responsibility
-export                           DEFERRED
-admin-directory selector dependency REJECTED
-generic entity/reference-data/deep-link resolver REJECTED
-all-human actor category filter  REJECTED for Launch — no distinct Auditor job proven
+P7 upstream findings       0 unresolved
+Fable unresolved           0 BLOCKING / 0 IMPORTANT
+P8 artifact blob           7daa6054851e617aeacb95a28d907d0d6d4bd3d6
+P8 static proof            PASS
+P8 internal behavior       79 / 79 PASS
+P8 operator disposition    LOCK / APPROVED
+P9 material controls       33 / 33 traced / 0 unbound
+P9 invented operations     0 / operation 90+ absent
+P10 new shared patterns    0
+P10 false abstractions     0
 ```
 
-B01-B08 remain preserved; no bounded rebaseline contradiction was found.
-
-P7 / Fable / P8 / P9 / P10 result:
+Exact locked B01-B09 P8 identities and the pre-cleanup temporary planning tree are preserved by:
 
 ```text
-leading hypothesis       Audit Investigation Ledger / OPERATOR-RATIFIED
-P7 upstream findings     0 unresolved
-Fable historical verdict HOLD BEFORE P8 — 0 BLOCKING / 1 IMPORTANT / 7 MINOR
-operator adjudication    I-1 + M-1..M-7 ACCEPTED and incorporated
-current unresolved       0 BLOCKING / 0 IMPORTANT
-upstream reopen          NO
-P8 Method eligibility    YES
-P8 artifact blob         7daa6054851e617aeacb95a28d907d0d6d4bd3d6
-P8 static proof          HTML parse PASS / duplicate static ids 0 / node --check PASS
-P8 internal behavior     79 / 79 checks PASS
-P8 artifact CI           #1479 required SUCCESS on artifact commit b99ef0aeb24b3b94af5e14c8fcd99f5b5c1c941a
-P8 operator walkthrough  OPERATED / no material issue reported
-P8 operator disposition  LOCK / APPROVED
-P9 material controls     33 / 33 traced / 0 unbound
-P9 invented operations   0 / operation 90+ absent
-P10 new shared patterns  0
-P10 false abstractions   0
+docs/decisions/t11-b01-b09-lock-evidence.md
 ```
 
-The sandbox Chromium could not navigate local/file URLs because its managed URL policy blocks local navigation. Serializer/parser round-trip and History-API failure fallback were proven internally; the operator accepted the exact artifact after the required browser walkthrough gate.
+The temporary `docs/work/**` tree is intentionally absent from the merge candidate. Its exact Evidence commit is preserved by the locator; it does not become a second Product authority.
+
+## PR #162 bounded checkpoint
+
+The cleaned candidate contains only durable Product/architecture decisions, repository governance/CI, the current local frontend-planning method, routing/status updates, and the exact LOCK Evidence locator.
+
+This checkpoint does **not** close T11. It integrates the accepted B01-B09 work so B10+ can continue later from a fresh branch instead of extending the giant PR.
 
 ## Exact next action
 
 ```text
-1. Treat B09 as LOCKED; do not reopen it without material Evidence.
-2. Do NOT open B10/B11/B12 in PR #162.
-3. Prepare PR #162 as a bounded B01-B09 T11 acceptance checkpoint rather than continuing the giant branch.
-4. Preserve the exact immutable P8 LOCK evidence identities needed for later P11 before removing temporary work.
-5. Promote only durable Product/architecture/status meaning required after integration; `docs/work/**` remains temporary Evidence.
-6. Remove all `docs/work/**` from the merge candidate as required by repository CI/governance.
-7. Run a whole-checkpoint coherence/adversarial closeout against the exact cleaned candidate.
-8. Require fresh exact-HEAD `required` CI with PR ready-for-review semantics.
-9. Stop for explicit operator merge authorization.
-10. After integration, continue B10+ in a fresh acceptance increment; T11 remains OPEN until its later exit conditions are actually met.
-11. T12 and Product implementation remain blocked.
+1. Revalidate the cleaned PR #162 exact HEAD and net diff.
+2. Run fresh exact-HEAD Draft CI.
+3. Perform a whole-checkpoint adversarial review of the cleaned 21-file candidate; do not reopen settled Product decisions without material Evidence.
+4. Resolve any MATERIAL/IMPORTANT findings against the smallest owning authority.
+5. When converged, mark PR #162 ready for review and require fresh ready-state `required` CI.
+6. Stop for explicit operator squash-merge authorization.
+7. After integration, adopt the accepted central DevelopmentConexus methodology in a separate repository-governance increment before resuming B10+.
+8. T11 remains OPEN; T12 and Product implementation remain BLOCKED.
 ```
 
 ## Hard stops
@@ -224,21 +170,17 @@ The sandbox Chromium could not navigate local/file URLs because its managed URL 
 no Product code/schema/OpenAPI/runtime/deploy implementation
 no T12 work
 no B10/B11/B12 work in PR #162
-no B09 reopen without material Evidence
-no browser-side filtering of incomplete Audit pages as complete truth
+no B01-B09 reopen without material Evidence
 no Audit-to-current-state reconstruction
 no Audit/Document History semantic merge
 no screen-shaped API by convenience
 no backend-shaped UX suppression by current-plan inertia
-no generic search/export platform without a proven consumer
-no admin-only directory as required Audit filter infrastructure
-no generic entity/reference-data/deep-link resolver
+no generic search/export/reference/deep-link platform without a proven consumer
 no frontend Authorization matrix
-no legacy restoration by sunk cost
 no merge authorization implied
 ```
 
-## T11 / implementation gate
+## Implementation gate
 
 Implementation remains blocked until:
 
@@ -252,4 +194,4 @@ operator implementation authorization = explicit
 
 ## Reopen law
 
-Accepted Product/R10/frontend LOCK decisions reopen only on material evidence under the DevelopmentConexus Engineering Method. Frontend Method v2.3 treats stronger pre-implementation user/operator/reference evidence as a legitimate trigger to test and, when material, reopen the smallest owning Product/backend authority. Preference, sunk cost, framework availability or hypothetical scale alone are not reopen triggers.
+Accepted Product/R10/frontend LOCK decisions reopen only on material Evidence under the DevelopmentConexus Engineering Method. Preference, sunk cost, framework availability or hypothetical scale alone are not reopen triggers.
