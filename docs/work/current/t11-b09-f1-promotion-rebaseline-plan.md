@@ -15,7 +15,7 @@ Task 3  bounded Product/T8/FP0 rebaseline              COMPLETE
 Task 4  exact-head / PR / CI consistency proof         COMPLETE
 ```
 
-## Verified final state
+## Verified authority state
 
 ```text
 application operations           89
@@ -48,11 +48,17 @@ docs/roadmap.md                                              P7 RESUMED
 docs/work/current/t11-b09-f1-promotion-rebaseline-plan.md   COMPLETE
 ```
 
-## Verification
+## Verification record
 
-The pre-promotion HEAD `bf9d1f77efbbe3265f7b87f54e15c785316d8b74` to final verified HEAD before this record refresh changed only the expected eight paths above. This record refresh itself changes only this plan path.
+Pre-promotion HEAD:
 
-Repository authority at final gate:
+```text
+bf9d1f77efbbe3265f7b87f54e15c785316d8b74
+```
+
+Promotion/rebaseline changed only the eight expected paths above. Subsequent verification-record commits touched only this plan file.
+
+Current authority scan:
 
 ```text
 roadmap current census         89
@@ -64,11 +70,16 @@ P8 current gate                BLOCKED pending P7
 main                            cae6ba48df5d611959c0390e0f2b9b8194d62a9d
 ```
 
+Latest exact-head CI immediately before this record pin:
+
+```text
+run #1462       SUCCESS
+required job    97407897051 SUCCESS
+```
+
 Older `78`/`86` counts remain only as explicitly historical/superseded stage evidence where applicable; they do not override the current numeric authority.
 
 ## Stop gate
-
-Execution stops here exactly as planned:
 
 ```text
 NEXT      B09 P7 layout hypotheses
