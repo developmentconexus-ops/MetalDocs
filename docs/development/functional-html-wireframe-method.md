@@ -7,7 +7,7 @@ summary: Reusable authority-to-UX planning method for designing and proving fron
 
 # Frontend Product Experience Planning Method
 
-**Version:** 2.3 — CANDIDATE / OPERATOR RATIFICATION PENDING  
+**Version:** 2.3 — OPERATOR-RATIFIED on 2026-08-23  
 **Scope:** reusable across products and repositories  
 **Purpose:** make production frontend implementation a realization of already-reviewed Product, UX, interaction and system decisions instead of a new design phase performed while coding.
 
@@ -1084,7 +1084,7 @@ P13 visual design + conformance
 
 A consuming repository should:
 
-1. cite `Frontend Product Experience Planning Method v2.3` after operator ratification;
+1. cite `Frontend Product Experience Planning Method v2.3`;
 2. keep mutable status in its own roadmap, not this method;
 3. define FP0–FP4 or an equivalent non-conflicting program;
 4. enumerate real `B01...Bnn` blocks;
@@ -1095,7 +1095,7 @@ A consuming repository should:
 9. route material missing-capability findings to the smallest owning authority before P8;
 10. record justified local deviations rather than silently forking the method.
 
-Recommended onboarding statement after ratification:
+Recommended onboarding statement:
 
 ```text
 Frontend planning follows Frontend Product Experience Planning Method v2.3.
