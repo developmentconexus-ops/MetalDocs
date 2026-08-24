@@ -94,8 +94,9 @@ B09   Audit                                        OPEN / ACTIVE
        Audit Query Assist                          OPERATOR-RATIFIED
        Owner-lens cross-link policy                OPERATOR-RATIFIED
        Exact op78 + op87-op89 package              OPERATOR-RATIFIED / DURABLE
-       P7                                          RESUMED / NEXT
-       P8                                          BLOCKED pending P7
+       P7 H1                                       OPERATOR-APPROVED IN CHAT
+       P7 written candidate                        REVIEW REQUIRED
+       P8                                          BLOCKED pending written P7 ratification
 B10   Organization Administration                  NOT OPEN
 B11   Access Administration                        NOT OPEN
 B12   Document Governance Administration           NOT OPEN
@@ -123,6 +124,7 @@ numeric authority  docs/decisions/api-operation-census.md
 finding ledger     docs/work/current/t11-b09-audit-upstream-replan.md
 R2 evidence        docs/work/current/t11-b09-audit-capability-decision-candidate-r2.md
 rebaseline proof   docs/work/current/t11-b09-f1-rebaseline-proof.md
+P7 candidate       docs/work/current/t11-b09-audit-r1.md
 ```
 
 Ratified Audit read surface:
@@ -164,13 +166,21 @@ generic entity/reference-data/deep-link resolver REJECTED
 
 B01-B08 remain preserved; no bounded rebaseline contradiction was found.
 
+P7 candidate result:
+
+```text
+leading hypothesis    Audit Investigation Ledger
+upstream findings     0 unresolved
+P8 eligibility        pending operator ratification of written candidate
+```
+
 ## Exact next action
 
 ```text
-1. Resume B09 P7 layout hypotheses under the ratified Audit authority.
-2. Compare the smallest credible Audit screen structures against Auditor jobs, scanability, scale, accessibility, responsive behavior and backend truth fit.
-3. Any new material Product/backend insufficiency becomes a new upstream FINDING under Method v2.3.
-4. P8 functional HTML remains BLOCKED until P7 exits with no unresolved finding.
+1. Operator reviews docs/work/current/t11-b09-audit-r1.md as the written B09 P7 exit candidate.
+2. If changes are requested, revise P7 before any P8 work.
+3. If the written candidate is operator-ratified, record clean P7 exit and only then begin P8 functional low-fidelity HTML.
+4. Any new material Product/backend insufficiency becomes a new upstream FINDING under Method v2.3.
 5. Do not open B10+ early.
 6. Implementation remains blocked.
 ```
@@ -180,7 +190,7 @@ B01-B08 remain preserved; no bounded rebaseline contradiction was found.
 ```text
 no Product code/schema/OpenAPI/runtime/deploy implementation
 no T12 work
-no B09 P8 until P7 exits cleanly
+no B09 P8 until written P7 ratification and clean exit
 no browser-side filtering of incomplete Audit pages as complete truth
 no Audit-to-current-state reconstruction
 no Audit/Document History semantic merge
