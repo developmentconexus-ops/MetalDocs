@@ -14,6 +14,7 @@ REPOSITORY MODE       CLEAN-SLATE / ARCHITECTURE-FIRST
 T1 → T10              CLOSED / OPERATOR-RATIFIED / INTEGRATED
 T11                   OPEN / ACTIVE
 T11 checkpoint        B01-B09 ACCEPTED / INTEGRATED
+T11 current block     B10 ORGANIZATION ADMINISTRATION / OPEN / ACTIVE
 METHODOLOGY ADOPTION  ACCEPTED / INTEGRATED
 T12                   NOT OPEN
 IMPLEMENTATION         BLOCKED
@@ -41,7 +42,7 @@ The exact accepted organizational methodology pin and method-selection route are
 
 The reusable local Frontend Product Experience Planning Method v2.3 was superseded by the central `FRONTEND-METHOD.md`, whose lineage explicitly consolidates the MetalDocs v2.3 generation. MetalDocs-specific P8 rendered-Evidence handling remains local in `docs/development/engineering-rules.md`.
 
-Adoption impact sweep:
+Adoption impact sweep at integration time:
 
 ```text
 B01-B09 protected structure / Screen Contracts  UNAFFECTED
@@ -49,7 +50,7 @@ Product/backend authority                       UNAFFECTED
 89-operation / 11-route census                  UNAFFECTED
 exact P8 LOCK Evidence                           UNAFFECTED
 FP2 / P11                                        NOT OPEN
-B10-B12                                          NOT OPEN
+B10-B12                                          NOT OPEN at methodology-adoption integration
 ```
 
 The independent methodology-adoption review converged with `MATERIAL=0` and `IMPORTANT=0`. Methodology adoption did not reopen Product/architecture/frontend LOCKs and did not authorize implementation.
@@ -86,7 +87,9 @@ B09   Audit                                        LOCKED / P8-P10 COMPLETE
        B09-F1 Audit query/evidence capability      CLOSED / OPERATOR-RATIFIED
        op78 + op87-op89 package                    OPERATOR-RATIFIED / DURABLE
        unresolved BLOCKING / IMPORTANT             0 / 0
-B10   Organization Administration                  NOT OPEN
+B10   Organization Administration                  OPEN / ACTIVE / P7 CANDIDATE OPERATOR-APPROVED
+       blocking upstream Findings                  0 proven
+       B10-A1 paginated-browse sufficiency         OPEN / FALSIFIABLE DURING P8
 B11   Access Administration                        NOT OPEN
 B12   Document Governance Administration           NOT OPEN
 ```
@@ -105,13 +108,14 @@ The Evidence ref remains exact-SHA checked and non-authoritative.
 ## Exact next action
 
 ```text
-1. Revalidate accepted main and recover authority through AGENTS → docs/index → docs/roadmap → pinned ROUTER.
-2. Select METHOD + FRONTEND-METHOD for the next frontend-planning increment.
-3. Revalidate the smallest authority pack and forward obligations before deciding whether B10 is ready to open.
-4. Do not treat B10 as opened merely because methodology adoption is integrated.
-5. T11 remains OPEN; B10-B12 remain NOT OPEN until explicitly opened by later authority.
-6. FP2/P11 remains NOT OPEN until the block program reaches its accepted assembly boundary.
-7. T12 and Product implementation remain BLOCKED.
+1. Continue only B10 — Organization Administration from the operator-approved P7 candidate.
+2. Materialize browser-operable functional P8 low-fidelity Evidence under docs/work/current/*.html only.
+3. Preserve B10-A1 as falsifiable: do not fake global search by filtering only a loaded page and do not invent an API merely for screen convenience.
+4. If operator/P8 Evidence proves paginated browse materially insufficient, STOP only affected B10 scope and route the smallest UPSTREAM FINDING before continuing.
+5. Operator operates the P8 artifact; only the operator may LOCK. Assistant/reviewer may propose REVISE/FINDING but not LOCK.
+6. After explicit B10 LOCK, run P9 bidirectional trace and P10 bounded pattern consolidation before preparing the B10 acceptance candidate.
+7. docs/work/** must be absent from the eventual merge candidate/main.
+8. B11-B12 and FP2/P11 remain NOT OPEN. T12 and Product implementation remain BLOCKED.
 ```
 
 ## Hard stops
@@ -119,8 +123,10 @@ The Evidence ref remains exact-SHA checked and non-authoritative.
 ```text
 no Product code/schema/OpenAPI/runtime/deploy implementation
 no T12 work
-no B10-B12 work until a later explicit acceptance increment opens it
+no B11-B12 work
+no FP2/P11 work
 no B01-B09 reopen without material Evidence
+no invented B10 search/filter/read API for UI convenience
 no local reusable methodology fork
 no floating methodology main as normative authority
 no methodology sync bot/submodule/generated copies/framework
