@@ -59,7 +59,23 @@ FP3  Whole-Product Adversarial Review / P12      NOT OPEN
 FP4  Visual Handoff + Readiness / P13-P14        NOT OPEN
 ```
 
-Method: `docs/development/functional-html-wireframe-method.md` v2.2.
+Method: `docs/development/functional-html-wireframe-method.md` v2.3 — OPERATOR-RATIFIED on 2026-08-23.
+
+Binding v2.3 hardening:
+
+```text
+NO screen-shaped backend
+  UI convenience alone does not justify an API.
+
+NO backend-shaped UX
+  current API absence alone does not justify removing a proven user need.
+
+current Product/backend planning during pre-implementation
+  = falsifiable baseline, not immutable UX ceiling
+
+material user need + insufficient authority
+  = blocking UPSTREAM FINDING before P8
+```
 
 ## FP1 block roadmap
 
@@ -83,7 +99,11 @@ B07   Document History
 B08   Notifications Full Inbox
        LOCKED / OPERATOR-RATIFIED · P8/P9/P10 COMPLETE
        B08-F1 human-recognizable Inbox read        CLOSED / OPERATOR-RATIFIED
-B09   Audit                                        NOT OPEN / NEXT ELIGIBLE
+B09   Audit
+       OPEN / ACTIVE
+       B09-F1 Audit query/evidence capability      OPEN / BLOCKING UPSTREAM FINDING
+       P7                                         PAUSED pending B09-F1
+       P8                                         BLOCKED pending B09-F1
 B10   Organization Administration                 NOT OPEN
 B11   Access Administration                       NOT OPEN
 B12   Document Governance Administration           NOT OPEN
@@ -176,26 +196,65 @@ source-workspace duplications                 0
 
 Shared patterns reused are Global App Shell and Notification Quick Inbox. B08 does not graduate a generic Inbox, NotificationRow, Activity/Event feed, filter engine, deep-link resolver or realtime entity-store abstraction.
 
-Not current B08 scope:
+## B09 current gate — Audit upstream replan
+
+Canonical working finding:
 
 ```text
-search / free-form / saved filters
-filter by author/Document
-bulk selection/archive
-snooze / priority / reminders
-preferences / email / push
-Notification delete
-Notification-kind selector
-source reply/editor/viewer inside Inbox
+docs/work/current/t11-b09-audit-upstream-replan.md
 ```
+
+Current accepted Audit baseline remains evidence, not ceiling:
+
+```text
+GET /api/v1/audit/events
+listAuditEvents
+AuditEventPage
+occurred_at DESC, event_id DESC
+cursor + limit only
+audit.read
+```
+
+Current Audit invariants remain binding unless evidence explicitly reopens them:
+
+```text
+AuditEvent = semantic action evidence, not current state
+Audit != Document History
+historical visibility is snapshotted at action time
+current authorization + historical visibility filtering precede pagination
+Audit remains PII-minimized
+browser may not post-filter incomplete pages as if results were complete
+```
+
+B09-F1 must seek the Global Maximum across the real Auditor job before P8. Candidate investigation space includes, without pre-accepting any feature:
+
+```text
+chronological inspection
+exact event detail
+time range
+action / actor / resource filtering
+exact resource lookup
+historical scope narrowing
+free-text search if a searchable evidence corpus is proven
+sort alternatives if justified
+owner-lens cross-links
+human recognition / historical-label semantics
+export only if a named compliance/auditor job is proven
+```
+
+Each material capability must be ratified, rejected or deferred for Product reasons. `The current API does not provide it` is not a rejection reason.
 
 ## Exact next action
 
 ```text
-1. B09 Audit is the next eligible FP1 block and remains NOT OPEN.
-2. Open B09 only when the operator chooses to continue FP1.
-3. Do not open B10+ early.
-4. Implementation remains blocked.
+1. Investigate B09-F1 Auditor jobs/questions and expected production inspection scale.
+2. Study candidate Audit query/evidence capabilities and competing Global-Maximum approaches.
+3. Reopen only the smallest Product/backend/wire authorities evidence requires.
+4. Ratify / reject / defer the B09-F1 capability set.
+5. Perform bounded FP0/B09 rebaseline if authority changes.
+6. Only then resume B09 P7 and P8 functional HTML.
+7. Do not open B10+ early.
+8. Implementation remains blocked.
 ```
 
 ## Hard stops
@@ -203,12 +262,13 @@ source reply/editor/viewer inside Inbox
 ```text
 no Product code/schema/OpenAPI/runtime/deploy implementation
 no T12 work
-no production framework in P8
-no Notifications/Minha Caixa semantic merge
-no frontend source-disclosure matrix or post-filter
-no copied source content/ACL as Notification authority
-no generic Inbox/filter/preferences platform without consumer
-no source reply/editor/viewer inside Inbox
+no B09 P8 while B09-F1 is unresolved
+no browser-side filtering of incomplete Audit pages as complete truth
+no Audit-to-current-state reconstruction
+no Audit/Document History semantic merge
+no screen-shaped API by convenience
+no backend-shaped UX suppression by current-plan inertia
+no generic search/export platform without a proven consumer
 no frontend Authorization matrix
 no unopened downstream block design
 no legacy restoration by sunk cost
@@ -229,4 +289,4 @@ operator implementation authorization = explicit
 
 ## Reopen law
 
-Accepted Product/R10/frontend LOCK decisions reopen only on material evidence under the DevelopmentConexus Engineering Method. Preference, sunk cost, framework availability or hypothetical scale are not reopen triggers.
+Accepted Product/R10/frontend LOCK decisions reopen only on material evidence under the DevelopmentConexus Engineering Method. Frontend Method v2.3 explicitly treats stronger pre-implementation user/operator/reference evidence as a legitimate trigger to test and, when proven material, reopen the smallest owning Product/backend authority. Preference, sunk cost, framework availability or hypothetical scale alone are not reopen triggers.
