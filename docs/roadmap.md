@@ -14,7 +14,7 @@ REPOSITORY MODE       CLEAN-SLATE / ARCHITECTURE-FIRST
 T1 → T10              CLOSED / OPERATOR-RATIFIED / INTEGRATED
 T11                   OPEN / ACTIVE
 T11 checkpoint        B01-B09 ACCEPTED / INTEGRATED
-T11 current block     B10 ORGANIZATION ADMINISTRATION / LOCKED / P8-P10 COMPLETE
+T11 current block     B10 ORGANIZATION ADMINISTRATION / LOCKED / P8-P10 COMPLETE / ACCEPTANCE CANDIDATE
 METHODOLOGY ADOPTION  ACCEPTED / INTEGRATED
 T12                   NOT OPEN
 IMPLEMENTATION         BLOCKED
@@ -55,7 +55,7 @@ B10-B12                                          NOT OPEN at methodology-adoptio
 
 The independent methodology-adoption review converged with `MATERIAL=0` and `IMPORTANT=0`. Methodology adoption did not reopen Product/architecture/frontend LOCKs and did not authorize implementation.
 
-Aggregate verification enforces the concrete bootstrap properties it owns, including the exact AGENTS methodology pin/ROUTER presence, context budget, temporary-work hygiene, known local-method removal, active-router de-reference, and existing exact Evidence-ref protections. Broader semantic duplicate-authority defects remain hard stops/review concerns rather than falsely claimed as exhaustively grep-detectable.
+Aggregate verification enforces the concrete bootstrap properties it owns, including the exact AGENTS methodology pin/ROUTER presence, context budget, temporary-work hygiene, known local-method removal, active-router de-reference, and exact Evidence-ref protections. Broader semantic duplicate-authority defects remain hard stops/review concerns rather than falsely claimed as exhaustively grep-detectable.
 
 ## Frontend Product Experience Program
 
@@ -87,7 +87,7 @@ B09   Audit                                        LOCKED / P8-P10 COMPLETE
        B09-F1 Audit query/evidence capability      CLOSED / OPERATOR-RATIFIED
        op78 + op87-op89 package                    OPERATOR-RATIFIED / DURABLE
        unresolved BLOCKING / IMPORTANT             0 / 0
-B10   Organization Administration                  LOCKED / P8-P10 COMPLETE
+B10   Organization Administration                  LOCKED / P8-P10 COMPLETE / PR #170 DRAFT
        locked P8 blob                              1d1cc7d5cb42e034ab9ee71a21c96918cdcf691d
        structural browser verification             32 / 32 PASS
        P9 material regions/controls                 34 / 34 TRACED
@@ -99,30 +99,32 @@ B11   Access Administration                        NOT OPEN
 B12   Document Governance Administration           NOT OPEN
 ```
 
-Exact locked B01-B09 P8 identities remain recoverable through:
+Exact locked frontend Evidence remains recoverable through:
 
 ```text
+B01-B09
 docs/decisions/t11-b01-b09-lock-evidence.md
-
 evidence/t11-pr162-b01-b09-locks-20260824
 → adf58e448bc5bd3a20cae5b7228d729c031f94ac
+
+B10
+docs/decisions/t11-b10-lock-evidence.md
+evidence/t11-pr170-b10-locks-20260824
+→ b8c607cbd30d61d6bcf6ec1ea734ed1653d2569e
 ```
 
-The Evidence ref remains exact-SHA checked and non-authoritative.
-
-B10's exact LOCK Evidence is currently branch-local under `docs/work/**` and must receive the same exact-ref + durable-locator treatment before its acceptance candidate removes temporary work.
+Both Evidence refs are exact-SHA checked and non-authoritative. B10 `docs/work/**` has been removed from the acceptance candidate after preservation.
 
 ## Exact next action
 
 ```text
-1. Prepare B10 as one coherent acceptance increment; do not begin B11.
-2. Open/maintain the B10 PR as Draft while branch-only docs/work/** Evidence is present.
-3. Preserve the exact B10 LOCK/P9/P10 planning tree by an immutable exact Evidence ref and add a durable locator/check before cleanup.
-4. Remove docs/work/** from the B10 merge candidate after preservation; keep Product/architecture semantics unchanged.
-5. Run the repository aggregate gate on the cleaned candidate and resolve any review findings proportionately.
-6. Only after a clean candidate + required review/CI may the PR become Ready.
-7. No merge without explicit operator authorization.
-8. B11-B12 and FP2/P11 remain NOT OPEN. T12 and Product implementation remain BLOCKED.
+1. Verify the cleaned PR #170 candidate with the repository aggregate gate; docs/work/** must remain absent.
+2. Inspect current PR review conversations/findings and adjudicate only material/current-authority defects.
+3. Independent adversarial review is required only if METHOD/repository triggers are met by the final candidate; B10 adds no new Product authority/trust boundary by itself.
+4. If required CI/review is clean, move PR #170 to Ready without changing B10 Product/frontend semantics.
+5. Stop for explicit operator squash-merge authorization on the exact Ready HEAD.
+6. Do not begin B11 until B10 is integrated and later authority explicitly opens it.
+7. B11-B12 and FP2/P11 remain NOT OPEN. T12 and Product implementation remain BLOCKED.
 ```
 
 ## Hard stops
