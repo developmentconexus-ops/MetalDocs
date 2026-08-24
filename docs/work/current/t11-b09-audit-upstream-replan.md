@@ -1,6 +1,6 @@
 # T11 — B09-F1 Audit Upstream Capability Replan
 
-> **Status:** OPEN / ACTIVE / UPSTREAM FINDING / AUDITOR JOBS + STRUCTURED QUERY + HUMAN RECOGNITION OPERATOR-RATIFIED.  
+> **Status:** OPEN / ACTIVE / UPSTREAM FINDING / AUDITOR JOBS + STRUCTURED QUERY + HUMAN RECOGNITION + QUERY ASSIST OPERATOR-RATIFIED.  
 > **Block:** B09 — Audit.  
 > **Method:** Frontend Product Experience Planning Method v2.3.  
 > **Trigger:** frontend/reference evidence exposed a material mismatch between the Auditor job and the current `listAuditEvents` query surface.  
@@ -322,7 +322,91 @@ generic entity resolver / reference-data platform
 
 Only recognition data proven necessary for Audit investigation may be composed, and that composition never becomes lifecycle/current-state authority.
 
-## 8. Remaining capability dispositions
+## 8. Audit Query Assist — OPERATOR-RATIFIED
+
+### 8.1 Purpose-built query construction
+
+Launch requires a bounded **Audit Query Assist** capability so an Auditor can construct the ratified structured query without knowing opaque UUIDs and without depending on Organization/Access administration directories.
+
+The capability is Audit-query purpose-built. It is not a generic entity/reference-data platform and it does not transfer semantic ownership of User, Area, Document or other resources to Audit.
+
+### 8.2 Action discovery
+
+`AuditOperationCode` is already a closed vocabulary.
+
+The frontend may group and humanize these codes for selection, but canonical filter identity remains the exact enum value. No server-side action directory is required merely to populate the action selector.
+
+### 8.3 Historical Area discovery
+
+The Area selector must be derived from the caller's current `audit.read` authority and historical Audit visibility, not from an unrestricted Organization-admin directory.
+
+Human-facing Area recognition may use the semantics in §7.3, but canonical query identity remains `area_id`.
+
+The default choice remains "all Audit events currently readable by me". Explicit Area narrowing never grants access beyond current `audit.read` authority.
+
+### 8.4 Actor discovery
+
+Actor selection is a bounded purpose-built typeahead over Audit-relevant actor identities.
+
+Candidate law:
+
+```text
+candidate USER
+  has at least one AuditEvent potentially visible
+  under the caller's current Audit authority
+
+candidate SYSTEM
+  represented by the closed SYSTEM actor meaning
+```
+
+Human recognition may show current admissible `display_name` when available. Lawful erasure or missing profile enrichment leaves the stable `user_id` selectable with neutral recognition text.
+
+Canonical filter identity remains exact `user_id` or SYSTEM. `display_name` equality never becomes query authority.
+
+### 8.5 Resource discovery
+
+Resource selection is closed by `resource_kind` first; MetalDocs does not create a universal global resource search.
+
+For the selected kind, bounded candidate discovery is drawn from resource identities that appear in Audit evidence visible under the caller's Audit authority.
+
+Canonical identity is always:
+
+```text
+resource_kind + resource_id
+```
+
+Stable immutable human identifiers may be shown when already authoritative; current mutable labels may be shown only under the §7 recognition/disclosure law.
+
+When no safe human label exists, a compact kind + stable-id representation remains truthful.
+
+### 8.6 Security / completeness law
+
+Query Assist is server-authored. It must not leak actors, Areas or resources merely because they exist in current administrative directories.
+
+```text
+current audit.read authority
++ historical Audit visibility
+→ admissible query-assist candidates
+```
+
+The browser never constructs completeness by collecting candidates from already-loaded Audit pages.
+
+A selected human label resolves to stable query identity before `listAuditEvents` execution; changing or erasing the label later does not change the historical identity being filtered.
+
+### 8.7 Explicit non-solutions
+
+```text
+/admin users/areas/documents as required Audit filter infrastructure
+manual UUID entry as the normal workflow
+global /reference-data or /entities search platform
+client-side candidate derivation from loaded Audit pages
+mutable display name as filter identity
+Audit persistence copy of current labels merely to support selectors
+```
+
+The exact count and wire shape of any auxiliary read operation(s) remain deliberately unchosen until the remaining B09-F1 semantics close.
+
+## 9. Remaining capability dispositions
 
 Already ratified:
 
@@ -339,19 +423,20 @@ free-text search                         DEFER
 sort alternatives                        REJECT
 export                                   DEFER
 human-recognition semantics              RATIFY
+Audit Query Assist                       RATIFY
 ```
 
 Still blocking B09-F1:
 
 ```text
-query-construction discovery for actor / Area / resource without admin-directory dependence
 owner-lens cross-link policy
-exact op78 query/read projection refinement after those semantics close
+exact op78 query/read projection refinement after cross-link semantics close
+smallest Query Assist wire realization
 bounded Product/API/wire ratification
 bounded FP0/B09 rebaseline
 ```
 
-## 9. Known non-solutions
+## 10. Known non-solutions
 
 ```text
 browser-side filtering over already-loaded Audit pages
@@ -361,10 +446,11 @@ arbitrary generic query DSL
 full-text engine before a searchable corpus and job are proven
 copying current labels into immutable Audit semantics as convenience
 using admin-only directories as required Audit filter infrastructure
+generic entity/reference-data platform for Audit selectors
 using Audit as Document History
 ```
 
-## 10. Current gate
+## 11. Current gate
 
 ```text
 Frontend Method v2.3                         OPERATOR-RATIFIED
@@ -377,7 +463,8 @@ Audit export                                 DEFERRED / OPERATOR-RATIFIED
 Structured Audit Query                       OPERATOR-RATIFIED
 Full-text generic Audit search               DEFERRED
 Human recognition / historical labels       OPERATOR-RATIFIED
-Audit query-construction discovery           NEXT DECISION
+Audit Query Assist                           OPERATOR-RATIFIED
+Owner-lens cross-link policy                 NEXT DECISION
 B09 P7                                       PAUSED pending B09-F1
 B09 P8                                       BLOCKED pending B09-F1
 B10-B12                                      NOT OPEN
@@ -386,4 +473,4 @@ Product implementation                       BLOCKED
 
 Next step:
 
-> Adjudicate how an Auditor discovers/selects actor, historical Area and resource filter identities without requiring Organization/Access administration screens, leaking entities that have no visible Audit evidence, or creating a generic directory. Then close owner-lens cross-links and the smallest exact op78/read refinement before bounded rebaseline and P7/P8.
+> Adjudicate which Audit evidence identities may offer a current owner-lens cross-link, under what disclosure conditions, and what must happen when the current owner resource is absent or non-disclosable. Then ratify the smallest exact op78 + Query Assist Product/API/wire refinement, perform the bounded rebaseline, and only then resume B09 P7/P8.
