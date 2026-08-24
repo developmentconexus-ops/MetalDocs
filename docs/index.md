@@ -7,7 +7,7 @@ summary: Canonical task/intention router to the smallest current MetalDocs autho
 
 # MetalDocs documentation
 
-Start here after `AGENTS.md`, then read `roadmap.md`, then only the owning documents needed for the task.
+Start here after `AGENTS.md`, then read `roadmap.md`, then follow the exact pinned methodology `ROUTER.md` named in `AGENTS.md` when method selection is required, then only the owning repository documents needed for the task.
 
 | Task / intention | Start with | Do not read by default |
 |---|---|---|
@@ -37,10 +37,10 @@ Start here after `AGENTS.md`, then read `roadmap.md`, then only the owning docum
 | Repository reset / provenance | [Repository reset](decisions/repository-reset.md) | Unmerged branches unless exact provenance is required |
 | Frontend LOCK/P8 evidence recovery for later P11 | [T11 B01-B09 LOCK Evidence Locator](decisions/t11-b01-b09-lock-evidence.md) | Historical Git broadly; use only the exact Evidence ref/blobs named by the locator |
 | Documentation governance | [Documentation rules](development/documentation.md) | Product architecture |
-| Repository-local engineering / CI / Git | [Engineering rules](development/engineering-rules.md) | Global Method text duplicated locally |
+| Repository-local engineering / CI / Git | [Engineering rules](development/engineering-rules.md) | Global methodology text duplicated locally |
 | Executable application wire | [Wire contract](architecture/wire-contract.md) + [Discussion/Notifications authority](decisions/discussion-notifications-launch.md) + [API census](decisions/api-operation-census.md) + [Document Official action precision](decisions/document-official-actions-read.md) when `getDocument.allowed_actions` is implicated + [My Work governance read precision](decisions/my-work-governance-identification-read.md) when `WorkGovernanceItem` is implicated + [Audit investigation read](decisions/audit-investigation-read.md) when op78/op87-op89 is implicated | Temporary work/review history, old OpenAPI |
 | Frontend realization | [Frontend](architecture/frontend.md) + [Discussion/Notifications authority](decisions/discussion-notifications-launch.md) + [Document Official action precision](decisions/document-official-actions-read.md) + [My Work governance read precision](decisions/my-work-governance-identification-read.md) + [Audit investigation read](decisions/audit-investigation-read.md) + [T8-F ratification](decisions/t8f-ratification.md) | Removed legacy frontend / speculative visual-framework choices |
-| Frontend product experience planning / wireframing | [Method](development/functional-html-wireframe-method.md) | Product-specific artifacts unless explicitly routed for the task |
+| Frontend Product Experience planning / wireframing | Pinned methodology `ROUTER.md` → `METHOD.md` + `FRONTEND-METHOD.md`, then the current block's smallest Product/architecture owner pack | Removed local reusable method copy, unrelated Product artifacts, speculative design-system choices |
 | Runtime / process / deployment | [Runtime](architecture/runtime.md) + [Discussion/Notifications authority](decisions/discussion-notifications-launch.md) + [T8-G ratification](decisions/t8g-ratification.md) | Removed legacy runtime/deploy topology / speculative scale infrastructure |
 | Golden Flows / validation proof baseline | [Validation baseline](architecture/validation-baseline.md) + [Discussion/Notifications authority](decisions/discussion-notifications-launch.md) + [T9 ratification](decisions/t9-ratification.md) | Temporary T9 review Evidence, implementation test code, transition mechanics |
 
@@ -52,7 +52,9 @@ Default fresh-actor route:
 AGENTS.md
 → docs/index.md
 → docs/roadmap.md
-→ 1–2 task authorities
+→ pinned methodology ROUTER.md when applicable
+→ selected methodology profile
+→ 1–2 repository-local task authorities
 ```
 
-Normal work stays at five files or fewer. Exceed that only for a named material reason. `docs/work/**`, research/evidence/history, Git history, and removed implementation are never default-read.
+Normal repository-local work stays at five files or fewer. Selected methodology files are a separate method profile. Exceed the local budget only for a named material reason. `docs/work/**`, research/Evidence/history, Git history, and removed implementation are never default-read.

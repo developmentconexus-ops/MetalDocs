@@ -2,16 +2,12 @@
 id: engineering-rules
 kind: authority
 owner: engineering
-summary: MetalDocs-specific engineering, Git, CI, provenance, and implementation-gate rules layered on organizational standards.
+summary: MetalDocs-specific engineering, Git, CI, provenance, and implementation-gate rules layered on the pinned organizational methodology.
 ---
 
 # Engineering rules
 
-Canonical reasoning: `developmentconexus-ops/conexus-methodology/METHOD.md` v1.0.0.
-
-Canonical repository operation: `developmentconexus-ops/conexus-methodology/REPOSITORY-STANDARD.md` v1.0.0.
-
-This page contains only MetalDocs-specific controls.
+The exact organizational methodology pin and selection route are owned by `AGENTS.md`. This page contains only MetalDocs-specific controls and MUST NOT duplicate or redefine reusable organizational methodology.
 
 ## Implementation gate
 
@@ -25,13 +21,13 @@ Before the first future implementation/code/schema/runtime commit is authorized,
 
 ## Frontend planning visual evidence
 
-While an architecture/planning PR remains Draft, P8 rendered structural wireframes may be tracked as temporary HTML evidence only under:
+While an architecture/planning PR remains Draft, P8 rendered structural wireframes may be tracked as temporary HTML Evidence only under:
 
 ```text
 docs/work/current/*.html
 ```
 
-This exception exists so the operator-reviewed visual artifact remains reproducible in its actual rendered medium. It does not admit production frontend code, scripts, dependencies, runtime assets, or HTML outside that bounded temporary-work root. The existing `docs/work/**` merge-candidate rule still requires all such temporary planning artifacts to be absent before integration.
+This is a MetalDocs repository specialization for preserving operator-reviewable rendered Evidence. It does not admit production frontend code, scripts, dependencies, runtime assets, or HTML outside that bounded temporary-work root. `docs/work/**` remains branch-only and must be absent from a merge candidate/main.
 
 ## Forward decision obligations
 
@@ -59,14 +55,14 @@ Do not rename/remove `required` without deliberately updating repository protect
 
 Normal governance/architecture integration uses squash merge after explicit operator merge authorization. No direct commits to `main`; no force-push or shared-history rewrite.
 
-Repository settings still permit merge-commit and rebase methods at the GitHub repository level; after this governance alignment is later merge-authorized and merged, settings should be tightened to squash-only normal integration, PR-only protected `main`, no force-push/delete, automatic head-branch deletion, and the required aggregate gate, as supported by the hosting configuration.
+Repository-host settings may expose additional merge mechanisms; MetalDocs policy remains squash as normal integration. Host-setting hardening is an administrative control, not a reason to duplicate Git policy in Product/architecture authority.
 
 ## Provenance
 
-Unique unmerged Product/R10 governance provenance is protected by explicit archive refs recorded in `docs/decisions/repository-reset.md`. Do not delete those refs while a current authority names the byte-level provenance as required.
+Required unmerged provenance/Evidence refs are named by durable repository authority and exact-SHA checked by the aggregate gate while they have a current consumer. Do not delete or move them until the owning authority's retirement condition is satisfied.
 
 ## Verification
 
-`.github/workflows/ci.yml` owns the current executable repository-conformance proof. A control counts only when its negative path is demonstrably capable of firing.
+`.github/workflows/ci.yml` owns the executable repository-conformance proof. A control counts only when its negative path is demonstrably capable of firing.
 
 A failing retired/legacy check is not a reason to restore old machinery; first prove the check still protects a current property.

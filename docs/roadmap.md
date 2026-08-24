@@ -14,13 +14,14 @@ REPOSITORY MODE       CLEAN-SLATE / ARCHITECTURE-FIRST
 T1 → T10              CLOSED / OPERATOR-RATIFIED / INTEGRATED
 T11                   OPEN / ACTIVE
 T11 checkpoint        B01-B09 ACCEPTED / INTEGRATED
+METHODOLOGY ADOPTION  ACCEPTED / INTEGRATED
 T12                   NOT OPEN
 IMPLEMENTATION         BLOCKED
 ```
 
 Current Product/architecture authority lives in `docs/product/**`, `docs/architecture/**`, and `docs/decisions/**`.
 
-Current authoritative system census:
+Current system census:
 
 ```text
 semantic owners                  4 business + 2 supporting
@@ -32,7 +33,28 @@ ETag read / mutation domains     13 / 13
 exact-byte resources             4
 ```
 
-`docs/decisions/api-operation-census.md` is the sole current application-operation / Idempotency / ETag / exact-byte census authority.
+`docs/decisions/api-operation-census.md` owns the current application-operation / Idempotency / ETag / exact-byte census.
+
+## Organizational methodology baseline
+
+The exact accepted organizational methodology pin and method-selection route are owned by `AGENTS.md`. Method selection starts at that pin's `ROUTER.md`.
+
+The reusable local Frontend Product Experience Planning Method v2.3 was superseded by the central `FRONTEND-METHOD.md`, whose lineage explicitly consolidates the MetalDocs v2.3 generation. MetalDocs-specific P8 rendered-Evidence handling remains local in `docs/development/engineering-rules.md`.
+
+Adoption impact sweep:
+
+```text
+B01-B09 protected structure / Screen Contracts  UNAFFECTED
+Product/backend authority                       UNAFFECTED
+89-operation / 11-route census                  UNAFFECTED
+exact P8 LOCK Evidence                           UNAFFECTED
+FP2 / P11                                        NOT OPEN
+B10-B12                                          NOT OPEN
+```
+
+The independent methodology-adoption review converged with `MATERIAL=0` and `IMPORTANT=0`. Methodology adoption did not reopen Product/architecture/frontend LOCKs and did not authorize implementation.
+
+Aggregate verification enforces the concrete bootstrap properties it owns, including the exact AGENTS methodology pin/ROUTER presence, context budget, temporary-work hygiene, known local-method removal, active-router de-reference, and existing exact Evidence-ref protections. Broader semantic duplicate-authority defects remain hard stops/review concerns rather than falsely claimed as exhaustively grep-detectable.
 
 ## Frontend Product Experience Program
 
@@ -43,8 +65,6 @@ FP2  Integrated Low-Fidelity Product / P11       NOT OPEN
 FP3  Whole-Product Adversarial Review / P12      NOT OPEN
 FP4  Visual Handoff + Readiness / P13-P14        NOT OPEN
 ```
-
-Current local frontend-planning method: `docs/development/functional-html-wireframe-method.md` v2.3, operator-ratified on 2026-08-23.
 
 ## FP1 block status
 
@@ -71,68 +91,7 @@ B11   Access Administration                        NOT OPEN
 B12   Document Governance Administration           NOT OPEN
 ```
 
-## Locked global IA
-
-```text
-Início       = current operational situation
-Minha Caixa  = assigned work
-  Para aprovação
-  Em edição
-Documentos   = official document truth / creation
-Gestão       = system configuration
-Evidência    = audit/evidence
-```
-
-Notifications remains transversal utility chrome, not `Minha Caixa` authority.
-
-## B09 closure
-
-Durable authority:
-
-```text
-docs/decisions/audit-investigation-read.md
-docs/decisions/api-operation-census.md
-```
-
-Ratified Audit read family:
-
-```text
-78  listAuditEvents                REFINED
-87  listAuditQueryAreas            SAFE_READ
-88  searchAuditQueryActors         SAFE_READ
-89  searchAuditQueryResources      SAFE_READ
-```
-
-Binding laws remain:
-
-```text
-AuditEvent = immutable semantic action evidence, not current state
-Audit != Document History
-historical visibility is snapshotted at action time
-current authorization + historical visibility filter before pagination
-structured query filters server-side complete evidence
-mutable recognition labels are optional current/non-historical context
-filter identity remains stable IDs/enums
-Audit Query Assist is purpose-built and Audit-visible-only
-owner links are secondary and destination rechecks current AuthZ/disclosure
-```
-
-Closure proof:
-
-```text
-P7 upstream findings       0 unresolved
-Fable unresolved           0 BLOCKING / 0 IMPORTANT
-P8 artifact blob           7daa6054851e617aeacb95a28d907d0d6d4bd3d6
-P8 static proof            PASS
-P8 internal behavior       79 / 79 PASS
-P8 operator disposition    LOCK / APPROVED
-P9 material controls       33 / 33 traced / 0 unbound
-P9 invented operations     0 / operation 90+ absent
-P10 new shared patterns    0
-P10 false abstractions     0
-```
-
-Exact locked B01-B09 P8 identities and the pre-cleanup temporary planning tree are preserved by:
+Exact locked B01-B09 P8 identities remain recoverable through:
 
 ```text
 docs/decisions/t11-b01-b09-lock-evidence.md
@@ -141,32 +100,18 @@ evidence/t11-pr162-b01-b09-locks-20260824
 → adf58e448bc5bd3a20cae5b7228d729c031f94ac
 ```
 
-The Evidence ref is exact-SHA pinned by the repository aggregate verification and is non-authoritative. `docs/work/**` remains absent from accepted main.
-
-## B01-B09 checkpoint result
-
-The accepted checkpoint contains only durable Product/architecture decisions, repository governance/CI, the current local frontend-planning method, routing/status authority, and the exact LOCK Evidence locator.
-
-This checkpoint does **not** close T11. It establishes a clean accepted base from which later T11 increments continue.
-
-Independent whole-checkpoint adversarial review converged with:
-
-```text
-MATERIAL open   0
-IMPORTANT open  0
-```
+The Evidence ref remains exact-SHA checked and non-authoritative.
 
 ## Exact next action
 
 ```text
-1. Revalidate accepted main after the B01-B09 checkpoint integration.
-2. Adopt the accepted central DevelopmentConexus methodology in a separate repository-governance acceptance increment:
-   developmentconexus-ops/conexus-methodology
-   @ 9c7210d1504bef01c0d134a6c3ae8627deebb535
-3. Do not mix that methodology adoption with Product/frontend/architecture progression.
-4. After the methodology adoption is independently accepted/integrated, recover current authority again before opening B10+.
+1. Revalidate accepted main and recover authority through AGENTS → docs/index → docs/roadmap → pinned ROUTER.
+2. Select METHOD + FRONTEND-METHOD for the next frontend-planning increment.
+3. Revalidate the smallest authority pack and forward obligations before deciding whether B10 is ready to open.
+4. Do not treat B10 as opened merely because methodology adoption is integrated.
 5. T11 remains OPEN; B10-B12 remain NOT OPEN until explicitly opened by later authority.
-6. T12 and Product implementation remain BLOCKED.
+6. FP2/P11 remains NOT OPEN until the block program reaches its accepted assembly boundary.
+7. T12 and Product implementation remain BLOCKED.
 ```
 
 ## Hard stops
@@ -174,14 +119,11 @@ IMPORTANT open  0
 ```text
 no Product code/schema/OpenAPI/runtime/deploy implementation
 no T12 work
-no B10/B11/B12 work until a later explicit acceptance increment opens it
+no B10-B12 work until a later explicit acceptance increment opens it
 no B01-B09 reopen without material Evidence
-no Audit-to-current-state reconstruction
-no Audit/Document History semantic merge
-no screen-shaped API by convenience
-no backend-shaped UX suppression by current-plan inertia
-no generic search/export/reference/deep-link platform without a proven consumer
-no frontend Authorization matrix
+no local reusable methodology fork
+no floating methodology main as normative authority
+no methodology sync bot/submodule/generated copies/framework
 ```
 
 ## Implementation gate
@@ -196,6 +138,4 @@ fresh independent challenge = converged
 operator implementation authorization = explicit
 ```
 
-## Reopen law
-
-Accepted Product/R10/frontend LOCK decisions reopen only on material Evidence under the DevelopmentConexus Engineering Method. Preference, sunk cost, framework availability or hypothetical scale alone are not reopen triggers.
+Accepted Product/R10/frontend LOCK decisions reopen only on material Evidence under the pinned DevelopmentConexus Engineering Method; methodology-migration ceremony alone is not a reopen trigger.

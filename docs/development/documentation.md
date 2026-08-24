@@ -2,12 +2,12 @@
 id: documentation-governance
 kind: authority
 owner: engineering
-summary: MetalDocs-specific documentation placement and provenance-routing rules layered on Repository Standard v1.0.0.
+summary: MetalDocs-specific documentation placement and provenance-routing rules layered on the pinned organizational Repository Standard.
 ---
 
 # Documentation governance
 
-Canonical repository organization/lifecycle is defined by `developmentconexus-ops/conexus-methodology/REPOSITORY-STANDARD.md` v1.0.0. This page contains only MetalDocs-specific specialization.
+The exact organizational methodology pin and selection route are owned by `AGENTS.md`; repository organization/lifecycle is selected from the pinned `REPOSITORY-STANDARD.md`. This page contains only MetalDocs-specific specialization.
 
 ## Local semantic layout
 
@@ -55,9 +55,9 @@ Do not recursively repair provenance-only strings unless a live consumer depends
 
 ## Temporary work and review
 
-Temporary work follows Repository Standard v1. Future independent Fable review uses an isolated `review/<gate>-fable` branch whose only delta from the candidate is `docs/work/current/ai-dialog.md`; the candidate branch and `main` never absorb that review artifact.
+Temporary work follows the pinned Repository Standard. Independent review follows the pinned `ADVERSARIAL-REVIEW-METHOD.md`; MetalDocs adds only the repository-specific executable isolation/protection checks in `.github/workflows/ci.yml`.
 
-The reset review predates this standard and remains historical provenance; do not fabricate a second historical review branch.
+The reset review predates the current review method and remains historical provenance; do not fabricate a second historical review branch.
 
 ## Source of current status
 
