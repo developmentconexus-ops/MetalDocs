@@ -1,15 +1,15 @@
 # T11 — B09-F1 Audit Upstream Capability Replan
 
-> **Status:** OPEN / ACTIVE / UPSTREAM FINDING / AUDITOR LAUNCH JOBS RATIFIED.  
+> **Status:** OPEN / ACTIVE / UPSTREAM FINDING / AUDITOR JOBS + STRUCTURED QUERY DIRECTION OPERATOR-RATIFIED.  
 > **Block:** B09 — Audit.  
 > **Method:** Frontend Product Experience Planning Method v2.3.  
-> **Trigger:** frontend/reference evidence exposed a potentially material mismatch between the auditor job and the current `listAuditEvents` query surface.  
-> **P8:** BLOCKED until this finding is ratified, rejected or deferred.  
+> **Trigger:** frontend/reference evidence exposed a material mismatch between the Auditor job and the current `listAuditEvents` query surface.  
+> **P8:** BLOCKED until B09-F1 is fully adjudicated and any required upstream authority is ratified.  
 > **Implementation:** BLOCKED.
 
 ## 1. Why this finding exists
 
-B09 initially recovered the current Audit application wire:
+Current Audit application wire:
 
 ```text
 GET /api/v1/audit/events
@@ -20,27 +20,25 @@ query: cursor + limit only
 permission: audit.read
 ```
 
-Reference study then surfaced mature audit-inspection patterns such as search, time-range narrowing, actor/action/resource filters, richer event detail and export.
+Frontend/reference investigation showed that a raw reverse-chronological feed is insufficient for the ratified Auditor jobs at realistic production scale.
 
-Under Frontend Method v2.3, the current wire is a falsifiable baseline rather than an immutable UX ceiling. The correct response is therefore not:
+Frontend Method v2.3 therefore treats the current wire as a falsifiable baseline, not an immutable UX ceiling.
+
+Forbidden shortcuts remain:
 
 ```text
 op78 lacks capability X
 → omit X from the experience
-```
 
-and not:
-
-```text
 reference product has capability X
 → invent endpoint X
 ```
 
-The finding must first prove the auditor job, compare Global-Maximum alternatives, and then reopen only the smallest owning Product/backend/wire authority if evidence requires it.
+B09-F1 must prove the human job, choose the Global Maximum, and reopen only the smallest owning Product/backend/wire authority.
 
-## 2. Current accepted Audit invariants that remain in force
+## 2. Audit invariants preserved
 
-Until explicitly reopened by evidence, preserve:
+Unless explicitly reopened by evidence:
 
 ```text
 AuditEvent = semantic action evidence, not current business state
@@ -48,14 +46,15 @@ Audit is append-only evidence, not event sourcing
 Audit does not reconstruct current Document lifecycle
 Document History remains separate Controlled Documents semantic history
 historical visibility is snapshotted at action time
-current grants determine read authorization; historical visibility determines event inclusion
+current grants determine read authorization
+historical visibility determines event inclusion
 historical visibility filtering occurs before pagination
 current relocation/rename does not rewrite historical Audit visibility
-Audit is PII-minimized
+Audit remains PII-minimized
 free-form governed reasons/comments/content are not copied into Audit by convenience
 ```
 
-Current event projection includes stable evidence such as:
+Current event evidence includes:
 
 ```text
 event_id
@@ -68,89 +67,25 @@ historical visibility: COMPANY | AREA(area_id)
 bounded typed facts where operation/resource identity is insufficient
 ```
 
-Current Launch wire has a closed Audit operation-code union and typed fact schemas for specific event families.
+The current Launch wire has a closed Audit operation-code union and typed facts for the event families that require them.
 
-## 3. B09-F1 question
+## 3. B09-F1 target
 
-Determine the smallest globally coherent Audit inspection/query capability that lets the Auditor / Governance Viewer efficiently answer real evidence questions at expected production scale without:
+Determine the smallest globally coherent Audit inspection/query capability that lets an Auditor / Governance Viewer answer real evidence questions efficiently without:
 
 ```text
 turning Audit into current-state authority
 merging Audit with Document History
-copying mutable current profile/resource labels as false historical truth
+copying mutable current labels as false historical truth
 post-filtering incomplete cursor pages in the browser
 creating a generic analytics/search platform without a consumer
-inventing export merely because competitors expose it
 ```
 
-## 4. Candidate capability space to investigate
+## 4. Auditor Launch jobs — OPERATOR-RATIFIED
 
-Each item must be dispositioned independently as `PRESENT-IN-AUTHORITY`, `RATIFY`, `REJECT`, or `DEFER`:
+### 4.1 Point investigation — LAUNCH CORE
 
-```text
-A. chronological inspection baseline
-B. exact event detail / typed facts presentation
-C. time-range narrowing
-D. operation/action filtering
-E. actor filtering
-F. resource-kind filtering
-G. exact resource-id lookup
-H. historical Area/Company visibility narrowing where useful
-I. free-text search, if a real searchable evidence corpus exists
-J. sort alternatives, if canonical reverse chronology is insufficient
-K. cross-links to owner lenses without making Audit a resolver
-L. export, only if a named auditor/compliance portability job is proven
-M. human-recognition enrichment, with historical-truth/PII rules made explicit
-```
-
-This list remains an investigation boundary, not a feature checklist.
-
-## 5. Required Global-Maximum analysis
-
-Before any backend/API change or P8 HTML:
-
-```text
-1. define the concrete auditor jobs/questions
-2. establish expected event volume and inspection frequency
-3. study mature audit products by task pattern
-4. distinguish query/navigation convenience from real semantic truth
-5. test each candidate capability against least privilege and historical visibility
-6. decide whether one read operation can remain coherent or whether a separate capability is semantically justified
-7. define pagination/query semantics that remain complete under authorization
-8. decide whether human labels are historical snapshots, current enrichment, or intentionally absent
-9. prove export need separately from on-screen inspection
-10. compare YAGNI / complexity / implementation cost against user value
-11. choose the Global-Maximum Product contract
-12. reopen only the smallest Product/API/wire/frontend authorities affected
-13. perform bounded FP0/B09 rebaseline
-14. only then resume P7 and P8
-```
-
-## 6. Known non-solutions
-
-```text
-browser-side filtering over already-loaded Audit pages
-client reconstruction of current state from event sequences
-client AuthZ/historical-visibility matrix
-adding arbitrary generic query DSL
-adding a full-text engine before proving searchable text and scale
-copying current User/Profile/Document names into immutable Audit semantics without historical-truth analysis
-using Audit as Document History
-```
-
-## 7. Auditor Launch jobs — OPERATOR-RATIFIED
-
-The first B09-F1 scope decision is ratified:
-
-```text
-A. Point investigation / exact evidence question     LAUNCH CORE
-B. Period + scope review                              LAUNCH CORE
-C. External evidence export                           DEFERRED
-```
-
-### 7.1 Launch Core job A — point investigation
-
-The Auditor must be able to answer questions such as:
+The Auditor must be able to answer:
 
 ```text
 what happened to this Document / User / access decision / configuration?
@@ -160,11 +95,11 @@ what exact semantic action was recorded?
 what bounded evidence facts belong to that event?
 ```
 
-Audit remains evidence. Any navigation to a current owner lens is a cross-link and never means Audit reconstructs current business state.
+Audit remains evidence. Navigation to a current owner lens is a cross-link only and never means Audit reconstructs current state.
 
-### 7.2 Launch Core job B — period / scope review
+### 4.2 Period + scope review — LAUNCH CORE
 
-The Auditor must be able to answer bounded review questions such as:
+The Auditor must be able to answer:
 
 ```text
 what relevant actions occurred during this period?
@@ -172,45 +107,172 @@ what occurred within the historically visible Company / Area scope available to 
 which actors/actions/resources account for the evidence set I am reviewing?
 ```
 
-The capability must remain complete under server-side historical-visibility filtering and cursor pagination. Browser filtering over an already-loaded subset is not acceptable evidence truth.
+The result must remain complete under server-side current `audit.read` authorization + historical-visibility filtering + cursor pagination.
 
-### 7.3 Export — DEFERRED by YAGNI
+### 4.3 External evidence export — DEFERRED
 
 Export is not Launch Core merely because mature products expose it.
 
-A future export reopen requires a named consumer such as:
+A future reopen requires a named consumer such as:
 
 ```text
 external auditor / certification body / regulator / customer
 + required evidence package or machine-readable handoff
-+ explicit scope/format/integrity expectations
++ explicit scope / format / integrity expectations
 ```
 
-Until then, MetalDocs does not pre-commit to CSV/PDF/JSON export, export jobs, governed export artifacts, signatures, hashes or export-specific Audit semantics.
+Until then there is no commitment to CSV/PDF/JSON export, export jobs, governed export artifacts, signatures, hashes or export-specific Audit semantics.
 
-This is a Product-scope deferral, not a backend limitation.
+This is Product-scope YAGNI, not a backend limitation.
 
-## 8. Reference evidence direction after job ratification
+## 5. Reference evidence direction
 
-Current reference evidence supports the Launch Core emphasis on investigation rather than raw chronological traversal:
+Reference products converge on one principle: Audit must be **investigable**, not merely scrollable.
 
 ```text
 GitHub Audit Log
-  structured qualifiers for time, actor, action/operation and resource context
-  demonstrates that investigation is a first-class Audit job
+  structured narrowing by time, actor, action and resource context
 
 Microsoft Purview Audit
-  date/time, activities, users and object scope
-  demonstrates explicit narrowing for large evidence sets
+  time, activity, user and object narrowing for large evidence sets
 
 Qualio Audit Trail
-  simple/complex search across date, user, action and document metadata
-  demonstrates the same investigation need in a controlled-quality-document context
+  date, user, action and document metadata investigation in a controlled-quality context
 ```
 
-The reference conclusion is intentionally narrower than their feature sets:
+MetalDocs deliberately takes the task pattern, not their full feature breadth.
 
-> MetalDocs Audit must be efficiently investigable by real evidence questions. It does not need a generic audit analytics/query language merely because mature platforms have one.
+## 6. Structured Audit Query — OPERATOR-RATIFIED
+
+### 6.1 Launch query dimensions
+
+The Global-Maximum/YAGNI direction is a **structured server-side Audit query**, preserving one canonical reverse-chronological result stream.
+
+Launch must support evidence-backed narrowing by:
+
+```text
+time
+  occurred_at bounded interval
+
+actor
+  exact stable USER identity
+  OR SYSTEM
+
+action
+  one or more closed AuditOperationCode values
+
+resource
+  resource_kind
+  + exact resource_id when known
+
+historical scope
+  default = every event currently readable by the caller
+  optional explicit narrowing to a historically attributed Area that is within the caller's current audit.read authority
+
+order
+  occurred_at DESC
+  event_id DESC
+```
+
+Filters are server-side and combine conjunctively across dimensions. Multi-valued action selection is an OR within the action dimension.
+
+The query result must continue to apply:
+
+```text
+current audit.read scope authority
+→ historical Audit visibility admission
+→ structured query predicates
+→ canonical ordering
+→ cursor pagination
+```
+
+No browser-side filtering over incomplete pages may masquerade as complete Audit truth.
+
+### 6.2 Cursor law direction
+
+The existing stateless cursor model remains the preferred architecture:
+
+```text
+first traversal
+  admitted structured filters + optional limit
+
+continuation
+  cursor + optional limit only
+
+cursor authenticates
+  operation identity
+  + normalized query predicates
+  + canonical ordering
+  + seek position
+```
+
+The final exact parameter vocabulary and wire encoding are intentionally not frozen until B09-F1 human-recognition semantics are resolved.
+
+### 6.3 Full-text and generic query platform dispositions
+
+```text
+free-text search over Audit      DEFERRED
+query DSL                        REJECTED for Launch
+saved searches                   DEFERRED
+custom sort                      REJECTED for Launch
+analytics/dashboard              REJECTED as B09 responsibility
+export                           DEFERRED by §4.3
+```
+
+The reason to defer free-text is Product semantics, not backend absence. MetalDocs does not yet have one unambiguous searchable Audit corpus whose meaning justifies full-text infrastructure.
+
+Questions such as these are deliberately unresolved rather than guessed:
+
+```text
+should q search current actor name or historical actor name?
+current Document title or title-at-event?
+translated action label or operation_code?
+resource identifiers?
+typed facts?
+text intentionally excluded from Audit evidence?
+```
+
+Structured query satisfies the ratified Launch investigation jobs with higher evidentiary precision and lower semantic ambiguity.
+
+## 7. Remaining capability dispositions
+
+Already ratified:
+
+```text
+chronological inspection baseline        PRESENT-IN-AUTHORITY
+exact event detail / typed facts         PRESENT-IN-AUTHORITY conceptually; UX projection still to close
+time-range narrowing                     RATIFY
+operation/action filtering               RATIFY
+actor filtering                          RATIFY
+resource-kind filtering                  RATIFY
+exact resource-id lookup                 RATIFY
+historical Area narrowing                RATIFY within current audit.read authority
+free-text search                         DEFER
+sort alternatives                        REJECT
+export                                   DEFER
+```
+
+Still blocking B09-F1:
+
+```text
+human-recognition enrichment / historical-label semantics
+owner-lens cross-link policy
+exact op78 query/read projection refinement after those semantics close
+bounded Product/API/wire ratification
+bounded FP0/B09 rebaseline
+```
+
+## 8. Known non-solutions
+
+```text
+browser-side filtering over already-loaded Audit pages
+client reconstruction of current state from event sequences
+client AuthZ/historical-visibility matrix
+arbitrary generic query DSL
+full-text engine before a searchable corpus and job are proven
+copying current User/Profile/Document names into immutable Audit semantics without historical-truth analysis
+using Audit as Document History
+```
 
 ## 9. Current gate
 
@@ -222,7 +284,9 @@ B09-F1 upstream Audit capability replan      OPEN / BLOCKING FINDING
 Auditor point investigation                  LAUNCH CORE / OPERATOR-RATIFIED
 Auditor period + scope review                LAUNCH CORE / OPERATOR-RATIFIED
 Audit export                                 DEFERRED / OPERATOR-RATIFIED
-B09 query dimensions                         NEXT DECISION
+Structured Audit Query                       OPERATOR-RATIFIED
+Full-text generic Audit search               DEFERRED
+Human recognition / historical labels       NEXT DECISION
 B09 P7                                       PAUSED pending B09-F1
 B09 P8                                       BLOCKED pending B09-F1
 B10-B12                                      NOT OPEN
@@ -231,4 +295,4 @@ Product implementation                       BLOCKED
 
 Next step:
 
-> Adjudicate the smallest structured query and human-recognition surface required to satisfy the ratified Launch Core jobs. Do not choose a final wire/API shape or build the B09 functional HTML until B09-F1 is fully adjudicated and any required upstream authority is ratified.
+> Adjudicate how actors, Areas and resources become human-recognizable without rewriting historical evidence, leaking current-state data, or forcing auditors to work from opaque UUIDs. Only after B09-F1 closes may the exact op78 refinement be ratified and B09 P7/P8 resume.
