@@ -42,7 +42,7 @@ B10 serves the human need to maintain current Organization identity/lifecycle tr
 Material jobs:
 
 ```text
-maintain current Company display/settings truth
+maintain current Company display name
 create and inspect Users
 maintain erasable UserProfile enrichment
 replace provider subject binding deliberately
@@ -170,7 +170,7 @@ Selected User
 │   ├── replace profile under profile concurrency law
 │   └── erase profile when explicitly intended
 ├── Authentication binding
-│   └── replace provider subject under its own ETag domain
+│   └── provider-subject query → exact provider result → replace binding under its own ETag domain
 └── Eligibility
     ├── disable / offboard
     └── re-enable
@@ -303,6 +303,7 @@ Organization section switching
 collection pagination
 list → selected-detail transitions
 create User provider-subject lookup/selection flow
+provider-binding lookup/selection/replacement flow
 create Area / create Group
 separate User Profile / Binding / Eligibility actions
 Company/Area/Group edits
