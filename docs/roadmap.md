@@ -87,9 +87,11 @@ B09   Audit                                        LOCKED / P8-P10 COMPLETE
        B09-F1 Audit query/evidence capability      CLOSED / OPERATOR-RATIFIED
        op78 + op87-op89 package                    OPERATOR-RATIFIED / DURABLE
        unresolved BLOCKING / IMPORTANT             0 / 0
-B10   Organization Administration                  OPEN / ACTIVE / P7 CANDIDATE OPERATOR-APPROVED
-       blocking upstream Findings                  0 proven
-       B10-A1 paginated-browse sufficiency         OPEN / FALSIFIABLE DURING P8
+B10   Organization Administration                  OPEN / ACTIVE / P8 CANDIDATE / OPERATOR REVIEW
+       P8 artifact                                 docs/work/current/t11-b10-organization-administration-p8.html
+       structural browser verification             32 / 32 PASS
+       blocking upstream Findings                  0 proven before operator walkthrough
+       B10-A1 paginated-browse sufficiency         OPEN / FALSIFIABLE DURING OPERATOR WALKTHROUGH
 B11   Access Administration                        NOT OPEN
 B12   Document Governance Administration           NOT OPEN
 ```
@@ -108,12 +110,12 @@ The Evidence ref remains exact-SHA checked and non-authoritative.
 ## Exact next action
 
 ```text
-1. Continue only B10 — Organization Administration from the operator-approved P7 candidate.
-2. Materialize browser-operable functional P8 low-fidelity Evidence under docs/work/current/*.html only.
-3. Preserve B10-A1 as falsifiable: do not fake global search by filtering only a loaded page and do not invent an API merely for screen convenience.
-4. If operator/P8 Evidence proves paginated browse materially insufficient, STOP only affected B10 scope and route the smallest UPSTREAM FINDING before continuing.
-5. Operator operates the P8 artifact; only the operator may LOCK. Assistant/reviewer may propose REVISE/FINDING but not LOCK.
-6. After explicit B10 LOCK, run P9 bidirectional trace and P10 bounded pattern consolidation before preparing the B10 acceptance candidate.
+1. Operator operates the B10 functional P8 artifact; only the operator may LOCK. Assistant/reviewer may propose REVISE/FINDING but not LOCK.
+2. Explicitly test B10-A1 by locating Rafael Siqueira through paginated Users without fake page-local search and judge whether browse is operationally sufficient.
+3. Exercise Company stale recovery, User creation/provider lookup, Profile/Binding/Eligibility separation, offboarding/re-enable consequence, Area lifecycle and Group dependency-blocked delete.
+4. If operator/P8 Evidence proves paginated browse or another accepted authority materially insufficient, STOP only affected B10 scope and route the smallest UPSTREAM FINDING before continuing.
+5. If operator disposition is REVISE, revise P8 and repeat the affected walkthrough.
+6. Only after explicit B10 LOCK, run P9 bidirectional trace and P10 bounded pattern consolidation before preparing the B10 acceptance candidate.
 7. docs/work/** must be absent from the eventual merge candidate/main.
 8. B11-B12 and FP2/P11 remain NOT OPEN. T12 and Product implementation remain BLOCKED.
 ```
@@ -127,6 +129,7 @@ no B11-B12 work
 no FP2/P11 work
 no B01-B09 reopen without material Evidence
 no invented B10 search/filter/read API for UI convenience
+no assistant/reviewer LOCK
 no local reusable methodology fork
 no floating methodology main as normative authority
 no methodology sync bot/submodule/generated copies/framework
