@@ -61,20 +61,13 @@ FP4  Visual Handoff + Readiness / P13-P14        NOT OPEN
 
 Method: `docs/development/functional-html-wireframe-method.md` v2.3 — OPERATOR-RATIFIED on 2026-08-23.
 
-Binding v2.3 hardening:
+Binding v2.3 law:
 
 ```text
 NO screen-shaped backend
-  UI convenience alone does not justify an API.
-
 NO backend-shaped UX
-  current API absence alone does not justify removing a proven user need.
-
-current Product/backend planning during pre-implementation
-  = falsifiable baseline, not immutable UX ceiling
-
-material user need + insufficient authority
-  = blocking UPSTREAM FINDING before P8
+current pre-implementation Product/backend plan = falsifiable baseline
+material user need + insufficient authority = blocking UPSTREAM FINDING before P8
 ```
 
 ## FP1 block roadmap
@@ -83,35 +76,28 @@ material user need + insufficient authority
 B01   App Shell + Global IA + Home                 LOCKED / OPERATOR-RATIFIED
 B01N  Notification global chrome + Quick Inbox     LOCKED / OPERATOR-RATIFIED
 B02   Library / Discovery                          LOCKED / OPERATOR-RATIFIED
-B03   Document Official / Ficha + Viewer + Discussion
-       LOCKED / OPERATOR-RATIFIED · P8/P9/P10 COMPLETE
-B04   Document Work / Authoring
-       LOCKED / OPERATOR-RATIFIED · P8/P9/P10 COMPLETE
-B05   My Work / Work Queues
-       LOCKED / OPERATOR-RATIFIED · P8 R2/P9/P10 COMPLETE
-B06   Governance Case
-       LOCKED / OPERATOR-RATIFIED · P8/P9/P10 COMPLETE
+B03   Document Official                            LOCKED / OPERATOR-RATIFIED · P8/P9/P10 COMPLETE
+B04   Document Work                                LOCKED / OPERATOR-RATIFIED · P8/P9/P10 COMPLETE
+B05   My Work                                      LOCKED / OPERATOR-RATIFIED · P8 R2/P9/P10 COMPLETE
+B06   Governance Case                              LOCKED / OPERATOR-RATIFIED · P8/P9/P10 COMPLETE
        B06-F1 deadline projection                  CLOSED / OPERATOR-RATIFIED
        B06-F2 Governance Review Layer seam         CLOSED / OPERATOR-RATIFIED / FUTURE-SEAM
-B07   Document History
-       LOCKED / OPERATOR-RATIFIED · P8/P9/P10 COMPLETE
-       B07-F1 human-recognizable History read      CLOSED / OPERATOR-RATIFIED
-B08   Notifications Full Inbox
-       LOCKED / OPERATOR-RATIFIED · P8/P9/P10 COMPLETE
-       B08-F1 human-recognizable Inbox read        CLOSED / OPERATOR-RATIFIED
-B09   Audit
-       OPEN / ACTIVE
+B07   Document History                             LOCKED / OPERATOR-RATIFIED · P8/P9/P10 COMPLETE
+       B07-F1 recognition read                     CLOSED / OPERATOR-RATIFIED
+B08   Notifications Full Inbox                     LOCKED / OPERATOR-RATIFIED · P8/P9/P10 COMPLETE
+       B08-F1 recognition read                     CLOSED / OPERATOR-RATIFIED
+B09   Audit                                        OPEN / ACTIVE
        B09-F1 Audit query/evidence capability      OPEN / BLOCKING UPSTREAM FINDING
-       Auditor point investigation                LAUNCH CORE / OPERATOR-RATIFIED
+       Auditor point investigation                 LAUNCH CORE / OPERATOR-RATIFIED
        Auditor period + scope review               LAUNCH CORE / OPERATOR-RATIFIED
-       Audit export                                DEFERRED / OPERATOR-RATIFIED
+       Audit export                                 DEFERRED / OPERATOR-RATIFIED
        Structured Audit Query                      OPERATOR-RATIFIED
        Human recognition / historical labels      OPERATOR-RATIFIED
        Query-construction discovery                NEXT DECISION
-       P7                                         PAUSED pending B09-F1
-       P8                                         BLOCKED pending B09-F1
-B10   Organization Administration                 NOT OPEN
-B11   Access Administration                       NOT OPEN
+       P7                                          PAUSED pending B09-F1
+       P8                                          BLOCKED pending B09-F1
+B10   Organization Administration                  NOT OPEN
+B11   Access Administration                        NOT OPEN
 B12   Document Governance Administration           NOT OPEN
 ```
 
@@ -129,88 +115,21 @@ Evidência    = audit/evidence
 
 Notifications remains transversal utility chrome, not `Minha Caixa` authority.
 
-## B07 closure
+## Locked-block evidence routing
 
-B07 remains LOCKED. Document History uses server-authored Revision recognition, chronological Revision chapters and exact read-only historical content; History remains distinct from Audit. Its P9/P10 closed with no new operation or generic Timeline/Event abstraction.
-
-## B08 closure
-
-Canonical authority/work/evidence:
+Detailed closed-block evidence remains in `docs/work/current/**` while this roadmap owns only mutable stage/gate state.
 
 ```text
-docs/decisions/discussion-notifications-launch.md
-docs/decisions/notification-inbox-recognition-read.md
-docs/work/current/t11-b08-notifications-full-inbox-r1.md
-docs/work/current/t11-b08-p8-realization-plan.md
-docs/work/current/t11-b08-notifications-full-inbox-functional-wireframe.html
-docs/work/current/t11-b08-screen-contract.md
-docs/work/current/t11-b08-pattern-consolidation.md
+B07 → docs/work/current/t11-b07-document-history-r1.md
+B08 → docs/work/current/t11-b08-notifications-full-inbox-r1.md
+B09 → docs/work/current/t11-b09-audit-upstream-replan.md
 ```
 
-Canonical P8 R1 HTML blob:
-
-```text
-bb130535721b2381524763a4885ade5199a15596
-```
-
-Locked B08 experience:
-
-```text
-Focused Triage Inbox
-→ unseen + unread summaries
-→ Caixa de entrada / Não lidas / Arquivadas
-→ one canonical recency-ordered Notification list
-→ human-recognizable current-disclosable source context
-→ Nova distinct from Não lida
-→ per-item read/unread + archive/unarchive
-→ Mark all read
-→ presentation-driven seen batching; fetch/cache != seen
-→ exact source handoff to B03 Discussion anchor
-→ cursor continuation/retry
-→ access-drift neutral reconciliation
-→ SSE invalidation/refetch only
-→ Quick Inbox + Full Inbox share one Notifications authority
-```
-
-B08-F1 keeps op82 as the single Inbox list authority. Current census remains 86 operations / 11 routes / 16 PermissionCode values.
-
-P9 closure:
-
-```text
-material B08 regions/controls traced         22 / 22
-unbound material controls                    0
-invented operations                          0
-operation 87+                                absent
-screen-shaped APIs                           0
-frontend presentability/AuthZ evaluator      0
-second Notification state store              0
-source-workspace duplication                 0
-SSE business-payload authority               0
-material findings                            0
-```
-
-P10 closure:
-
-```text
-existing shared patterns reused              2
-new shared semantic patterns graduated        0
-B08-local patterns retained                   8
-false abstractions                            0
-Notifications/Minha Caixa semantic merges    0
-source-workspace duplications                 0
-```
-
-Shared patterns reused are Global App Shell and Notification Quick Inbox. B08 does not graduate a generic Inbox, NotificationRow, Activity/Event feed, filter engine, deep-link resolver or realtime entity-store abstraction.
+B07 History remains distinct from Audit. B08 keeps op82 as its single Inbox list authority. Neither closure changes the current system census.
 
 ## B09 current gate — Audit upstream replan
 
-Canonical working finding:
-
-```text
-docs/work/current/t11-b09-audit-upstream-replan.md
-```
-
-Current accepted Audit baseline remains evidence, not ceiling:
+Current baseline:
 
 ```text
 GET /api/v1/audit/events
@@ -221,14 +140,15 @@ cursor + limit only
 audit.read
 ```
 
-Ratified B09-F1 direction so far:
+Ratified B09-F1 direction:
 
 ```text
-point investigation / exact evidence question       LAUNCH CORE
-period + authorized historical-scope review         LAUNCH CORE
-external evidence export                            DEFERRED
+Launch jobs
+  point investigation / exact evidence question
+  period + authorized historical-scope review
+  export DEFERRED
 
-Structured Audit Query                              OPERATOR-RATIFIED
+Structured Audit Query
   occurred_at interval
   exact USER actor identity or SYSTEM
   one-or-more AuditOperationCode values
@@ -237,36 +157,37 @@ Structured Audit Query                              OPERATOR-RATIFIED
   optional historical Area narrowing within audit.read authority
   fixed occurred_at DESC,event_id DESC
 
-free-text generic Audit search                      DEFERRED
-query DSL                                           REJECTED
-saved searches                                      DEFERRED
-custom sort                                         REJECTED
-analytics/dashboard                                 REJECTED as B09 responsibility
+YAGNI
+  free-text generic Audit search DEFERRED
+  query DSL REJECTED
+  saved searches DEFERRED
+  custom sort REJECTED
+  analytics/dashboard REJECTED as B09 responsibility
 
-Human recognition / historical labels               OPERATOR-RATIFIED
+Human recognition
   immutable IDs/facts remain Audit evidence authority
-  current mutable labels are optional non-historical enrichment
+  mutable labels are optional current/non-historical enrichment
   immutable human identifiers may be stable recognition
   filter identity remains IDs/enums, never mutable names
 ```
 
-Current Audit invariants remain binding:
+Binding invariants:
 
 ```text
 AuditEvent = semantic action evidence, not current state
 Audit != Document History
 historical visibility is snapshotted at action time
-current authorization + historical visibility filtering precede pagination
+current authorization + historical visibility filter before pagination
 Audit remains PII-minimized
-browser may not post-filter incomplete pages as if results were complete
+browser never post-filters incomplete pages as complete evidence truth
 ```
 
 ## Exact next action
 
 ```text
-1. Adjudicate B09-F1 query-construction discovery for actor / Area / resource identities without admin-directory dependence.
+1. Adjudicate B09-F1 query-construction discovery for actor / Area / resource without admin-directory dependence.
 2. Close owner-lens cross-link policy.
-3. Ratify the smallest exact op78/Product/API/wire refinement required by the accepted jobs/query/recognition semantics.
+3. Ratify the smallest exact op78/Product/API/wire refinement required.
 4. Perform bounded FP0/B09 rebaseline if authority changes.
 5. Only then resume B09 P7 and P8 functional HTML.
 6. Do not open B10+ early.
@@ -306,4 +227,4 @@ operator implementation authorization = explicit
 
 ## Reopen law
 
-Accepted Product/R10/frontend LOCK decisions reopen only on material evidence under the DevelopmentConexus Engineering Method. Frontend Method v2.3 explicitly treats stronger pre-implementation user/operator/reference evidence as a legitimate trigger to test and, when proven material, reopen the smallest owning Product/backend authority. Preference, sunk cost, framework availability or hypothetical scale alone are not reopen triggers.
+Accepted Product/R10/frontend LOCK decisions reopen only on material evidence under the DevelopmentConexus Engineering Method. Frontend Method v2.3 treats stronger pre-implementation user/operator/reference evidence as a legitimate trigger to test and, when material, reopen the smallest owning Product/backend authority. Preference, sunk cost, framework availability or hypothetical scale alone are not reopen triggers.
