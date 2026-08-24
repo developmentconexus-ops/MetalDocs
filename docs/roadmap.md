@@ -102,6 +102,12 @@ B08   Notifications Full Inbox
 B09   Audit
        OPEN / ACTIVE
        B09-F1 Audit query/evidence capability      OPEN / BLOCKING UPSTREAM FINDING
+       Auditor point investigation                LAUNCH CORE / OPERATOR-RATIFIED
+       Auditor period + scope review               LAUNCH CORE / OPERATOR-RATIFIED
+       Audit export                                DEFERRED / OPERATOR-RATIFIED
+       Structured Audit Query                      OPERATOR-RATIFIED
+       Human recognition / historical labels      OPERATOR-RATIFIED
+       Query-construction discovery                NEXT DECISION
        P7                                         PAUSED pending B09-F1
        P8                                         BLOCKED pending B09-F1
 B10   Organization Administration                 NOT OPEN
@@ -215,7 +221,36 @@ cursor + limit only
 audit.read
 ```
 
-Current Audit invariants remain binding unless evidence explicitly reopens them:
+Ratified B09-F1 direction so far:
+
+```text
+point investigation / exact evidence question       LAUNCH CORE
+period + authorized historical-scope review         LAUNCH CORE
+external evidence export                            DEFERRED
+
+Structured Audit Query                              OPERATOR-RATIFIED
+  occurred_at interval
+  exact USER actor identity or SYSTEM
+  one-or-more AuditOperationCode values
+  resource_kind
+  exact resource_id when known
+  optional historical Area narrowing within audit.read authority
+  fixed occurred_at DESC,event_id DESC
+
+free-text generic Audit search                      DEFERRED
+query DSL                                           REJECTED
+saved searches                                      DEFERRED
+custom sort                                         REJECTED
+analytics/dashboard                                 REJECTED as B09 responsibility
+
+Human recognition / historical labels               OPERATOR-RATIFIED
+  immutable IDs/facts remain Audit evidence authority
+  current mutable labels are optional non-historical enrichment
+  immutable human identifiers may be stable recognition
+  filter identity remains IDs/enums, never mutable names
+```
+
+Current Audit invariants remain binding:
 
 ```text
 AuditEvent = semantic action evidence, not current state
@@ -226,35 +261,16 @@ Audit remains PII-minimized
 browser may not post-filter incomplete pages as if results were complete
 ```
 
-B09-F1 must seek the Global Maximum across the real Auditor job before P8. Candidate investigation space includes, without pre-accepting any feature:
-
-```text
-chronological inspection
-exact event detail
-time range
-action / actor / resource filtering
-exact resource lookup
-historical scope narrowing
-free-text search if a searchable evidence corpus is proven
-sort alternatives if justified
-owner-lens cross-links
-human recognition / historical-label semantics
-export only if a named compliance/auditor job is proven
-```
-
-Each material capability must be ratified, rejected or deferred for Product reasons. `The current API does not provide it` is not a rejection reason.
-
 ## Exact next action
 
 ```text
-1. Investigate B09-F1 Auditor jobs/questions and expected production inspection scale.
-2. Study candidate Audit query/evidence capabilities and competing Global-Maximum approaches.
-3. Reopen only the smallest Product/backend/wire authorities evidence requires.
-4. Ratify / reject / defer the B09-F1 capability set.
-5. Perform bounded FP0/B09 rebaseline if authority changes.
-6. Only then resume B09 P7 and P8 functional HTML.
-7. Do not open B10+ early.
-8. Implementation remains blocked.
+1. Adjudicate B09-F1 query-construction discovery for actor / Area / resource identities without admin-directory dependence.
+2. Close owner-lens cross-link policy.
+3. Ratify the smallest exact op78/Product/API/wire refinement required by the accepted jobs/query/recognition semantics.
+4. Perform bounded FP0/B09 rebaseline if authority changes.
+5. Only then resume B09 P7 and P8 functional HTML.
+6. Do not open B10+ early.
+7. Implementation remains blocked.
 ```
 
 ## Hard stops
@@ -269,6 +285,7 @@ no Audit/Document History semantic merge
 no screen-shaped API by convenience
 no backend-shaped UX suppression by current-plan inertia
 no generic search/export platform without a proven consumer
+no admin-only directory as required Audit filter infrastructure
 no frontend Authorization matrix
 no unopened downstream block design
 no legacy restoration by sunk cost
