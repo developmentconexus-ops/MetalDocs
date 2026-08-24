@@ -87,7 +87,7 @@ B09   Audit                                        LOCKED / P8-P10 COMPLETE
        B09-F1 Audit query/evidence capability      CLOSED / OPERATOR-RATIFIED
        op78 + op87-op89 package                    OPERATOR-RATIFIED / DURABLE
        unresolved BLOCKING / IMPORTANT             0 / 0
-B10   Organization Administration                  LOCKED / P8-P10 COMPLETE / PR #170 DRAFT
+B10   Organization Administration                  LOCKED / P8-P10 COMPLETE / ACCEPTANCE CANDIDATE
        locked P8 blob                              1d1cc7d5cb42e034ab9ee71a21c96918cdcf691d
        structural browser verification             32 / 32 PASS
        P9 material regions/controls                 34 / 34 TRACED
