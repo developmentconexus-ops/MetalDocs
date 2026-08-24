@@ -1,16 +1,17 @@
 # T11 — B09-F1 Audit Investigation Capability — Written Decision Candidate R2
 
-> **Status:** CANDIDATE / IN-CHAT DESIGN OPERATOR-APPROVED / WRITTEN RATIFICATION PENDING.  
-> **Supersedes as review candidate:** `t11-b09-audit-capability-decision-candidate.md` (R1 remains work evidence only).  
+> **Status:** OPERATOR-RATIFIED / PROMOTED TO DURABLE AUTHORITY.  
+> **Supersedes as review evidence:** `t11-b09-audit-capability-decision-candidate.md` (R1 remains work evidence only).  
+> **Durable authority:** `../../decisions/audit-investigation-read.md`.  
 > **Block:** B09 — Audit.  
 > **Finding:** B09-F1 — Audit query/evidence capability.  
 > **Method:** Frontend Product Experience Planning Method v2.3 + DevelopmentConexus Engineering Method.  
 > **Implementation:** BLOCKED.  
-> **P7/P8:** PAUSED/BLOCKED until written ratification + bounded authority rebaseline.
+> **P7/P8:** P7 RESUMED / NEXT; P8 BLOCKED pending clean P7 exit.
 
 ## 1. Ratification package
 
-R2 freezes the exact pre-implementation decision already approved section-by-section in chat:
+R2 freezes the exact pre-implementation decision approved section-by-section and then operator-ratified as written:
 
 ```text
 Launch jobs
@@ -64,7 +65,7 @@ YAGNI
     NEW SAFE READ
 ```
 
-If ratified:
+Ratified result:
 
 ```text
 application operations           86 → 89
@@ -566,7 +567,7 @@ No shared semantic model, generic query service, ServiceLocator, cross-owner rep
 
 ## 12. Exact supersession boundary after written ratification
 
-Promote one bounded durable decision that supersedes only conflicting current-tense clauses in:
+The promoted bounded durable decision supersedes only conflicting current-tense clauses in:
 
 ```text
 docs/product/journeys.md
@@ -583,7 +584,7 @@ docs/architecture/frontend.md
   Audit inspection/paging-only + no-filter clause
 
 docs/decisions/api-operation-census.md
-  86-operation numeric count
+  prior 86-operation numeric count
 ```
 
 Unrelated Product/T1→T10 authority remains unchanged.
@@ -603,19 +604,19 @@ After durable promotion:
 
 ```text
 FP0
-  rebaseline Audit-only flows/coverage/surface mappings
+  Audit-only flows/coverage/surface mappings rebaselined to 89/11
 
 B01-B08
-  preserve LOCK unless new evidence specifically falsifies one
+  LOCK preserved; no new evidence falsified them
 
 B09-F1
-  close after authority/census rebaseline proves consistency
+  CLOSED after authority/census rebaseline proof
 
 B09 P7
-  resume
+  RESUMED / NEXT
 
 B09 P8
-  remains blocked until P7 exits with no unresolved upstream finding
+  BLOCKED until P7 exits with no unresolved upstream finding
 
 B10+
   remain NOT OPEN
@@ -651,22 +652,18 @@ PASS  implementation and P8 remain blocked
 
 No unresolved placeholder, `suggested` wire behavior or screen-shaped convenience operation remains in R2.
 
-## 15. Exact gate
+## 15. Promotion result
 
 ```text
-NOW
-  operator reviews R2 as written
-
-IF OPERATOR-RATIFIED
-  create/promote one durable bounded Audit investigation decision
-  update sole API census 86→89
-  apply bounded Product/T8-C/T8-E/T8-F supersession/rebaseline
-  close B09-F1 after consistency proof
-  invoke planning workflow for B09 P7/P8
-
-NOT YET
-  no Product implementation
-  no P8 HTML
-  no B10+
-  no merge
+R2 written decision                 OPERATOR-RATIFIED
+Durable authority                   ../../decisions/audit-investigation-read.md
+Sole numeric census                 89
+Bounded rebaseline proof            t11-b09-f1-rebaseline-proof.md
+B09-F1                              CLOSED / OPERATOR-RATIFIED
+B09 P7                              RESUMED / NEXT
+B09 P8                              BLOCKED pending P7
+B10-B12                             NOT OPEN
+Product implementation              BLOCKED
+T12                                 NOT OPEN
+Merge                                NOT AUTHORIZED
 ```
