@@ -119,6 +119,7 @@ T4/T8/T9/T10 architecture pages
 T8-F/T8-H/T9/T10 ratification records
 frontend-read/responsible-owner precision provenance
 transition/content-integrity closure prose
+current T11 bounded-decision census/proof blocks that predate a later T11 bounded reopen
 other pre-current-T11 closure snapshots
 ```
 
