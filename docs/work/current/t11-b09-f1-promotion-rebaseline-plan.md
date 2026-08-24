@@ -50,22 +50,9 @@ docs/work/current/t11-b09-f1-promotion-rebaseline-plan.md   COMPLETE
 
 ## Verification
 
-The pre-promotion HEAD `bf9d1f77efbbe3265f7b87f54e15c785316d8b74` to promotion HEAD `0307b23bea6b2a37950da5de7c4570bd91207a89` changed only the expected eight paths above.
+The pre-promotion HEAD `bf9d1f77efbbe3265f7b87f54e15c785316d8b74` to final verified HEAD before this record refresh changed only the expected eight paths above. This record refresh itself changes only this plan path.
 
-CI on promotion HEAD:
-
-```text
-run #1460       SUCCESS
-required job    97407296404 SUCCESS
-```
-
-`main` remained:
-
-```text
-cae6ba48df5d611959c0390e0f2b9b8194d62a9d
-```
-
-Current authority scan:
+Repository authority at final gate:
 
 ```text
 roadmap current census         89
@@ -74,6 +61,7 @@ sole numeric census            89
 B09-F1 current gate            CLOSED
 P7 current gate                RESUMED / NEXT
 P8 current gate                BLOCKED pending P7
+main                            cae6ba48df5d611959c0390e0f2b9b8194d62a9d
 ```
 
 Older `78`/`86` counts remain only as explicitly historical/superseded stage evidence where applicable; they do not override the current numeric authority.
