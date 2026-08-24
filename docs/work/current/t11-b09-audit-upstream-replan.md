@@ -1,6 +1,6 @@
 # T11 — B09-F1 Audit Upstream Capability Replan
 
-> **Status:** OPEN / ACTIVE / UPSTREAM FINDING / AUDITOR JOBS + STRUCTURED QUERY + HUMAN RECOGNITION + QUERY ASSIST OPERATOR-RATIFIED.  
+> **Status:** OPEN / ACTIVE / UPSTREAM FINDING / AUDITOR JOBS + STRUCTURED QUERY + HUMAN RECOGNITION + QUERY ASSIST + OWNER CROSS-LINK POLICY OPERATOR-RATIFIED.  
 > **Block:** B09 — Audit.  
 > **Method:** Frontend Product Experience Planning Method v2.3.  
 > **Trigger:** frontend/reference evidence exposed a material mismatch between the Auditor job and the current `listAuditEvents` query surface.  
@@ -406,7 +406,103 @@ Audit persistence copy of current labels merely to support selectors
 
 The exact count and wire shape of any auxiliary read operation(s) remain deliberately unchosen until the remaining B09-F1 semantics close.
 
-## 9. Remaining capability dispositions
+## 9. Owner-lens cross-link policy — OPERATOR-RATIFIED
+
+### 9.1 Audit-native investigation remains universal
+
+Every evidence item may continue investigation inside Audit using the already-ratified structured query:
+
+```text
+same actor
+same resource
+same action
+```
+
+This is the universal next-step capability. An owner-lens link is secondary and optional.
+
+### 9.2 Owner handoff admission
+
+A current owner-lens cross-link may be offered only when all are true:
+
+```text
+an accepted stable owner route already exists
+the exact routing identity is already present in admitted Audit evidence/facts
+the destination meaning is unambiguous
+navigation does not imply current access or current-state truth
+```
+
+The destination always performs its own current Authorization/disclosure check. Historical Audit visibility never grants access to the current owner resource.
+
+Audit does not persist URLs, invent a generic resource resolver or derive current domain state to construct navigation.
+
+### 9.3 Current admitted cross-links
+
+```text
+Document resource event
+  resource_kind=document + resource_id=document_id
+  → /documents/:document_id
+  → Document Official current-owner lens
+
+Release / revision cancellation / obsolescence events
+  typed facts already expose document_id
+  → /documents/:document_id/history
+  → Document History semantic lens
+
+Governance Decision event
+  GovernanceDecisionAuditFacts already expose governance_attempt_id
+  → /work/governance/:governance_attempt_id
+  → exact Governance Case lens
+```
+
+The link meaning is a handoff from historical action evidence to the appropriate owner lens; it never means Audit and that lens share authority.
+
+### 9.4 Deferred admin-owned destinations
+
+Exact deep-links for current User / Area / Group / RoleAssignment / DocumentType administration are **DEFERRED** until B10/B11/B12 establish and lock their own route/detail semantics.
+
+B09 records the future seam but does not design unopened administration blocks or guess routes now.
+
+### 9.5 Insufficient routing identity
+
+When an Audit event does not already expose the exact identity required by an accepted owner route, Launch does not add new Audit facts merely for navigation by convenience.
+
+Example:
+
+```text
+revision.created
+  resource_id = revision_id
+  no currently admitted document_id routing fact
+  → no fabricated Document/History link
+  → same-resource Audit investigation remains available
+```
+
+A later functional/proven user need may reopen the smallest owning read composition, but navigation convenience alone is insufficient.
+
+### 9.6 Access drift / unavailable destination
+
+```text
+historical Audit event remains legitimately visible
++ current owner resource is absent or non-disclosable
+→ Audit evidence remains visible and unchanged
+→ destination owner returns its ordinary current non-disclosing result
+→ Audit does not explain hidden current access/state
+```
+
+No failed owner handoff mutates or suppresses historical Audit evidence.
+
+### 9.7 Explicit non-solutions
+
+```text
+every resource_kind automatically links somewhere
+generic resource/deep-link resolver
+URLs persisted inside AuditEvent
+Audit-generated current-state projection
+historical visibility treated as current owner access
+new Audit facts added solely to fabricate navigation
+B10-B12 route/detail design inside B09
+```
+
+## 10. Remaining capability dispositions
 
 Already ratified:
 
@@ -424,19 +520,19 @@ sort alternatives                        REJECT
 export                                   DEFER
 human-recognition semantics              RATIFY
 Audit Query Assist                       RATIFY
+owner-lens cross-link policy             RATIFY
 ```
 
 Still blocking B09-F1:
 
 ```text
-owner-lens cross-link policy
-exact op78 query/read projection refinement after cross-link semantics close
-smallest Query Assist wire realization
+exact op78 structured-query/read projection refinement
+smallest Audit Query Assist wire realization
 bounded Product/API/wire ratification
 bounded FP0/B09 rebaseline
 ```
 
-## 10. Known non-solutions
+## 11. Known non-solutions
 
 ```text
 browser-side filtering over already-loaded Audit pages
@@ -447,10 +543,11 @@ full-text engine before a searchable corpus and job are proven
 copying current labels into immutable Audit semantics as convenience
 using admin-only directories as required Audit filter infrastructure
 generic entity/reference-data platform for Audit selectors
+generic resource/deep-link resolver
 using Audit as Document History
 ```
 
-## 11. Current gate
+## 12. Current gate
 
 ```text
 Frontend Method v2.3                         OPERATOR-RATIFIED
@@ -464,7 +561,8 @@ Structured Audit Query                       OPERATOR-RATIFIED
 Full-text generic Audit search               DEFERRED
 Human recognition / historical labels       OPERATOR-RATIFIED
 Audit Query Assist                           OPERATOR-RATIFIED
-Owner-lens cross-link policy                 NEXT DECISION
+Owner-lens cross-link policy                 OPERATOR-RATIFIED
+Exact Product/API/wire refinement            NEXT DECISION
 B09 P7                                       PAUSED pending B09-F1
 B09 P8                                       BLOCKED pending B09-F1
 B10-B12                                      NOT OPEN
@@ -473,4 +571,4 @@ Product implementation                       BLOCKED
 
 Next step:
 
-> Adjudicate which Audit evidence identities may offer a current owner-lens cross-link, under what disclosure conditions, and what must happen when the current owner resource is absent or non-disclosable. Then ratify the smallest exact op78 + Query Assist Product/API/wire refinement, perform the bounded rebaseline, and only then resume B09 P7/P8.
+> Ratify the smallest exact `listAuditEvents` + Audit Query Assist Product/API/wire refinement that realizes the already-ratified B09-F1 semantics without generic search/reference infrastructure. Then perform the bounded B09 rebaseline and only afterward resume B09 P7/P8.
