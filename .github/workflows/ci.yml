@@ -265,9 +265,11 @@ jobs:
           pr131=$(git ls-remote --heads origin refs/heads/archive/r10-pr131-pre-reset-20260820 | awk '{print $1}')
           pr132=$(git ls-remote --heads origin refs/heads/archive/repository-governance-pr132-20260820 | awk '{print $1}')
           t11locks=$(git ls-remote --heads origin refs/heads/evidence/t11-pr162-b01-b09-locks-20260824 | awk '{print $1}')
+          b10locks=$(git ls-remote --heads origin refs/heads/evidence/t11-pr170-b10-locks-20260824 | awk '{print $1}')
           [[ "$pr131" == "d8b1c6d31e704e9552a14faa7764c634a29b081d" ]]
           [[ "$pr132" == "b0ebe54cb010e9837a25f7b778f3d9814d283cb8" ]]
           [[ "$t11locks" == "adf58e448bc5bd3a20cae5b7228d729c031f94ac" ]]
+          [[ "$b10locks" == "b8c607cbd30d61d6bcf6ec1ea734ed1653d2569e" ]]
 
           # Whitespace remains non-blocking hygiene, but git diff --check also
           # detects unresolved merge-conflict markers; those remain correctness blockers.
