@@ -7,9 +7,9 @@ summary: Durable locator for exact operator-LOCKED B11 P8 and converged post-LOC
 
 # T11 B11 LOCK Evidence Locator
 
-> **Status:** ACTIVE DURABLE EVIDENCE LOCATOR.  
-> **Scope:** B11 — Access Administration operator-LOCKED P8 + P9/P10 + final challenge proof only.  
-> **T11:** remains OPEN.  
+> **Status:** ACTIVE DURABLE EVIDENCE LOCATOR.
+> **Scope:** B11 — Access Administration operator-LOCKED P8 + P9/P10 + final challenge proof only.
+> **T11:** remains OPEN.
 > **Implementation:** BLOCKED by `../roadmap.md`.
 
 ## 1. Why this exists
