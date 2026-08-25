@@ -74,6 +74,22 @@ Reviewer output is Evidence, not authority. A finding that implies new Product m
 
 Do **not** require a fresh independent review for every normal P7/P8 iteration, copy/layout correction, mechanical trace update or already-owned bounded fix. Use targeted proof during the inner loop and one strong independent challenge when a material candidate reaches its real gate.
 
+### Stable-candidate convergence bound
+
+For one stable material candidate scope:
+
+```text
+one independent material challenge
+→ one bounded correction / re-challenge round when required
+→ if material findings remain on already-swept scope in that second challenge:
+   candidate = NOT CONVERGED
+   stop patching
+   reopen / rebaseline / split the implicated structure
+→ no third finding-by-finding round on the same stable candidate scope
+```
+
+A material finding that legitimately changes Product/architecture authority or the candidate scope produces a **new candidate and a new review cycle** after the old candidate is declared structurally not converged. It is not permission to relabel Round 3 as a new cycle while continuing the same patch chain.
+
 ### Git-mediated FABLE dialogue protocol
 
 When an independent ClaudeCode/FABLE review is requested through Git, the review is isolated from candidate authority.
