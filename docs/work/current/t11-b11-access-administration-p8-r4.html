@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MetalDocs — B11 Access Administration P8 R4</title>
+<style>
+:root{--bg:#ededed;--paper:#fff;--ink:#222;--muted:#686868;--line:#8e8e8e;--soft:#f5f5f5;--soft2:#e7e7e7;--dark:#333}
+*{box-sizing:border-box}html{color-scheme:light}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 Arial,Helvetica,sans-serif}button,select{font:inherit;color:inherit}button{cursor:pointer}button:disabled{opacity:.45;cursor:not-allowed}button:focus-visible,select:focus-visible{outline:3px solid #111;outline-offset:2px}.hidden,[hidden]{display:none!important}
+.review{max-width:1540px;margin:auto;padding:18px}.review-head{display:flex;justify-content:space-between;align-items:flex-end;gap:18px;margin-bottom:10px}.kicker{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}h1{font-size:24px;margin:3px 0}.status{border:1px solid #333;background:#fff;padding:8px 10px;font-size:12px;font-weight:700}.note{margin:0 0 12px;padding:10px 12px;background:#fafafa;border:1px dashed #999;color:#555}.fixture{background:#fff;border:1px solid #555;margin-bottom:12px}.fixture-head{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:9px 11px;border-bottom:1px solid #aaa;background:#f2f2f2}.fixture-head strong{font-size:12px}.fixture-head span{font-size:11px;color:#666}.review-mark{display:inline-block;border:1px dashed #777;padding:2px 5px;font-size:10px;color:#666;margin-left:5px}.fixture-grid{display:flex;flex-wrap:wrap;gap:7px;padding:9px}.fixture button{border:1px solid #888;background:#fff;padding:7px 9px}.fixture button[aria-pressed="true"]{background:#333;color:#fff}.fixture-log{border-top:1px solid #ccc;background:#fafafa;padding:8px 10px;font:11px/1.4 ui-monospace,SFMono-Regular,Consolas,monospace;color:#555;min-height:34px}
+.shell{height:850px;background:#fff;border:1px solid #666;display:grid;grid-template-columns:245px minmax(0,1fr);grid-template-rows:58px minmax(0,1fr);overflow:hidden;position:relative}.top{grid-column:1/3;display:flex;align-items:center;border-bottom:1px solid #888;background:#fafafa;z-index:8;position:relative}.brand{width:245px;height:100%;display:flex;align-items:center;padding:0 18px;border-right:1px solid #999;font-size:17px;font-weight:800}.tagline{padding-left:20px;color:#666;font-size:12px}.grow{flex:1}.utility{height:100%;display:flex;align-items:center;gap:8px;padding-right:13px}.bell{width:40px;height:40px;border:1px solid #777;background:#fff;display:grid;place-items:center;position:relative;font-weight:700}.badge{position:absolute;right:-5px;top:-6px;min-width:19px;height:19px;padding:0 5px;border-radius:11px;background:#222;color:#fff;border:1px solid #111;display:grid;place-items:center;font-size:10px}.session{border-left:1px solid #bbb;padding-left:11px;color:#666;font-size:11px}.side{border-right:1px solid #8d8d8d;background:#f5f5f5;padding:12px 10px;overflow:auto}.mainnav,.nav{padding:9px 11px;margin:1px 0;border:1px solid transparent}.mainnav{font-weight:700}.sectionlabel{margin:16px 10px 5px;color:#777;text-transform:uppercase;letter-spacing:.07em;font-size:10px;font-weight:700}.indent{padding-left:30px}.nav.active{background:#ddd;border-color:#aaa;font-weight:700}.main{overflow:auto;background:#fff;scroll-behavior:smooth}.content{max-width:1120px;margin:auto;padding:27px 28px 60px}.pagehead{display:flex;justify-content:space-between;gap:20px;align-items:flex-start}.pagehead h2{font-size:25px;margin:0 0 4px}.pagehead p{margin:0;color:#666}.route{font-size:11px;color:#777;margin-top:4px}.boundary-note{margin:13px 0;padding:9px 11px;border:1px dashed #999;background:#fafafa;color:#555;font-size:11px}.tabs{display:flex;gap:6px;border-bottom:1px solid #999;margin:0 0 14px}.tab{border:0;border-bottom:3px solid transparent;background:transparent;padding:10px 12px 9px}.tab[aria-selected="true"]{font-weight:700;border-bottom-color:#222}.mobile-hint{display:none;border:1px dashed #999;background:#fafafa;padding:8px;margin-bottom:10px;color:#666;font-size:11px}
+.split{display:grid;grid-template-columns:minmax(250px,.72fr) minmax(480px,1.28fr);gap:14px;align-items:start}.panel{border:1px solid #999;background:#fff}.panelhead{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:11px 13px;border-bottom:1px solid #bbb;background:#f4f4f4;font-weight:700}.panelbody{padding:12px 13px}.help{font-size:11px;color:#666;margin:0 0 10px}.list{border-top:1px solid #ddd}.listbutton{width:100%;display:grid;grid-template-columns:1fr auto;gap:10px;text-align:left;border:0;border-bottom:1px solid #ddd;background:#fff;padding:10px 11px}.listbutton:hover{background:#fafafa}.listbutton.active{background:#ececec}.listbutton strong{display:block}.meta{font-size:11px;color:#707070}.pill{display:inline-block;border:1px solid #aaa;padding:2px 6px;font-size:10px;background:#fafafa}.pager{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 0 0}.pager button,.secondary,.primary,.danger{border:1px solid #777;background:#fff;padding:7px 9px}.primary{background:#333;color:#fff;border-color:#333;font-weight:700}.danger{color:#551b1b;border-color:#6e4040}.section{padding:11px 0;border-bottom:1px solid #ddd}.section:last-child{border-bottom:0}.section h3{font-size:13px;margin:0 0 4px}.section p{margin:0 0 8px;color:#666;font-size:11px}.grant-list{border:1px solid #aaa}.grant-row{display:grid;grid-template-columns:minmax(180px,1.2fr) minmax(120px,.8fr) minmax(130px,.85fr) auto;gap:8px;padding:10px 11px;border-bottom:1px solid #ddd;align-items:center}.grant-row:last-child{border-bottom:0}.grant-row b{display:block}.grant-row small{display:block;color:#6c6c6c}.grant-row button{border:1px solid #888;background:#fff;padding:5px 7px}.member-row{display:grid;grid-template-columns:1fr auto;gap:10px;padding:9px 10px;border-bottom:1px solid #ddd}.member-row:last-child{border-bottom:0}.member-row button{border:1px solid #888;background:#fff;padding:5px 7px}.empty{padding:18px;text-align:center;color:#777;border:1px dashed #aaa}.role-perms{margin:8px 0 0;padding-left:18px}.role-perms li{margin:4px 0}.read-only{border:1px dashed #999;background:#fafafa;padding:8px 9px;font-size:11px;color:#555;margin-top:9px}.state-line{font-size:11px;color:#666;margin-top:7px}.state-line.error{color:#551b1b;font-weight:700}
+.quick{position:absolute;z-index:20;right:91px;top:49px;width:390px;background:#fff;border:1px solid #555;box-shadow:0 8px 18px rgba(0,0,0,.16);display:none}.quick.open{display:block}.quick-head{display:flex;justify-content:space-between;align-items:center;padding:11px 12px;border-bottom:1px solid #aaa}.quick-row{padding:10px 12px;border-bottom:1px solid #ddd}.quick-row strong{display:block;font-size:12px}.quick-row span{font-size:11px;color:#666}.quick-foot{padding:10px 12px;background:#f5f5f5;font-size:11px;color:#666}
+dialog{border:1px solid #555;padding:0;width:min(580px,calc(100% - 28px))}dialog::backdrop{background:rgba(0,0,0,.22)}.dialoghead{padding:11px 13px;border-bottom:1px solid #aaa;background:#f4f4f4;font-weight:700}.dialogbody{padding:13px}.dialogfoot{display:flex;justify-content:flex-end;gap:8px;padding:11px 13px;border-top:1px solid #bbb;background:#fafafa}.formgrid{display:grid;grid-template-columns:120px 1fr;gap:8px 10px;align-items:center}.formgrid label{font-weight:700;font-size:11px}.formgrid select{width:100%;border:1px solid #888;background:#fff;padding:7px}.reviewbox{margin-top:11px;border:1px solid #999;background:#fafafa;padding:9px 10px}.reviewbox dl{display:grid;grid-template-columns:90px 1fr;gap:4px;margin:0}.reviewbox dt{color:#666}.reviewbox dd{margin:0;font-weight:700}.ambiguous{margin-top:9px;border:1px dashed #8a7440;background:#fffdf4;padding:8px;font-size:11px}.foot{margin-top:13px;color:#666;font-size:11px}
+@media(max-width:900px){.shell{grid-template-columns:205px minmax(0,1fr)}.brand{width:205px}.tagline{display:none}.split{grid-template-columns:1fr}.content{padding:22px 20px}.grant-row{grid-template-columns:1fr 1fr}.grant-row .row-action{grid-column:1/3}}
+@media(max-width:680px){.review{padding:10px}.review-head{align-items:flex-start;flex-direction:column}.fixture-head{align-items:flex-start;flex-direction:column}.fixture-grid{overflow:auto;flex-wrap:nowrap}.fixture button{white-space:nowrap}.shell{grid-template-columns:1fr;grid-template-rows:56px minmax(0,1fr);height:790px}.top{grid-column:1}.brand{width:auto;border-right:0;padding:0 12px}.side{display:none}.session{display:none}.utility{padding-right:9px}.main{grid-column:1}.content{padding:18px 12px 50px}.mobile-hint{display:block}.tabs{overflow-x:auto}.tab{white-space:nowrap;padding-left:9px;padding-right:9px}.split{display:block}.split>.panel+ .panel{margin-top:12px}.grant-row{display:block;padding:9px 10px}.grant-row>div{margin-bottom:5px}.grant-row .row-action{margin-top:7px}.quick{position:absolute;inset:56px 0 auto;width:auto;border-left:0;border-right:0}.formgrid{grid-template-columns:1fr}.pager{font-size:11px}}
+</style>
+</head>
+<body>
+<div class="review">
+  <div class="review-head">
+    <div><div class="kicker">T11 · B11 · Access Administration · P8 R4</div><h1>Acesso — Functional Low-Fi</h1><div>Por Área / Grupos / Funções · estrutura herdada dos P8 LOCKED</div></div>
+    <div class="status">CANDIDATE · OPERATOR USE</div>
+  </div>
+  <div class="note"><strong>Não é Product UI:</strong> a área de fixtures abaixo existe somente para falsificar estados, paginação, concorrência e consequências deste P8. O produto começa no shell MetalDocs. O R4 não decide identidade visual final.</div>
+  <section class="fixture" aria-label="Controles de fixture do P8">
+    <div class="fixture-head"><strong>Controles de fixture <span class="review-mark">REVIEW ONLY</span></strong><span>one-shot quando indicado; “Restaurar base” recompõe os dados</span></div>
+    <div class="fixture-grid">
+      <button id="fx-reset">Restaurar base</button>
+      <button id="fx-page-fail" aria-pressed="false">Próxima página → falha</button>
+      <button id="fx-409" aria-pressed="false">Próximo grant → 409</button>
+      <button id="fx-ambiguous" aria-pressed="false">Próximo grant → ambíguo</button>
+      <button id="fx-membership" aria-pressed="false">Próxima membership → conflito</button>
+      <button id="fx-403">Forçar 403</button>
+      <button id="fx-404">Forçar 404</button>
+    </div>
+    <div class="fixture-log" id="fixture-log">Aguardando interação de review.</div>
+  </section>
+
+  <section class="shell" aria-label="MetalDocs Access Administration wireframe">
+    <header class="top">
+      <div class="brand">MetalDocs</div><div class="tagline">Sistema de documentos controlados</div><div class="grow"></div>
+      <div class="utility"><button class="bell" id="bell" aria-label="Notificações, 3 novas" aria-expanded="false">◇<span class="badge">3</span></button><div class="session">Sessão autenticada</div></div>
+    </header>
+    <aside class="side" aria-label="Navegação global">
+      <div class="mainnav">⌂ &nbsp; Início</div>
+      <div class="sectionlabel">Minha caixa</div><div class="nav indent">Para aprovação</div><div class="nav indent">Em edição</div>
+      <div class="sectionlabel">Documentos</div><div class="nav">▣ &nbsp; Biblioteca</div><div class="nav">＋ &nbsp; Novo documento</div><div class="nav">M &nbsp; Criar a partir de modelo</div>
+      <div class="sectionlabel">Gestão</div><div class="nav">G &nbsp; Governança documental</div><div class="nav">O &nbsp; Organização</div><div class="nav active">A &nbsp; Acesso</div>
+      <div class="sectionlabel">Evidência</div><div class="nav">H &nbsp; Auditoria</div>
+    </aside>
+    <main class="main">
+      <div class="content">
+        <div class="mobile-hint"><strong>Responsive:</strong> a sidebar global é ocultada conforme o shell LOCKED; as listas/detalhes empilham, e o significado Subject × Role × Scope permanece textual.</div>
+        <div class="pagehead"><div><h2>Acesso</h2><p>Administre quem pode fazer o quê e onde.</p><div class="route">/admin/access</div></div><button id="grant-open" class="primary">Conceder acesso</button></div>
+        <div class="boundary-note"><strong>Limite:</strong> esta superfície mostra configuração canônica de GroupMembership e RoleAssignment. Ela <strong>não calcula acesso efetivo completo</strong> de uma pessoa nem cria permissões customizadas.</div>
+        <div class="tabs" role="tablist" aria-label="Lentes de Acesso">
+          <button id="tab-area" class="tab" role="tab" aria-selected="true" data-lens="area">Por Área</button>
+          <button id="tab-groups" class="tab" role="tab" aria-selected="false" data-lens="groups">Grupos</button>
+          <button id="tab-roles" class="tab" role="tab" aria-selected="false" data-lens="roles">Funções</button>
+        </div>
+
+        <section id="lens-area" data-lens-panel="area">
+          <div class="split">
+            <article class="panel"><div class="panelhead"><span>Áreas</span><span class="pill">Scope</span></div><div class="panelbody"><p class="help">“Toda a empresa” representa Company scope; não é uma Área sintética.</p><div id="area-list" class="list"></div><div class="pager"><button id="area-prev">← Anterior</button><span id="area-page"></span><button id="area-next">Próxima →</button></div></div></article>
+            <article class="panel"><div class="panelhead"><span id="selected-area-title">Comercial</span><span class="pill">Area</span></div><div class="panelbody">
+              <div class="section"><h3>Acessos específicos desta Área</h3><p>RoleAssignments cujo scope é exatamente a Área selecionada.</p><div id="area-specific-list" class="grant-list"></div><div class="pager"><button id="area-specific-prev">← Anterior</button><span id="area-specific-page"></span><button id="area-specific-next">Próxima →</button></div><div id="area-specific-state" class="state-line"></div></div>
+              <div class="section"><h3>Acessos de toda a empresa</h3><p>Também se aplicam nesta Área, mas continuam sendo grants Company-wide.</p><div id="company-list" class="grant-list"></div><div class="pager"><button id="company-prev">← Anterior</button><span id="company-page"></span><button id="company-next">Próxima →</button></div></div>
+            </div></article>
+          </div>
+        </section>
+
+        <section id="lens-groups" data-lens-panel="groups" hidden>
+          <div class="split">
+            <article class="panel"><div class="panelhead"><span>Grupos</span><span class="pill">Organization identity</span></div><div class="panelbody"><div id="group-list" class="list"></div><div class="pager"><button id="group-prev">← Anterior</button><span id="group-page"></span><button id="group-next">Próxima →</button></div></div></article>
+            <article class="panel"><div class="panelhead"><span id="selected-group-title">Aprovadores Financeiro</span><span class="pill">Group</span></div><div class="panelbody">
+              <div class="read-only"><strong>Leitura correta:</strong> este grupo <strong>não pertence a uma única Área</strong>. Cada linha abaixo é um RoleAssignment independente, possivelmente em scopes diferentes.</div>
+              <div class="section"><h3>Acessos do grupo</h3><p>Footprint canônico filtrado por Group subject.</p><div id="group-access-list" class="grant-list"></div><div class="pager"><button id="group-access-prev">← Anterior</button><span id="group-access-page"></span><button id="group-access-next">Próxima →</button></div></div>
+              <div class="section"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><div><h3>Membros</h3><p>Revise o footprint acima antes de alterar membership.</p></div><button id="add-member" class="secondary">+ Adicionar membro</button></div><div id="member-list" class="grant-list"></div></div>
+            </div></article>
+          </div>
+        </section>
+
+        <section id="lens-roles" data-lens-panel="roles" hidden>
+          <div class="split">
+            <article class="panel"><div class="panelhead"><span>Funções</span><span class="pill">RoleView</span></div><div class="panelbody"><div id="role-list" class="list"></div></div></article>
+            <article class="panel"><div class="panelhead"><span id="role-title">Aprovador</span><span class="pill">read-only</span></div><div class="panelbody"><div id="role-detail"></div><div class="section"><h3>Assignments com esta função</h3><p>Slice canônico filtrado por RoleCode.</p><div id="role-assignment-list" class="grant-list"></div><div class="pager"><button id="role-assign-prev">← Anterior</button><span id="role-assign-page"></span><button id="role-assign-next">Próxima →</button></div></div></div></article>
+          </div>
+        </section>
+        <div class="foot">P8 fixture truth only · sem API real · B11-F1 refina op31 sem criar operação 90+</div>
+      </div>
+    </main>
+
+    <section class="quick" id="quick" role="dialog" aria-label="Quick Inbox" aria-modal="false">
+      <div class="quick-head"><strong>Notificações</strong><span class="meta">B01N herdado</span></div>
+      <div class="quick-row"><strong>Mariana mencionou você</strong><span>PO-032 · 2 min</span></div>
+      <div class="quick-row"><strong>João mencionou você</strong><span>PL-014 · 18 min</span></div>
+      <div class="quick-row"><strong>Ana mencionou você</strong><span>IT-008 · 1 h</span></div>
+      <div class="quick-foot">Quick Inbox global; B11 não redefine esta superfície.</div>
+    </section>
+  </section>
+</div>
+
+<dialog id="member-dialog"><div class="dialoghead">Adicionar membro</div><div class="dialogbody"><p id="member-dialog-copy">Adicionar Mariana Costa a Aprovadores Financeiro? Revise os acessos do grupo visíveis nesta tela antes de confirmar. A pessoa poderá receber acesso por RoleAssignments atuais e futuros do grupo; outros caminhos de acesso não são calculados aqui.</p></div><div class="dialogfoot"><button id="member-cancel" class="secondary">Cancelar</button><button id="member-confirm" class="primary">Adicionar ao grupo</button></div></dialog>
+
+<dialog id="grant-dialog"><div class="dialoghead">Conceder acesso · Subject × Role × Scope</div><div class="dialogbody">
+  <div class="formgrid">
+    <label for="grant-subject-kind">Tipo</label><select id="grant-subject-kind"><option value="user">User</option><option value="group">Group</option></select>
+    <label for="grant-subject">Quem</label><select id="grant-subject"></select>
+    <label for="grant-role">Função</label><select id="grant-role"></select>
+    <label for="grant-scope-kind">Onde</label><select id="grant-scope-kind"><option value="company">Toda a empresa</option><option value="area">Área</option></select>
+    <label for="grant-area">Área</label><select id="grant-area"></select>
+  </div>
+  <div id="grant-role-meaning" class="read-only"></div>
+  <button id="grant-review" class="secondary" style="margin-top:10px">Revisar grant</button>
+  <div id="grant-review-box" class="reviewbox" hidden></div>
+  <div id="grant-ambiguous" class="ambiguous" hidden>Resultado de transporte ambíguo. Reuse o mesmo logical command / Idempotency-Key. <div>Key: <code id="grant-key"></code></div><button id="grant-retry" class="secondary" style="margin-top:7px">Retry same command</button></div>
+  <div id="last-key" hidden></div>
+</div><div class="dialogfoot"><button id="grant-close" class="secondary">Fechar</button><button id="grant-confirm" class="primary">Conceder</button></div></dialog>
+
+<dialog id="revoke-dialog"><div class="dialoghead">Revogar este acesso?</div><div class="dialogbody"><div id="revoke-copy"></div><p class="help">Somente este RoleAssignment será removido. Outros grants diretos ou via grupos podem continuar válidos.</p></div><div class="dialogfoot"><button id="revoke-cancel" class="secondary">Cancelar</button><button id="revoke-confirm" class="danger">Revogar</button></div></dialog>
+
+<script>
+(() => {
+const roleDefs=[
+ {code:'governance_admin',label:'Administrador de governança',scopes:['company'],perms:['Administrar organização','Administrar acessos','Configurar tipos de documento','Configurar uso de modelos']},
+ {code:'area_manager',label:'Gestor de Área',scopes:['area'],perms:['Ver documentos vigentes','Ver histórico','Ver trabalho em andamento','Criar documentos','Editar documentos','Enviar para governança','Cancelar revisão','Obsoletar documento','Gerenciar responsável','Atuar em governança']},
+ {code:'author',label:'Autor',scopes:['company','area'],perms:['Ver documentos vigentes','Ver histórico','Ver trabalho em andamento','Criar documentos','Editar documentos','Enviar para governança']},
+ {code:'approver',label:'Aprovador',scopes:['company','area'],perms:['Ver documentos vigentes','Atuar em governança']},
+ {code:'viewer',label:'Visualizador',scopes:['company','area'],perms:['Ver documentos vigentes']},
+ {code:'governance_viewer',label:'Visualizador de governança',scopes:['company','area'],perms:['Ver documentos vigentes','Ver histórico','Ver auditoria']}
+];
+const areas=[{id:'comercial',code:'COM',name:'Comercial'},{id:'financeiro',code:'FIN',name:'Financeiro'},{id:'juridico',code:'JUR',name:'Jurídico'},{id:'rh',code:'RH',name:'Recursos Humanos'},{id:'qualidade',code:'QLD',name:'Qualidade'},{id:'operacoes',code:'OPE',name:'Operações'},{id:'ti',code:'TI',name:'Tecnologia'}];
+const groups=[{id:'g-fin',name:'Aprovadores Financeiro'},{id:'g-com',name:'Equipe Comercial'},{id:'g-dir',name:'Diretoria'},{id:'g-qld',name:'Qualidade'},{id:'g-rh',name:'RH'},{id:'g-ti',name:'TI'}];
+const users=[{id:'u-mariana',name:'Mariana Costa'},{id:'u-joao',name:'João Almeida'},{id:'u-beatriz',name:'Beatriz Silva'},{id:'u-rafael',name:'Rafael Siqueira'}];
+const BASE=[
+ {id:'A-001',subjectKind:'group',subjectId:'g-fin',subject:'Aprovadores Financeiro',role:'approver',scopeKind:'area',scopeId:'financeiro',scope:'Financeiro'},
+ {id:'A-002',subjectKind:'group',subjectId:'g-fin',subject:'Aprovadores Financeiro',role:'viewer',scopeKind:'area',scopeId:'comercial',scope:'Comercial'},
+ {id:'A-003',subjectKind:'group',subjectId:'g-fin',subject:'Aprovadores Financeiro',role:'viewer',scopeKind:'company',scopeId:null,scope:'Toda a empresa'},
+ {id:'A-004',subjectKind:'group',subjectId:'g-fin',subject:'Aprovadores Financeiro',role:'governance_viewer',scopeKind:'area',scopeId:'juridico',scope:'Jurídico'},
+ {id:'A-005',subjectKind:'group',subjectId:'g-fin',subject:'Aprovadores Financeiro',role:'viewer',scopeKind:'area',scopeId:'rh',scope:'Recursos Humanos'},
+ {id:'A-006',subjectKind:'group',subjectId:'g-fin',subject:'Aprovadores Financeiro',role:'approver',scopeKind:'area',scopeId:'qualidade',scope:'Qualidade'},
+ {id:'A-007',subjectKind:'group',subjectId:'g-com',subject:'Equipe Comercial',role:'author',scopeKind:'area',scopeId:'comercial',scope:'Comercial'},
+ {id:'A-008',subjectKind:'group',subjectId:'g-dir',subject:'Diretoria',role:'viewer',scopeKind:'company',scopeId:null,scope:'Toda a empresa'},
+ {id:'A-009',subjectKind:'user',subjectId:'u-joao',subject:'João Almeida',role:'area_manager',scopeKind:'area',scopeId:'comercial',scope:'Comercial'},
+ {id:'A-010',subjectKind:'user',subjectId:'u-beatriz',subject:'Beatriz Silva',role:'viewer',scopeKind:'area',scopeId:'comercial',scope:'Comercial'},
+ {id:'A-011',subjectKind:'group',subjectId:'g-qld',subject:'Qualidade',role:'viewer',scopeKind:'area',scopeId:'comercial',scope:'Comercial'},
+ {id:'A-012',subjectKind:'user',subjectId:'u-rafael',subject:'Rafael Siqueira',role:'approver',scopeKind:'area',scopeId:'comercial',scope:'Comercial'},
+ {id:'A-013',subjectKind:'group',subjectId:'g-rh',subject:'RH',role:'governance_viewer',scopeKind:'area',scopeId:'comercial',scope:'Comercial'},
+ {id:'A-014',subjectKind:'group',subjectId:'g-ti',subject:'TI',role:'viewer',scopeKind:'company',scopeId:null,scope:'Toda a empresa'},
+ {id:'A-015',subjectKind:'user',subjectId:'u-mariana',subject:'Mariana Costa',role:'governance_viewer',scopeKind:'company',scopeId:null,scope:'Toda a empresa'},
+ {id:'A-016',subjectKind:'user',subjectId:'u-mariana',subject:'Mariana Costa',role:'approver',scopeKind:'area',scopeId:'juridico',scope:'Jurídico'}
+];
+let assignments=BASE.map(x=>({...x}));
+let members={'g-fin':['u-joao','u-beatriz'],'g-com':['u-mariana','u-rafael'],'g-dir':['u-joao'],'g-qld':['u-beatriz'],'g-rh':['u-mariana'],'g-ti':['u-rafael']};
+let state={lens:'area',area:'comercial',areaPage:0,areaSpecificPage:0,companyPage:0,group:'g-fin',groupPage:0,groupAccessPage:0,role:'approver',roleAssignPage:0,revoke:null,grantKey:null};
+let flags={pageFail:false,grant409:false,ambiguous:false,membership:false};
+const pageSize=4,$=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)], role=c=>roleDefs.find(r=>r.code===c), user=id=>users.find(u=>u.id===id), group=id=>groups.find(g=>g.id===id);
+function slice(items,page,size=pageSize){const start=page*size;return {items:items.slice(start,start+size),pages:Math.max(1,Math.ceil(items.length/size)),more:start+size<items.length}}
+function pager(prev,next,label,page,pg){$(prev).disabled=page===0;$(next).disabled=!pg.more;$(label).textContent=`Página ${page+1} de ${pg.pages}`}
+function grantRow(a){return `<div class="grant-row" data-assignment="${a.id}"><div><b>${a.subject}</b><small>${a.subjectKind==='group'?'Grupo':'Usuário'} · ${a.id}</small></div><div><b>${role(a.role).label}</b><small>${a.role}</small></div><div><b>${a.scope}</b><small>${a.scopeKind==='company'?'Company scope':'Area scope'}</small></div><div class="row-action"><button data-revoke="${a.id}">Revogar</button></div></div>`}
+function bindRevoke(){$$('[data-revoke]').forEach(b=>b.onclick=()=>openRevoke(b.dataset.revoke))}
+function renderAreaList(){const items=[{id:'company',code:'COMPANY',name:'Toda a empresa'},...areas];const pg=slice(items,state.areaPage);$('#area-list').innerHTML=pg.items.map(a=>`<button class="listbutton${state.area===a.id?' active':''}" data-area="${a.id}"><span><strong>${a.name}</strong><span class="meta">${a.code}</span></span><span class="pill">${a.id==='company'?'Company':'Area'}</span></button>`).join('');$$('[data-area]').forEach(b=>b.onclick=()=>{state.area=b.dataset.area;state.areaSpecificPage=0;state.companyPage=0;renderArea()});pager('#area-prev','#area-next','#area-page',state.areaPage,pg)}
+function areaSpecific(){return state.area==='company'?[]:assignments.filter(a=>a.scopeKind==='area'&&a.scopeId===state.area)}
+function companyAssignments(){return assignments.filter(a=>a.scopeKind==='company')}
+function renderArea(){renderAreaList();const selected=state.area==='company'?{name:'Toda a empresa'}:areas.find(a=>a.id===state.area);$('#selected-area-title').textContent=selected.name;if(state.area==='company'){$('#area-specific-list').innerHTML='<div class="empty">Nesta lente, veja somente grants Company-wide abaixo.</div>';$('#area-specific-page').textContent='—';$('#area-specific-prev').disabled=$('#area-specific-next').disabled=true}else{const pg=slice(areaSpecific(),state.areaSpecificPage);$('#area-specific-list').innerHTML=pg.items.map(grantRow).join('')||'<div class="empty">Nenhum grant específico.</div>';pager('#area-specific-prev','#area-specific-next','#area-specific-page',state.areaSpecificPage,pg)}const cpg=slice(companyAssignments(),state.companyPage,3);$('#company-list').innerHTML=cpg.items.map(grantRow).join('');pager('#company-prev','#company-next','#company-page',state.companyPage,cpg);bindRevoke()}
+function renderGroupList(){const pg=slice(groups,state.groupPage);$('#group-list').innerHTML=pg.items.map(g=>`<button class="listbutton${state.group===g.id?' active':''}" data-group="${g.id}"><span><strong>${g.name}</strong><span class="meta">${g.id}</span></span><span class="pill">Group</span></button>`).join('');$$('[data-group]').forEach(b=>b.onclick=()=>{state.group=b.dataset.group;state.groupAccessPage=0;renderGroups()});pager('#group-prev','#group-next','#group-page',state.groupPage,pg)}
+function renderGroups(){renderGroupList();const g=group(state.group);$('#selected-group-title').textContent=g.name;const gpg=slice(assignments.filter(a=>a.subjectKind==='group'&&a.subjectId===g.id),state.groupAccessPage);$('#group-access-list').innerHTML=gpg.items.map(grantRow).join('')||'<div class="empty">Nenhum grant para este grupo.</div>';pager('#group-access-prev','#group-access-next','#group-access-page',state.groupAccessPage,gpg);const ids=members[g.id]||[];$('#member-list').innerHTML=ids.map(id=>`<div class="member-row"><span><strong>${user(id).name}</strong><span class="meta"> ${id}</span></span><button data-remove-member="${id}">Remover</button></div>`).join('')||'<div class="empty">Nenhum membro.</div>';bindRevoke();$$('[data-remove-member]').forEach(b=>b.onclick=()=>{members[g.id]=(members[g.id]||[]).filter(x=>x!==b.dataset.removeMember);renderGroups()})}
+function renderRoleList(){ $('#role-list').innerHTML=roleDefs.map(r=>`<button class="listbutton${state.role===r.code?' active':''}" data-role="${r.code}"><span><strong>${r.label}</strong><span class="meta">${r.code}</span></span><span class="pill">Role</span></button>`).join('');$$('[data-role]').forEach(b=>b.onclick=()=>{state.role=b.dataset.role;state.roleAssignPage=0;renderRoles()})}
+function renderRoles(){renderRoleList();const r=role(state.role);$('#role-title').textContent=r.label;$('#role-detail').innerHTML=`<div class="read-only"><strong>Função fixa do produto.</strong> B11 explica o RoleView retornado pelo servidor; não edita Role ou Permission.</div><div class="section"><h3>Onde pode ser atribuída</h3><p>${r.scopes.map(s=>s==='company'?'Toda a empresa':'Área').join(' · ')}</p></div><div class="section"><h3>Pode</h3><ul class="role-perms">${r.perms.map(p=>`<li>${p}</li>`).join('')}</ul></div>`;const pg=slice(assignments.filter(a=>a.role===r.code),state.roleAssignPage);$('#role-assignment-list').innerHTML=pg.items.map(grantRow).join('')||'<div class="empty">Nenhum assignment.</div>';pager('#role-assign-prev','#role-assign-next','#role-assign-page',state.roleAssignPage,pg);bindRevoke()}
+function setLens(name){state.lens=name;$$('.tab').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.lens===name)));$$('[data-lens-panel]').forEach(p=>p.hidden=p.dataset.lensPanel!==name);if(name==='area')renderArea();if(name==='groups')renderGroups();if(name==='roles')renderRoles()}
+function openRevoke(id){const a=assignments.find(x=>x.id===id);state.revoke=id;$('#revoke-copy').innerHTML=`<strong>${a.subject}</strong><br>${role(a.role).label} · ${a.scope}`;$('#revoke-dialog').showModal()}
+function fillGrant(){const kind=$('#grant-subject-kind').value;const source=kind==='group'?groups:users;$('#grant-subject').innerHTML=source.map(x=>`<option value="${x.id}">${x.name}</option>`).join('');$('#grant-role').innerHTML=roleDefs.map(r=>`<option value="${r.code}">${r.label}</option>`).join('');$('#grant-area').innerHTML=areas.map(a=>`<option value="${a.id}">${a.name}</option>`).join('');updateGrantRole()}
+function updateGrantRole(){const r=role($('#grant-role').value);$('#grant-role-meaning').innerHTML=`<strong>${r.label}</strong> · ${r.perms.join(' · ')}`;const scope=$('#grant-scope-kind');[...scope.options].forEach(o=>o.disabled=!r.scopes.includes(o.value));if(scope.selectedOptions[0].disabled)scope.value=r.scopes[0];$('#grant-area').disabled=scope.value!=='area'}
+function grantReview(){const kind=$('#grant-subject-kind').value,id=$('#grant-subject').value,sub=(kind==='group'?group(id):user(id)).name,r=role($('#grant-role').value),sk=$('#grant-scope-kind').value,sc=sk==='company'?'Toda a empresa':areas.find(a=>a.id===$('#grant-area').value).name;state.grantKey='grant-'+Date.now();$('#grant-key').textContent=state.grantKey;$('#grant-review-box').hidden=false;$('#grant-review-box').innerHTML=`<dl><dt>Quem</dt><dd>${sub}</dd><dt>Função</dt><dd>${r.label}</dd><dt>Onde</dt><dd>${sc}</dd></dl><p>Esta concessão é aditiva. Grants existentes não são alterados.</p>`;$('#grant-ambiguous').hidden=true}
+function confirmGrant(){if(flags.grant409){flags.grant409=false;$('#fx-409').setAttribute('aria-pressed','false');$('#fixture-log').textContent='409 state.conflict — grant rejeitado; composição preservada para revisão.';return}if(flags.ambiguous){flags.ambiguous=false;$('#fx-ambiguous').setAttribute('aria-pressed','false');$('#grant-ambiguous').hidden=false;$('#fixture-log').textContent='Resultado ambíguo — não crie segundo grant; retry deve reutilizar a mesma key.';return}createGrant()}
+function createGrant(){const kind=$('#grant-subject-kind').value,id=$('#grant-subject').value,sub=(kind==='group'?group(id):user(id)).name,r=role($('#grant-role').value),sk=$('#grant-scope-kind').value,area=areas.find(a=>a.id===$('#grant-area').value);assignments.push({id:'A-'+String(assignments.length+1).padStart(3,'0'),subjectKind:kind,subjectId:id,subject:sub,role:r.code,scopeKind:sk,scopeId:sk==='area'?area.id:null,scope:sk==='area'?area.name:'Toda a empresa'});$('#last-key').textContent=state.grantKey;$('#fixture-log').textContent='Grant criado com o logical command atual; servidor continuaria revalidando AuthZ e estado.';setLens(state.lens)}
+function reset(){assignments=BASE.map(x=>({...x}));members={'g-fin':['u-joao','u-beatriz'],'g-com':['u-mariana','u-rafael'],'g-dir':['u-joao'],'g-qld':['u-beatriz'],'g-rh':['u-mariana'],'g-ti':['u-rafael']};flags={pageFail:false,grant409:false,ambiguous:false,membership:false};state.area='comercial';state.areaPage=0;state.areaSpecificPage=0;state.companyPage=0;state.group='g-fin';state.groupPage=0;state.groupAccessPage=0;state.role='approver';state.roleAssignPage=0;$$('.fixture button[aria-pressed]').forEach(b=>b.setAttribute('aria-pressed','false'));$('#fixture-log').textContent='Fixture base restaurada.';setLens('area')}
+$$('.tab').forEach(b=>b.onclick=()=>setLens(b.dataset.lens));$('#bell').onclick=()=>{const q=$('#quick'),open=!q.classList.contains('open');q.classList.toggle('open',open);$('#bell').setAttribute('aria-expanded',String(open))};
+$('#area-prev').onclick=()=>{if(state.areaPage>0){state.areaPage--;renderAreaList()}};$('#area-next').onclick=()=>{if((state.areaPage+1)*pageSize<[ {id:'company'},...areas].length){state.areaPage++;renderAreaList()}};
+$('#area-specific-prev').onclick=()=>{if(state.areaSpecificPage>0){state.areaSpecificPage--;renderArea()}};$('#area-specific-next').onclick=()=>{if(flags.pageFail){flags.pageFail=false;$('#fx-page-fail').setAttribute('aria-pressed','false');$('#area-specific-state').className='state-line error';$('#area-specific-state').textContent='Falha na continuação. Grants já carregados permanecem válidos.';return}state.areaSpecificPage++;$('#area-specific-state').textContent='';renderArea()};
+$('#company-prev').onclick=()=>{if(state.companyPage>0){state.companyPage--;renderArea()}};$('#company-next').onclick=()=>{state.companyPage++;renderArea()};
+$('#group-prev').onclick=()=>{if(state.groupPage>0){state.groupPage--;renderGroupList()}};$('#group-next').onclick=()=>{state.groupPage++;renderGroupList()};$('#group-access-prev').onclick=()=>{if(state.groupAccessPage>0){state.groupAccessPage--;renderGroups()}};$('#group-access-next').onclick=()=>{state.groupAccessPage++;renderGroups()};
+$('#role-assign-prev').onclick=()=>{if(state.roleAssignPage>0){state.roleAssignPage--;renderRoles()}};$('#role-assign-next').onclick=()=>{state.roleAssignPage++;renderRoles()};
+$('#add-member').onclick=()=>$('#member-dialog').showModal();$('#member-cancel').onclick=()=>$('#member-dialog').close();$('#member-confirm').onclick=()=>{if(flags.membership){flags.membership=false;$('#fx-membership').setAttribute('aria-pressed','false');$('#member-dialog').close();$('#fixture-log').textContent='409 membership/offboarding conflict — nenhuma membership foi criada.';return}if(!(members[state.group]||[]).includes('u-mariana'))(members[state.group]||=[]).push('u-mariana');$('#member-dialog').close();renderGroups()};
+$('#grant-open').onclick=()=>{fillGrant();$('#grant-review-box').hidden=true;$('#grant-ambiguous').hidden=true;$('#grant-dialog').showModal()};$('#grant-close').onclick=()=>$('#grant-dialog').close();$('#grant-subject-kind').onchange=fillGrant;$('#grant-role').onchange=updateGrantRole;$('#grant-scope-kind').onchange=()=>$('#grant-area').disabled=$('#grant-scope-kind').value!=='area';$('#grant-review').onclick=grantReview;$('#grant-confirm').onclick=confirmGrant;$('#grant-retry').onclick=()=>{const key=state.grantKey;createGrant();$('#last-key').textContent=key;$('#grant-ambiguous').hidden=true;$('#fixture-log').textContent='Retry same command reconhecido com a mesma Idempotency-Key; nenhum segundo logical command foi inventado.'};
+$('#revoke-cancel').onclick=()=>$('#revoke-dialog').close();$('#revoke-confirm').onclick=()=>{assignments=assignments.filter(a=>a.id!==state.revoke);$('#revoke-dialog').close();setLens(state.lens)};
+$('#fx-reset').onclick=reset;$('#fx-page-fail').onclick=()=>{flags.pageFail=!flags.pageFail;$('#fx-page-fail').setAttribute('aria-pressed',String(flags.pageFail));$('#fixture-log').textContent='Próxima continuação de op31 será simulada como falha.'};$('#fx-409').onclick=()=>{flags.grant409=!flags.grant409;$('#fx-409').setAttribute('aria-pressed',String(flags.grant409));$('#fixture-log').textContent='Próximo grant simulará 409 state.conflict.'};$('#fx-ambiguous').onclick=()=>{flags.ambiguous=!flags.ambiguous;$('#fx-ambiguous').setAttribute('aria-pressed',String(flags.ambiguous));$('#fixture-log').textContent='Próximo grant terá resultado de transporte ambíguo.'};$('#fx-membership').onclick=()=>{flags.membership=!flags.membership;$('#fx-membership').setAttribute('aria-pressed',String(flags.membership));$('#fixture-log').textContent='Próxima membership simulará conflito com offboarding.'};$('#fx-403').onclick=()=>$('#fixture-log').textContent='403 permission.denied — servidor permanece autoridade; esconder controles não seria AuthZ.';$('#fx-404').onclick=()=>$('#fixture-log').textContent='404 notfound.resource — recurso ausente ou não divulgável; frontend não infere existência.';
+reset();
+})();
+</script>
+</body>
+</html>
