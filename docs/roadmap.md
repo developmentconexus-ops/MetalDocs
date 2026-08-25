@@ -14,7 +14,7 @@ REPOSITORY MODE       CLEAN-SLATE / ARCHITECTURE-FIRST
 T1 → T10              CLOSED / OPERATOR-RATIFIED / INTEGRATED
 T11                   OPEN / ACTIVE
 T11 checkpoint        B01-B10 ACCEPTED / INTEGRATED
-T11 current block     B11 ACCESS ADMINISTRATION / OPEN / ACTIVE / P8 R4 CANDIDATE / OPERATOR REVIEW
+T11 current block     B11 ACCESS ADMINISTRATION / OPEN / ACTIVE / P8 R4 FRAME APPROVED / CONTENT WALKTHROUGH
 METHODOLOGY ADOPTION  ACCEPTED / INTEGRATED
 T12                   NOT OPEN
 IMPLEMENTATION         BLOCKED
@@ -95,7 +95,7 @@ B10   Organization Administration                  LOCKED / P8-P10 COMPLETE / OP
        operation 27+ consumed                       0
        B10-A1 paginated-browse sufficiency          VALIDATED FOR CURRENT LAUNCH P8
        unresolved material B10 Findings             0
-B11   Access Administration                        OPEN / ACTIVE / P8 R4 CANDIDATE / OPERATOR REVIEW
+B11   Access Administration                        OPEN / ACTIVE / P8 R4 FRAME APPROVED / CONTENT WALKTHROUGH
        P6 reference study                           COMPLETE / OFFICIAL SOURCES
        P7 R1 written spec                           docs/work/current/t11-b11-access-administration-p6-p7.md
        P7 R1 disposition                            SUPERSEDED ONLY WHERE B11-F1 CHANGES IA
@@ -136,12 +136,14 @@ B11   Access Administration                        OPEN / ACTIVE / P8 R4 CANDIDA
        P8 R4 LOCKED-wireframe fidelity               30 / 30 PASS
        P8 R4 functional/browser verification        34 / 34 PASS
        P8 R4 combined verification                  64 / 64 PASS
-       P8 R4 operator disposition                   AWAITING OPERATOR WALKTHROUGH
-       B11-R2-A Group footprint comprehension       OPEN / FALSIFIABLE DURING OPERATOR WALKTHROUGH
-       B11-R2-B Area configuration comprehension    OPEN / FALSIFIABLE DURING OPERATOR WALKTHROUGH
-       B11-R2-C membership consequence              OPEN / FALSIFIABLE DURING OPERATOR WALKTHROUGH
-       B11-R2-D remaining effective-access gap      OPEN / FALSIFIABLE DURING OPERATOR WALKTHROUGH
-       B11-R2-E filtered pagination sufficiency     OPEN / FALSIFIABLE DURING OPERATOR WALKTHROUGH
+       P8 R4 frame fidelity                         OPERATOR-APPROVED
+       P8 R4 content disposition                    OPERATOR WALKTHROUGH PENDING
+       P8 R4 walkthrough evidence                   docs/work/current/t11-b11-p8-r4-operator-walkthrough.md
+       B11-R2-A Group footprint comprehension       OPEN / FALSIFIABLE DURING CONTENT WALKTHROUGH
+       B11-R2-B Area configuration comprehension    OPEN / FALSIFIABLE DURING CONTENT WALKTHROUGH
+       B11-R2-C membership consequence              OPEN / FALSIFIABLE DURING CONTENT WALKTHROUGH
+       B11-R2-D remaining effective-access gap      OPEN / FALSIFIABLE DURING CONTENT WALKTHROUGH
+       B11-R2-E filtered pagination sufficiency     OPEN / FALSIFIABLE DURING CONTENT WALKTHROUGH
 B12   Document Governance Administration           NOT OPEN
 ```
 
@@ -164,18 +166,17 @@ Both Evidence refs are exact-SHA checked and non-authoritative. B10 `docs/work/*
 ## Exact next action
 
 ```text
-1. Operator operates the exact B11 P8 R4 artifact at docs/work/current/t11-b11-access-administration-p8-r4.html; only the operator may LOCK.
-2. First judge wireframe fidelity itself: review header/status, explicit REVIEW ONLY fixture surface, then the inherited B01/B01N monochrome shell. If this still does not match the established P8 grammar, disposition is REVISE without reopening B11-F1.
-3. Test B11-R2-A in Grupos using `Aprovadores Financeiro`: confirm Aprovador @ Financeiro, Visualizador @ Comercial, Visualizador @ Toda a empresa and Visualizador de governança @ Jurídico are immediately understandable without implying one Group-owned Area.
-4. Test B11-R2-B in Por Área using `Comercial`: confirm Area-specific grants and Company-wide grants that also apply remain visibly separate and truthful.
-5. Test B11-R2-C by adding Mariana to `Aprovadores Financeiro` while the group's footprint remains visible; judge whether the visible footprint + bounded consequence copy is sufficient.
-6. Test B11-R2-D while direct and Group grants coexist: judge whether Launch access administration remains safe without a per-User effective-access troubleshooter.
-7. Test B11-R2-E by paging Area-specific, Company, Group and Role-filtered slices; judge whether filtered pagination is operationally sufficient without global matrix/search capability.
-8. Exercise Funções read-only meaning, grant review Subject × Role × Scope, role scope restrictions, exact revoke, ambiguous retry with same logical command/Idempotency-Key, membership conflict and 403/404/409/failure fixtures.
-9. If disposition REVISE, revise only the smallest affected P8 scope unless operator Evidence exposes a new semantic insufficiency; then route the smallest UPSTREAM FINDING.
-10. Only after explicit B11 LOCK run P9 bidirectional trace and P10 bounded pattern consolidation.
-11. docs/work/** must be absent from the eventual B11 merge candidate/main after exact Evidence preservation.
-12. B12 and FP2/P11 remain NOT OPEN. T12 and Product implementation remain BLOCKED.
+1. Continue only the B11 P8 R4 content walkthrough; frame/wireframe fidelity is already OPERATOR-APPROVED and must not be redesigned.
+2. Test B11-R2-A in Grupos using `Aprovadores Financeiro`: confirm Aprovador @ Financeiro, Visualizador @ Comercial, Visualizador @ Toda a empresa and Visualizador de governança @ Jurídico are immediately understandable without implying one Group-owned Area.
+3. Test B11-R2-B in Por Área using `Comercial`: confirm Area-specific grants and Company-wide grants that also apply remain visibly separate and truthful.
+4. Test B11-R2-C by adding Mariana to `Aprovadores Financeiro` while the group's footprint remains visible; judge whether the visible footprint + bounded consequence copy is sufficient.
+5. Test B11-R2-D while direct and Group grants coexist: judge whether Launch access administration remains safe without a per-User effective-access troubleshooter.
+6. Test B11-R2-E by paging Area-specific, Company, Group and Role-filtered slices; judge whether filtered pagination is operationally sufficient without global matrix/search capability.
+7. Exercise Funções read-only meaning, grant review Subject × Role × Scope, role scope restrictions, exact revoke, ambiguous retry with same logical command/Idempotency-Key, membership conflict and 403/404/409/failure fixtures.
+8. If disposition REVISE, revise only the smallest affected P8 content scope unless operator Evidence exposes a new semantic insufficiency; then route the smallest UPSTREAM FINDING.
+9. Only the operator may LOCK B11. Only after explicit B11 LOCK run P9 bidirectional trace and P10 bounded pattern consolidation.
+10. docs/work/** must be absent from the eventual B11 merge candidate/main after exact Evidence preservation.
+11. B12 and FP2/P11 remain NOT OPEN. T12 and Product implementation remain BLOCKED.
 ```
 
 ## Hard stops
@@ -192,7 +193,7 @@ no client-side crawl/post-filter over incomplete pages presented as complete
 no frontend effective-permission authority or inferred inherited-access matrix
 no Group single-Area ownership inferred from access scope
 no custom Role/Permission editor
-no P8 R5 before explicit operator disposition of P8 R4
+no P8 R5 before explicit operator disposition of P8 R4 content
 no unapproved shell/sidebar/header/local-nav topology redesign inside a block P8
 no production-like visual design in P8
 no assistant/reviewer LOCK
