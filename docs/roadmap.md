@@ -14,7 +14,7 @@ REPOSITORY MODE       CLEAN-SLATE / ARCHITECTURE-FIRST
 T1 → T10              CLOSED / OPERATOR-RATIFIED / INTEGRATED
 T11                   OPEN / ACTIVE
 T11 checkpoint        B01-B10 ACCEPTED / INTEGRATED
-T11 acceptance        B11 EXPLICITLY OPENED IN THIS INCREMENT / BOUNDED P8-P9 REOPEN / R6 CANDIDATE
+T11 acceptance        B11 EXPLICITLY OPENED IN THIS INCREMENT / LOCKED / P8 R6-P10 COMPLETE / PENDING INTEGRATION
 LOCAL METHODS         RESTORED / ENGINEERING v1.0.0 + FRONTEND v2.3
 T12                   NOT OPEN
 IMPLEMENTATION         BLOCKED
@@ -52,16 +52,16 @@ Both files are the unchanged accepted methods also used by the other Development
 
 PR #172 restored these local methods after B11 planning had already begun on its feature branch. The restoration changed operating mechanics only; it did not change Product, Authorization, wire, UX or existing frontend truth. B11 was therefore revalidated against the restored local methods before this acceptance candidate was reconciled with current `main`.
 
-Current bounded impact sweep after the PR #173 review finding:
+Final bounded impact sweep after the PR #173 review finding and R6 partial re-LOCK:
 
 ```text
 B01-B10 protected structure / Screen Contracts  UNAFFECTED
 B11 IA / frame / non-pagination R5 semantics     PRESERVED
-B11 R5 pagination surfaces                       BOUNDED REOPEN
+B11 pagination surfaces                          RE-LOCKED IN R6
 B11-F1 Access Assignment read precision          UNAFFECTED
-B11 P9 bidirectional trace                       BOUNDED REOPEN FOR op6/op16/op22/op27 TRAVERSAL ONLY
-B11 P10 pattern consolidation                    UNAFFECTED
-B11 prior exact LOCK Evidence                     PRESERVED AS HISTORICAL ACCEPTED INPUT
+B11 P9 bidirectional trace                       COMPLETE + R6 PAGINATION DELTA PASS
+B11 P10 pattern consolidation                    UNAFFECTED / COMPLETE
+B11 exact LOCK Evidence                          R6 CURRENT + R5 HISTORICAL PRESERVED
 89-operation / 11-route census                   UNAFFECTED
 operating-method routing                         REBASELINED TO LOCAL v1.0 / v2.3
 FP2 / P11                                        NOT OPEN
@@ -83,8 +83,9 @@ main before PR #173
 PR #173 acceptance candidate
   explicitly opens B11
   + integrates the bounded B11-F1 read precision
-  + consumes operator-operated B11 Evidence
-  + must close all material B11 findings before integration
+  + consumes operator-operated B11 R5 + R6 Evidence
+  + closes the material PR review finding through bounded partial re-LOCK
+  + records P9/P10 closure
   + leaves B12/FP2/T12/implementation blocked
 
 integration of PR #173
@@ -93,9 +94,9 @@ integration of PR #173
 
 A separate open-only PR is not required by the adopted Engineering Method or Frontend Product Experience Planning Method and would protect no additional invariant. Until this acceptance increment is integrated, current `main` remains authoritative with B11 `NOT OPEN`; this branch is the candidate transition, not a parallel main-roadmap authority.
 
-## PR #173 pagination finding
+## PR #173 pagination finding — closed
 
-The first merge attempt was correctly blocked by an unresolved review conversation. The review finding was validated against the exact R5/P9 Evidence and is material but bounded.
+The first merge attempt was correctly blocked by an unresolved review conversation. The review finding was validated against the exact R5/P9 Evidence and was material but bounded.
 
 Root contradiction:
 
@@ -110,7 +111,7 @@ P9 marked those surfaces READY
   without proving how later pages were reached
 ```
 
-Leaving that contradiction unresolved would force one of two invalid implementation outcomes:
+Leaving that contradiction unresolved would have forced one of two invalid implementation outcomes:
 
 ```text
 omit valid later-page identities/members
@@ -125,13 +126,13 @@ CURRENT STRUCTURE CONFIRMED
 + bounded P8/P9 correction
 ```
 
-No Product/backend/wire reopen is justified because the current operations already expose the required paginated truth.
+No Product/backend/wire reopen was required because the current operations already expose the necessary paginated truth.
 
-Affected only:
+R6 corrected and the operator re-LOCKED only:
 
 ```text
 Group member list        op27 visible continuation
-Add-member User picker   op6 continuation/failure precision
+Add-member User picker   op6 visible continuation / failure precision
 Grant User picker        op6 visible continuation
 Grant Group picker       op22 visible continuation
 Grant Area picker        op16 visible continuation
@@ -154,6 +155,19 @@ B11-F1 op31 precision
 Authorization authority
 89-operation census
 P10 consolidation
+```
+
+Closure proof:
+
+```text
+P8 R6 Git blob                    26e8905c5c5012aba59280b1001f62529ed4dfd0
+R6 structural verification       12 / 12 PASS
+R6 Chromium behavior             23 / 23 PASS
+R6 JavaScript parse              PASS
+R6 operator partial re-LOCK      APPROVED
+P9 R6 controls                   5 / 5 READY
+P9 R6 verdict                    PASS
+unresolved material finding      0
 ```
 
 ## Frontend Product Experience Program
@@ -194,34 +208,37 @@ B10   Organization Administration                  LOCKED / P8-P10 COMPLETE / OP
        operation 27+ consumed                       0
        B10-A1 paginated-browse sufficiency          VALIDATED FOR CURRENT LAUNCH P8
        unresolved material B10 Findings             0
-B11   Access Administration                        BOUNDED P8-P9 REOPEN / R6 CANDIDATE / PARTIAL RE-LOCK REQUIRED
-       durable prior Evidence locator               docs/decisions/t11-b11-lock-evidence.md
-       prior Evidence ref                           evidence/t11-b11-locks-20260825
-       prior Evidence exact commit                  469a753904041e7800400dc1074510456aa50df8
-       prior Evidence exact tree                    c4f04b75c3676dcde00caa07279824b3c653c7f3
+B11   Access Administration                        LOCKED / P8 R6-P10 COMPLETE / OPERATOR-RATIFIED / ACCEPTANCE CANDIDATE
+       durable Evidence locator                     docs/decisions/t11-b11-lock-evidence.md
+       current Evidence ref                         evidence/t11-b11-r6-locks-20260825
+       current Evidence exact commit                6dbcec41a43dc2a74629351e22b748188e5c6dc4
+       current Evidence exact tree                  c5054688c68068457a6c46add198c1797cddec0a
+       canonical P8 R6 Git blob                     26e8905c5c5012aba59280b1001f62529ed4dfd0
+       prior R5 Evidence ref                        evidence/t11-b11-locks-20260825
+       prior R5 Evidence exact commit               469a753904041e7800400dc1074510456aa50df8
        prior R5 Git blob                            96094773435a88c357e308779639415d9853b327
        B11-F1 Access Assignment Read Precision      OPERATOR-RATIFIED / DURABLE CANDIDATE
        B11-F1 authority                             docs/decisions/access-assignment-read.md
        op31 listRoleAssignments                     REFINED / FILTERED + HUMAN-RECOGNIZABLE READ
        application-operation delta                  +0 / CENSUS REMAINS 89
-       PR #173 review finding                       VALIDATED / MATERIAL / BOUNDED
-       review finding Evidence                      docs/work/current/t11-b11-p8-r6-review-finding.md
-       R5 preserved scope                           ALL EXCEPT AFFECTED PAGINATION / IDENTITY-PICKER TRAVERSAL
-       P8 R6 artifact                               docs/work/current/t11-b11-access-administration-p8-r6.html
-       P8 R6 Git blob                               26e8905c5c5012aba59280b1001f62529ed4dfd0
-       P8 R6 structural verification                12 / 12 PASS
-       P8 R6 Chromium behavior                      23 / 23 PASS
-       P8 R6 JavaScript parse                       PASS
-       P8 R6 operator disposition                   AWAITING PARTIAL RE-LOCK
-       P9 R6 pagination delta                       docs/work/current/t11-b11-screen-contract-r6-delta.md
-       P9 R6 disposition                            CANDIDATE / AWAITING OPERATOR PARTIAL RE-LOCK
-       P10                                          PRESERVED / UNAFFECTED
+       PR #173 review finding                       CLOSED / VALIDATED + CORRECTED + RE-LOCKED
+       R6 structural verification                   12 / 12 PASS
+       R6 Chromium behavior                         23 / 23 PASS
+       R6 JavaScript parse                          PASS
+       R6 operator disposition                      PARTIAL RE-LOCK / APPROVED
+       P9 original material regions/controls        36 / 36 TRACED subject to R6 supersession on affected rows
+       P9 primary B11 operations                    7 / 7 BOUND (ops 27-33)
+       P9 supporting Organization reads             ops 6 / 16 / 22
+       P9 R6 pagination delta                       5 / 5 READY / PASS (ops 6 / 16 / 22 / 27)
+       P10 existing shared behaviors reused         4
+       P10 new shared semantic patterns             0
+       P10 B11-local protected patterns             9
        operation 90+ consumed                       0
-       unresolved material B11 Findings             1
+       unresolved material B11 Findings             0
 B12   Document Governance Administration           NOT OPEN
 ```
 
-Exact prior locked frontend Evidence remains recoverable through:
+Exact locked frontend Evidence remains recoverable through:
 
 ```text
 B01-B09
@@ -234,31 +251,28 @@ docs/decisions/t11-b10-lock-evidence.md
 evidence/t11-pr170-b10-locks-20260824
 → b8c607cbd30d61d6bcf6ec1ea734ed1653d2569e
 
-B11 prior R5 Evidence
+B11 current R6 Evidence
 docs/decisions/t11-b11-lock-evidence.md
+evidence/t11-b11-r6-locks-20260825
+→ 6dbcec41a43dc2a74629351e22b748188e5c6dc4
+
+B11 prior R5 Evidence
 evidence/t11-b11-locks-20260825
 → 469a753904041e7800400dc1074510456aa50df8
 ```
 
-The prior B11 Evidence remains useful and protected for all unaffected semantics, but it no longer proves the reopened pagination surfaces after the material PR review finding. A new exact Evidence checkpoint is required after operator partial re-LOCK of R6.
+The Evidence refs are non-authoritative recovery/provenance inputs. R6 is the current complete B11 reconstruction artifact; R5 remains historical Evidence for the pre-review LOCK and unaffected semantics.
 
 ## Exact next action
 
 ```text
-1. Operator operates exact P8 R6 blob 26e8905c5c5012aba59280b1001f62529ed4dfd0; judge only the bounded pagination delta.
-2. In Grupos → Aprovadores Financeiro, page the member list to a later page and verify a later-page member (fixture: Sofia Barros) is inspectable/removable.
-3. Exercise continuation failure for the member list; loaded rows must remain visible and must not be presented as the complete membership.
-4. In Conceder acesso, page User subjects to a later page and select/review Mariana Costa.
-5. Switch the grant subject kind to Group, page to the later page and select/review Segurança Operacional.
-6. Choose Area scope, page Areas to the later page and select/review Compras.
-7. Exercise a supporting-read continuation failure; the loaded page/draft must remain intact.
-8. Confirm Group-context grant still preselects Aprovadores Financeiro and Area-context grant still preselects Comercial.
-9. If the operator explicitly re-LOCKs this bounded delta, close only P9 R6-01..R6-05 as READY/PASS; preserve all unaffected R5/P9/P10 decisions.
-10. Create a new exact B11 R6 Evidence checkpoint and update the durable B11 Evidence locator without rewriting the prior R5 Evidence meaning.
-11. Remove `docs/work/**` from the merge candidate, reply to the PR #173 review thread with exact proof, and resolve the thread only after the re-LOCK/P9 closure exists.
-12. Mark PR #173 Ready only after the cleaned candidate is mergeable and `required` is green.
-13. Because the accepted artifact changed after the earlier merge authorization, obtain fresh explicit operator merge authorization before squash merge.
-14. B12 and FP2/P11 remain NOT OPEN. T12 and Product implementation remain BLOCKED.
+1. Remove `docs/work/**` from the PR #173 merge candidate now that exact R6 Evidence is preserved.
+2. Reply to the PR #173 review thread with the exact R6 blob, operator partial re-LOCK and P9 R6 PASS; resolve the thread because its material finding is now closed.
+3. Revalidate PR #173 against current main; the branch must remain mergeable with no unresolved material review conversation.
+4. Mark PR #173 Ready only after the cleaned candidate contains no `docs/work/**`.
+5. Run/inspect the final objective aggregate check `required` on the Ready candidate.
+6. Because the accepted artifact changed after the earlier merge authorization, obtain fresh explicit operator merge authorization before squash merge.
+7. B12 and FP2/P11 remain NOT OPEN. T12 and Product implementation remain BLOCKED.
 ```
 
 ## Hard stops
@@ -269,7 +283,7 @@ no T12 work
 no B12 work
 no FP2/P11 work
 no B01-B10 reopen without material Evidence
-no widening of the B11 reopen beyond the validated pagination finding without new Evidence
+no widening of B11 without new material Evidence
 no application operation 90+ for B11 without a new lawful bounded reopen
 no global User/Group/Area search invented for UI convenience
 no client-side crawl/post-filter over incomplete pages presented as complete
@@ -280,9 +294,8 @@ no ad-hoc rewrite of the shared local method files
 no unapproved shell/sidebar/header/local-nav topology redesign
 no production-like visual design authority inferred from P8
 no assistant/reviewer LOCK
-no declaring P9 complete while R6 lacks operator partial re-LOCK
-no resolving the material PR #173 review thread before exact re-LOCK/P9 proof exists
-no merge while the material finding remains open
+no declaring B11/P9 closed without current R6 operator partial re-LOCK Evidence
+no resolving a material review thread before exact re-LOCK/P9 proof exists
 no merge without fresh explicit operator authorization after the changed accepted artifact
 ```
 
@@ -298,4 +311,4 @@ fresh independent challenge = converged
 operator implementation authorization = explicit
 ```
 
-Accepted Product/R10/frontend LOCK decisions reopen only on material Evidence under the DevelopmentConexus Engineering Method; the current reopen is bounded to the specific pagination surfaces falsified by PR #173 review.
+Accepted Product/R10/frontend LOCK decisions reopen only on material Evidence under the DevelopmentConexus Engineering Method. The PR #173 pagination finding was closed by the bounded R6 correction and operator partial re-LOCK; no broader B11 authority was reopened.
