@@ -2,19 +2,19 @@
 id: repository-reset
 kind: authority
 owner: architecture
-summary: Ratified clean-slate repository reset and its durable provenance/reopen contract.
+summary: Ratified clean-slate repository reset and durable provenance/reopen contract.
 ---
 
 # Repository clean-slate reset
 
 ## Decision
 
-The MetalDocs live repository is architecture-first and excludes the superseded implementation.
+The MetalDocs live tree is architecture-first and excludes the superseded application implementation.
 
 ```text
 PRESERVE CURRENT PRODUCT / ARCHITECTURE TRUTH
 +
-REACHABLE REQUIRED PROVENANCE
+REACHABLE REQUIRED UNMERGED PROVENANCE
 +
 MINIMAL DOCUMENTATION + AGENT + CI SPINE
 -
@@ -23,17 +23,17 @@ SUPERSEDED APPLICATION / DB / OPENAPI / FRONTEND / DEPLOY
 SUPERSEDED SCRIPTS / TESTS / VERIFIERS / ROADMAP / HARNESS / QA / REVIEW ESTATE
 ```
 
-The reset direction is operator-ratified and is not reopened by Repository Standard alignment.
+This reset is operator-ratified. Repository-governance storage/mechanism changes do not reopen the clean-slate Product/technical decision.
 
 ## Why
 
-The ratified technical posture establishes clean-slate physical freedom, no historical-business migration requirement, and implementation blocked until later architecture/readiness gates close. Keeping the old implementation live created false constraints and context bloat.
+The ratified technical posture gives MetalDocs clean-slate physical freedom, requires no historical business-data migration for Launch, and keeps implementation blocked until later readiness gates close. Keeping superseded implementation in the live tree created false constraints and context bloat.
 
-## Durable unmerged provenance refs
+## Required unmerged provenance
 
-Some required byte-level Evidence is intentionally preserved outside the live tree because it must remain exactly recoverable without becoming current Product/status authority.
+Some byte-level provenance is intentionally preserved outside the live tree because Git history on `main` cannot preserve content that was never merged.
 
-The GitHub connector available to this execution does not expose annotated-tag creation. Repository Standard v1 §10 permits "a durable annotated tag or another explicit durable ref". The following explicit durable refs were therefore created and remotely proven byte-identical to their exact source heads:
+Current explicit durable refs required by this authority/its frontend locators:
 
 ```text
 archive/r10-pr131-pre-reset-20260820
@@ -49,36 +49,54 @@ evidence/t11-pr170-b10-locks-20260824
 → b8c607cbd30d61d6bcf6ec1ea734ed1653d2569e
 ```
 
-The first two refs preserve unmerged PR #131/#132 authority/review lineages from the repository reset. The T11 Evidence refs preserve exact operator-LOCKED frontend Evidence required for later P11 reconstruction: B01-B09 are routed by `t11-b01-b09-lock-evidence.md`; B10 P8/P9/P10 is routed by `t11-b10-lock-evidence.md`.
+The first two refs preserve required unmerged pre-reset authority/review lineage. The T11 refs preserve exact operator-LOCKED frontend Evidence for later P11 reconstruction and are routed by their durable Evidence locators.
 
-Proof: each current Evidence/provenance ref is exact-SHA pinned by the repository aggregate gate. The B10 ref was additionally remotely resolved immediately after creation to the exact pre-cleanup PR #170 HEAD above.
+### Reachability law
 
-These durable refs MUST NOT be moved or deleted while this page or another current authority names their byte-level provenance as required. The original source branches may be removed only after equivalent reachability has been independently re-proven. Retirement of each T11 Evidence ref additionally follows the explicit retirement law in its corresponding Evidence locator.
+These refs must not be moved/deleted while a current authority names their exact provenance as required.
 
-Git history on `main` preserves the removed legacy implementation; the refs above preserve required **unmerged** authority/review/Evidence lineages.
+Current `required` CI does **not** network/SHA-check every historical ref on every unrelated PR. That is deliberate: provenance correctness is proved when the current claim or cleanup action depends on it.
 
-## What survives
-
-Only named current consumers survive in the live tree:
+Before removing an original branch/ref that might be the last required path to unmerged material:
 
 ```text
-Product Contract / whole-product alignment / ownership
-T1 → T8-D ratified authorities
-accepted T8-E checkpoint
-52 forward decision obligations
-Repository Standard-aligned documentation / Git / CI envelope
+identify current consumer
+→ verify surviving durable authority
+→ resolve the named archive/Evidence ref to the expected exact commit/blob
+→ only then remove the redundant ordinary branch
+```
+
+Merged legacy implementation remains recoverable through `main` Git history; no working-tree archive is required.
+
+## What survives in the live tree
+
+Only current named consumers survive, including:
+
+```text
+Product contract / alignment / ownership
+current T1→T10 Product and architecture authorities
+current bounded T11 decisions already integrated
+forward obligations still relevant to future stages
+local repository methods / routers / objective CI spine
 ```
 
 Historical mechanisms return only through the proof-backed reuse gate in `docs/architecture/technical-baseline.md`.
 
 ## Relationship to transition
 
-This was source-tree cleanup, not production/business-data cutover. Any future runtime/data transition remains owned by the stage progression in `docs/roadmap.md`.
+This reset was source-tree cleanup, not production/business-data cutover. Future runtime/data transition remains owned by `docs/roadmap.md` + `docs/architecture/transition.md`.
 
-## Retired controls and reopen triggers
+## Retired controls and future implementation gate
 
-Old implementation/dependency CI was retired because its protected implementation population is zero in the architecture-first tree.
+Old implementation/dependency CI was retired because its protected implementation population in the live tree is zero.
 
 Secret scanning is not currently active because executable implementation/dependency surfaces are absent. **Before the first future implementation/code/schema/runtime commit is authorized, an appropriate secret-scanning control must be restored and proved capable of firing.**
 
-Reopen this reset only if concrete evidence proves a removed mechanism is an externally binding compatibility contract or independently the smallest sustainable realization of a current ratified requirement. Sunk cost, old test coverage, roadmap status, or old CI expectations are not reopen triggers.
+## Reopen triggers
+
+Reopen this reset only if concrete Evidence proves a removed mechanism is:
+
+- an externally binding compatibility contract; or
+- independently the smallest sustainable realization of a current accepted requirement.
+
+Sunk cost, old test coverage, historical branch existence, or retired CI expectations are not reopen triggers.
