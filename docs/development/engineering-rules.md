@@ -123,7 +123,7 @@ exact candidate branch / HEAD
 
 The reviewer MUST NOT edit Product, architecture, method, plan, P8/P9/P10, code, or any other candidate file on the review branch. Corrections belong on the candidate branch only after lead/operator adjudication.
 
-`docs/work/current/ai-dialog.md` is append-only transport for the active review. Existing turns are never rewritten to make later reasoning look cleaner.
+`docs/work/current/ai-dialog.md` is append-only transport for the active review. Existing turns are never rewritten to make later reasoning look cleaner. The single header `status:` field is the one explicit exemption: the Lead updates it in place on convergence/supersession, in the same commit as the turn that justifies the transition.
 
 Use this turn grammar:
 
