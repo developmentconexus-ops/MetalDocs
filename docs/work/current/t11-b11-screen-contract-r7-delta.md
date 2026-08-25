@@ -1,19 +1,19 @@
 # T11 — B11 Access Administration — P9 R7 User Picker Delta
 
-> **Status:** CANDIDATE / AWAITING OPERATOR RE-LOCK.  
+> **Status:** COMPLETE / OPERATOR RE-LOCKED / PASS.  
 > **P8 delta:** `docs/work/current/t11-b11-grant-user-picker-p8-r7.html`  
 > **P8 R7 blob:** `3e9130fd7b9e5b6b414b5c8e96faf6c6644cb4df`  
 > **Finding:** `docs/work/current/t11-b11-p8-r7-review-finding.md`.
 
 ## Preserved contract
 
-All R6/P9 rows remain protected except the grant User picker traversal previously named R6-03.
+All R6/P9 rows remain protected except the grant User picker traversal previously named R6-03. R7 supersedes only that row.
 
-## Reopened row
+## Closed row
 
 | Surface | Accepted truth | Correct interaction | Failure | Forbidden shortcut | Status |
 |---|---|---|---|---|---|
-| Grant User subject picker | op6 `listUsers` / raw `UserPage`, `user_id ASC`, cursor pagination | page raw server rows; render ENABLED selectable and DISABLED visible/unavailable; later page can reach final Subject × Role × Scope review | failed continuation preserves loaded page/draft | pre-pagination client state filter; hidden all-page crawl; invented state filter/search | CANDIDATE |
+| Grant User subject picker | op6 `listUsers` / raw `UserPage`, `user_id ASC`, cursor pagination | page raw server rows; render ENABLED selectable and DISABLED visible/unavailable; later page can reach final Subject × Role × Scope review | failed continuation preserves loaded page/draft | pre-pagination client state filter; hidden all-page crawl; invented state filter/search | READY / PASS |
 
 ## Bidirectional trace
 
@@ -34,9 +34,9 @@ DISABLED row
 → no selectable user_id
 ```
 
-The frontend does not reshape cursor pages after receipt.
+The frontend does not reshape cursor pages after receipt and does not require any new op6 filter.
 
-## Exact R7 probe
+## Exact R7 proof
 
 ```text
 page 1 raw boundary
@@ -58,23 +58,25 @@ page 3 raw boundary
   Felipe Moraes
 ```
 
-On exact local bytes matching blob `3e9130fd7b9e5b6b414b5c8e96faf6c6644cb4df`:
+Exact R7 bytes:
 
 ```text
-static + Chromium 12 / 12 PASS
-JavaScript parse PASS
+Git blob              3e9130fd7b9e5b6b414b5c8e96faf6c6644cb4df
+static + Chromium     12 / 12 PASS
+JavaScript parse      PASS
+operator disposition  APPROVED / RE-LOCK
 ```
 
-## Exit gate
+## Verdict
 
 ```text
-operator operates exact R7 delta
-→ explicit re-LOCK of grant User picker only
-→ this row READY / PASS
-→ preserve amended Evidence
-→ update durable B11 locator as R6 + R7 amendment
-→ clean docs/work/**
-→ close PR review thread with exact proof
+R6-03 grant User picker      SUPERSEDED BY R7
+R7 grant User picker         READY / PASS
+new backend capability       0
+new application operation    0
+hidden all-page crawl        0
+pre-pagination state filter  0
+unresolved P9 R7 findings    0
 ```
 
-Until then, B11 has one bounded material finding open and PR #173 remains Draft.
+R6 remains the accepted complete B11 base artifact for all unaffected structure. R7 is the exact operator-LOCKED amendment for grant User picker page fidelity.
