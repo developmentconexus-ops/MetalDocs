@@ -2,12 +2,17 @@
 id: engineering-rules
 kind: authority
 owner: engineering
-summary: MetalDocs-specific engineering, Git, CI, provenance, and implementation-gate rules layered on the pinned organizational methodology.
+summary: MetalDocs-specific execution, Git, CI, provenance, and implementation-gate rules.
 ---
 
 # Engineering rules
 
-The exact organizational methodology pin and selection route are owned by `AGENTS.md`. This page contains only MetalDocs-specific controls and MUST NOT duplicate or redefine reusable organizational methodology.
+This page contains only MetalDocs-specific controls. Reusable engineering/frontend reasoning lives in the repository-local method files:
+
+- [`engineering-method.md`](engineering-method.md) — DevelopmentConexus Engineering Method v1.0.0;
+- [`frontend-product-experience-planning-method.md`](frontend-product-experience-planning-method.md) — Frontend Product Experience Planning Method v2.3.
+
+`AGENTS.md` and `docs/index.md` route to these files directly. There is no external methodology router, pin, profile-selection step, file-count limit, owner-count limit, or context budget.
 
 ## Implementation gate
 
@@ -21,13 +26,13 @@ Before the first future implementation/code/schema/runtime commit is authorized,
 
 ## Frontend planning visual evidence
 
-While an architecture/planning PR remains Draft, P8 rendered structural wireframes may be tracked as temporary HTML Evidence only under:
+While an architecture/planning PR remains Draft, P8 rendered structural wireframes may be tracked as temporary HTML Evidence under:
 
 ```text
 docs/work/current/*.html
 ```
 
-This is a MetalDocs repository specialization for preserving operator-reviewable rendered Evidence. It does not admit production frontend code, scripts, dependencies, runtime assets, or HTML outside that bounded temporary-work root. `docs/work/**` remains branch-only and must be absent from a merge candidate/main.
+This does not admit production frontend code or runtime assets. `docs/work/**` is temporary planning material and must be absent from a merge candidate/main.
 
 ## Forward decision obligations
 
@@ -43,26 +48,26 @@ When an obligation closes or materially refines, update the durable register rat
 
 ## Repository protection
 
-Current external repository binding:
+Current protected aggregate status context remains:
 
 ```text
-required aggregate status context: required
-GitHub ruleset id:                 20560142
-review conversations:              resolved before merge
+required
 ```
 
 Do not rename/remove `required` without deliberately updating repository protection.
 
-Normal governance/architecture integration uses squash merge after explicit operator merge authorization. No direct commits to `main`; no force-push or shared-history rewrite.
-
-Repository-host settings may expose additional merge mechanisms; MetalDocs policy remains squash as normal integration. Host-setting hardening is an administrative control, not a reason to duplicate Git policy in Product/architecture authority.
+Normal integration is squash merge after explicit operator merge authorization. No direct commits to `main`; no force-push or shared-history rewrite.
 
 ## Provenance
 
-Required unmerged provenance/Evidence refs are named by durable repository authority and exact-SHA checked by the aggregate gate while they have a current consumer. Do not delete or move them until the owning authority's retirement condition is satisfied.
+Durable Evidence locators remain repository evidence and may name exact historical refs/blobs when needed to recover accepted LOCK evidence. They do not need to become permanent network/SHA checks in every unrelated CI run.
 
 ## Verification
 
-`.github/workflows/ci.yml` owns the executable repository-conformance proof. A control counts only when its negative path is demonstrably capable of firing.
+`.github/workflows/ci.yml` owns the small required repository safety net.
 
-A failing retired/legacy check is not a reason to restore old machinery; first prove the check still protects a current property.
+Required CI protects objective properties only: essential operating files, unresolved merge-conflict markers, implementation-block violations in the PR diff, and temporary `docs/work/**` material entering a merge candidate.
+
+Do not use CI to judge Global Maximum, evidence quality, UX/architecture quality, number of files read, methodology selection, documentation reachability, historical status prose, or Evidence-branch freshness. Those are engineering/review questions governed by the adopted methods.
+
+Run targeted proof when a specific Product/architecture/wireframe claim requires it. A failing retired or historical checker is not a reason to restore old machinery; first prove the checker still protects a current property.

@@ -2,7 +2,7 @@ name: CI
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
 
 permissions:
   contents: read
@@ -13,266 +13,34 @@ concurrency:
 
 jobs:
   required:
+    name: required
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
+          persist-credentials: false
 
-      - name: Verify repository envelope
+      - name: Verify objective repository properties
         shell: bash
         env:
           PR_DRAFT: ${{ github.event.pull_request.draft }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          BASE_REF: ${{ github.event.pull_request.base.ref }}
-          HEAD_REF: ${{ github.event.pull_request.head.ref }}
         run: |
           set -euo pipefail
 
-          # Review branches are isolated Evidence channels. A valid review PR
-          # stays Draft, targets its candidate branch and differs only by the
-          # temporary Fable dialogue. Valid isolation is green; making the PR
-          # ready or violating isolation is the blocking condition.
-          if [[ "$HEAD_REF" == review/* ]]; then
-            if [[ "$PR_DRAFT" != "true" ]]; then
-              echo "::error::review Evidence PRs must remain Draft and must never become merge candidates"
-              exit 1
-            fi
-            if [[ "$BASE_REF" == "main" ]]; then
-              echo "::error::review branches must target their candidate branch, never main"
-              exit 1
-            fi
-            if ! git merge-base --is-ancestor "$BASE_SHA" "$HEAD_SHA"; then
-              echo "::error::review branch does not contain the current candidate base"
-              exit 1
-            fi
-            mapfile -t changed < <(git diff --name-only "$BASE_SHA..$HEAD_SHA")
-            if [[ "${#changed[@]}" -ne 1 || "${changed[0]:-}" != "docs/work/current/ai-dialog.md" ]]; then
-              echo "::error::review branch delta must be docs/work/current/ai-dialog.md only"
-              printf 'changed: %s\n' "${changed[@]:-<none>}"
-              exit 1
-            fi
-            echo "review Evidence isolation verified"
-            exit 0
-          fi
-
-          # Main-targeting architecture-first PRs admit only the accepted live surfaces.
-          if [[ "$BASE_REF" != "main" ]]; then
-            echo "::error::non-review repository PRs must target main"
-            exit 1
-          fi
-          allowed_path() {
-            if [[ "$1" =~ ^(AGENTS\.md|CLAUDE\.md|README\.md|\.gitignore|\.gitattributes|\.github/.+\.ya?ml|docs/.+\.md)$ ]]; then
-              return 0
-            fi
-            # P8 rendered visual evidence may use HTML only as temporary Draft work.
-            [[ "$PR_DRAFT" == "true" && "$1" =~ ^docs/work/current/[^/]+\.html$ ]]
-          }
-
-          allowed_path "docs/roadmap.md"
-          allowed_path ".github/workflows/ci.yml"
-          if [[ "$PR_DRAFT" == "true" ]]; then
-            allowed_path "docs/work/current/p8-wireframe.html"
-          else
-            if allowed_path "docs/work/current/p8-wireframe.html"; then
-              echo "::error::temporary P8 HTML must be rejected outside Draft planning"
-              exit 1
-            fi
-          fi
-          if allowed_path "docs/t11-wireframe.html" || allowed_path "docs/work/current/nested/p8-wireframe.html"; then
-            echo "::error::P8 HTML escaped the bounded docs/work/current root"
-            exit 1
-          fi
-          if allowed_path "src/main.go" || allowed_path "openapi/app.yaml" || allowed_path "migrations/001.sql"; then
-            echo "::error::architecture-only allowlist accepted implementation path"
-            exit 1
-          fi
-
-          invalid=0
-          while IFS= read -r path; do
-            if ! allowed_path "$path"; then
-              echo "::error file=$path::tracked path is outside the architecture-first allowlist"
-              invalid=1
-            fi
-          done < <(git ls-files)
-          [[ "$invalid" -eq 0 ]]
-
-          # Required bootstrap and unique routing surfaces.
-          test -f AGENTS.md
-          test -f docs/index.md
-          test -f docs/roadmap.md
-          test ! -e docs/status.md
-          test ! -e docs/decisions/stage-program.md
-
-          bootstrap_bytes=$(( $(wc -c < AGENTS.md) + $(wc -c < docs/index.md) + $(wc -c < docs/roadmap.md) ))
-          echo "bootstrap_bytes=$bootstrap_bytes"
-          [[ "$bootstrap_bytes" -le 20480 ]]
-
-          # Exact organizational methodology consumption is part of bootstrap.
-          methodology_pin='9c7210d1504bef01c0d134a6c3ae8627deebb535'
-          methodology_bootstrap_ok() {
-            local file="$1"
-            grep -Fq 'developmentconexus-ops/conexus-methodology' "$file" &&
-            grep -Fq "$methodology_pin" "$file" &&
-            grep -Fq 'ROUTER.md' "$file"
-          }
-          methodology_bootstrap_ok AGENTS.md
-
-          # Negative-path proof: a moving-main bootstrap must not satisfy the pin guard.
-          cat > /tmp/bad-agents-methodology <<'EOF'
-          developmentconexus-ops/conexus-methodology
-          main
-          ROUTER.md
-          EOF
-          if methodology_bootstrap_ok /tmp/bad-agents-methodology; then
-            echo "::error::methodology pin guard accepted a moving-main bootstrap"
-            exit 1
-          fi
-
-          # The reusable MetalDocs v2.3 frontend method was promoted centrally;
-          # keeping a local canonical copy would recreate duplicate method authority.
-          test ! -e docs/development/functional-html-wireframe-method.md
-          grep -Fq 'FRONTEND-METHOD.md' docs/index.md
-          if git grep -n 'functional-html-wireframe-method\.md' -- AGENTS.md docs/index.md; then
-            echo "::error::active router still references the superseded local frontend method"
-            exit 1
-          fi
-
-          # README/routers cannot become parallel mutable roadmaps.
-          if grep -Eiq 'PR #[0-9]+|Current (posture|stage|gate)|Exact next action|T8-[A-Z].*(ACTIVE|PAUSED|CLOSED)|IMPLEMENTATION[[:space:]]+(BLOCKED|ALLOWED)' README.md AGENTS.md docs/index.md; then
-            echo "::error::mutable stage/status leaked outside docs/roadmap.md"
-            exit 1
-          fi
-
-          # Merge candidates/main contain no temporary work or permanent review trees.
-          if [[ "$PR_DRAFT" != "true" ]] && git ls-files 'docs/work/**' | grep -q .; then
-            echo "::error::docs/work must be absent from a merge candidate"
-            exit 1
-          fi
-          if git ls-files | grep -Eqi '(^|/)(docs/superpowers|old|archive|tombstones?|reviews?|rounds?|handoffs?)(/|$)|ai-dialog'; then
-            echo "::error::permanent old/archive/review/handoff surface detected"
-            exit 1
-          fi
-
-          # Required Product/R10 authority set survives the reset.
           for path in \
-            docs/product/contract.md \
-            docs/product/alignment.md \
-            docs/product/journeys.md \
-            docs/architecture/ownership.md \
-            docs/architecture/domain-model.md \
-            docs/architecture/lifecycle.md \
-            docs/architecture/authorization-and-audit.md \
-            docs/architecture/content-integrity.md \
-            docs/architecture/async-and-search.md \
-            docs/architecture/technical-baseline.md \
-            docs/architecture/backend.md \
-            docs/architecture/interfaces.md \
-            docs/architecture/persistence.md \
-            docs/architecture/wire-contract.md \
-            docs/decisions/api-operation-census.md \
-            docs/decisions/forward-obligations.md; do
-            test -f "$path"
+            AGENTS.md \
+            docs/index.md \
+            docs/roadmap.md \
+            docs/development/engineering-method.md \
+            docs/development/frontend-product-experience-planning-method.md \
+            docs/development/engineering-rules.md; do
+            test -f "$path" || { echo "::error file=$path::required operating file missing"; exit 1; }
           done
 
-          # Decision forward-obligation census must be internally coherent.
-          # Counts are owned by the document, not duplicated in workflow code.
-          python3 - <<'PY'
-          from pathlib import Path
-          import re
-
-          p = Path('docs/decisions/forward-obligations.md').read_text()
-          kinds = ('PRESERVE', 'REOPEN', 'DEFERRED')
-          counts = {}
-
-          for kind in kinds:
-              heading = re.search(rf'^## {kind} — (\d+)$', p, re.M)
-              if not heading:
-                  raise SystemExit(f'{kind}: count heading missing')
-              declared = int(heading.group(1))
-              actual = len(re.findall(rf'^- \*\*[^*\n]+ — {kind}\*\* —', p, re.M))
-              if actual != declared:
-                  raise SystemExit(f'{kind}: declared {declared}, got {actual}')
-              counts[kind] = declared
-
-          if '## Count proof' not in p:
-              raise SystemExit('forward-obligation count proof missing')
-          proof = p.split('## Count proof', 1)[1]
-
-          for kind, declared in counts.items():
-              row = re.search(rf'^{kind}\s+(\d+)$', proof, re.M)
-              if not row or int(row.group(1)) != declared:
-                  raise SystemExit(f'{kind}: count proof disagrees with heading')
-
-          total = re.search(r'^TOTAL\s+(\d+)$', proof, re.M)
-          expected_total = sum(counts.values())
-          if not total or int(total.group(1)) != expected_total:
-              raise SystemExit(f'TOTAL: expected {expected_total} from declared sections')
-          PY
-
-          # Router links resolve; durable docs are reachable from docs/index.md.
-          python3 - <<'PY'
-          from pathlib import Path
-          import re
-          from urllib.parse import unquote
-
-          root = Path('.').resolve()
-          link_re = re.compile(r'\[[^\]]+\]\(([^)]+)\)')
-
-          def targets(path):
-              text = path.read_text()
-              for raw in link_re.findall(text):
-                  target = raw.strip().split('#', 1)[0]
-                  if not target or '://' in target or target.startswith(('mailto:', '#')):
-                      continue
-                  target = unquote(target)
-                  resolved = (path.parent / target).resolve()
-                  if root not in resolved.parents and resolved != root:
-                      raise SystemExit(f'link escapes repo: {path} -> {target}')
-                  if not resolved.exists():
-                      raise SystemExit(f'broken link: {path} -> {target}')
-                  if resolved.is_file() and resolved.suffix == '.md':
-                      yield resolved
-
-          start = (root / 'docs/index.md').resolve()
-          seen, stack = set(), [start]
-          while stack:
-            p = stack.pop()
-            if p in seen:
-              continue
-            seen.add(p)
-            stack.extend(t for t in targets(p) if t not in seen)
-
-          durable = {
-              p.resolve() for p in (root / 'docs').rglob('*.md')
-              if 'work' not in p.relative_to(root / 'docs').parts
-          }
-          missing = sorted(str(p.relative_to(root)) for p in durable - seen)
-          if missing:
-              raise SystemExit('unrouted durable docs: ' + ', '.join(missing))
-
-          # Durable docs may discuss work rules but may not link to temporary work.
-          for p in durable:
-              for t in targets(p):
-                  rel = t.relative_to(root)
-                  if len(rel.parts) >= 2 and rel.parts[0:2] == ('docs', 'work'):
-                      raise SystemExit(f'durable doc depends on work: {p.relative_to(root)} -> {rel}')
-          PY
-
-          # Exact-SHA pins preserve required unmerged provenance/Evidence refs.
-          pr131=$(git ls-remote --heads origin refs/heads/archive/r10-pr131-pre-reset-20260820 | awk '{print $1}')
-          pr132=$(git ls-remote --heads origin refs/heads/archive/repository-governance-pr132-20260820 | awk '{print $1}')
-          t11locks=$(git ls-remote --heads origin refs/heads/evidence/t11-pr162-b01-b09-locks-20260824 | awk '{print $1}')
-          b10locks=$(git ls-remote --heads origin refs/heads/evidence/t11-pr170-b10-locks-20260824 | awk '{print $1}')
-          [[ "$pr131" == "d8b1c6d31e704e9552a14faa7764c634a29b081d" ]]
-          [[ "$pr132" == "b0ebe54cb010e9837a25f7b778f3d9814d283cb8" ]]
-          [[ "$t11locks" == "adf58e448bc5bd3a20cae5b7228d729c031f94ac" ]]
-          [[ "$b10locks" == "b8c607cbd30d61d6bcf6ec1ea734ed1653d2569e" ]]
-
-          # Whitespace remains non-blocking hygiene, but git diff --check also
-          # detects unresolved merge-conflict markers; those remain correctness blockers.
           diff_check=$(git diff --check "$BASE_SHA...$HEAD_SHA" 2>&1 || true)
           conflict_issues=$(printf '%s\n' "$diff_check" | grep -F 'leftover conflict marker' || true)
           if [[ -n "$conflict_issues" ]]; then
@@ -286,3 +54,21 @@ jobs:
             echo "::warning::non-blocking whitespace findings in PR diff"
             printf '%s\n' "$whitespace_issues"
           fi
+
+          if grep -Eq '^IMPLEMENTATION[[:space:]]+BLOCKED$|Product implementation.*BLOCKED|IMPLEMENTATION[[:space:]]+\*\*BLOCKED' docs/roadmap.md; then
+            while IFS= read -r path; do
+              case "$path" in
+                apps/*|src/*|cmd/*|internal/*|backend/*|frontend/*|migrations/*|openapi/*|contracts/*|deploy/*|Dockerfile|docker-compose*|go.mod|go.sum|package.json|package-lock.json|pnpm-lock.yaml|yarn.lock)
+                  echo "::error file=$path::Product implementation is blocked by docs/roadmap.md"
+                  exit 1
+                  ;;
+              esac
+            done < <(git diff --name-only "$BASE_SHA...$HEAD_SHA")
+          fi
+
+          if [[ "$PR_DRAFT" != "true" ]] && git ls-files 'docs/work/**' | grep -q .; then
+            echo "::error::temporary docs/work material must be absent from a merge candidate"
+            exit 1
+          fi
+
+          echo 'required: PASS'
