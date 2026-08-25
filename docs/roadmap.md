@@ -15,10 +15,10 @@ REPOSITORY GOVERNANCE REBASELINED / OPERATOR-APPROVED
 REPOSITORY READINESS  READY TO RESUME PRODUCT PLANNING
 T1 → T10              CLOSED / OPERATOR-RATIFIED / INTEGRATED
 T11                   OPEN / ACTIVE
-T11 checkpoint        B01-B10 ACCEPTED / INTEGRATED
+T11 checkpoint        B01-B11 ACCEPTED / INTEGRATED
 B11-F1                ACCESS ASSIGNMENT READ PRECISION / OPERATOR-RATIFIED / INTEGRATED
-B11                   LOCKED / P8-P10 COMPLETE / ACCEPTANCE CANDIDATE
-B12                   NOT OPEN
+B11                   LOCKED / P8-P10 COMPLETE / INTEGRATED
+B12                   OPEN / P6-P7 NEXT
 FP2 / P11             NOT OPEN
 T12                   NOT OPEN
 IMPLEMENTATION         BLOCKED
@@ -94,13 +94,13 @@ B07   Document History                            LOCKED / P8-P10 COMPLETE
 B08   Notifications Full Inbox                    LOCKED / P8-P10 COMPLETE
 B09   Audit                                       LOCKED / P8-P10 COMPLETE
 B10   Organization Administration                 LOCKED / P8-P10 COMPLETE / INTEGRATED
-B11   Access Administration                       LOCKED / P8-P10 COMPLETE / ACCEPTANCE CANDIDATE
-B12   Document Governance Administration          NOT OPEN
+B11   Access Administration                       LOCKED / P8-P10 COMPLETE / INTEGRATED
+B12   Document Governance Administration          OPEN / P6-P7 NEXT
 ```
 
 B01–B11 exact frontend Evidence remains recoverable through their durable locators; Evidence identity/details do not belong in this roadmap.
 
-B11-F1 remains the upstream op31 authority consumed by the B11 acceptance candidate. The old B11 PR remains superseded Evidence only.
+B11-F1 remains the upstream op31 authority consumed by integrated B11. The old B11 PR remains superseded Evidence only.
 
 ## B11 acceptance result
 
@@ -116,17 +116,18 @@ unresolved material findings                          0
 application operations                                89 / operation 90 absent
 ```
 
-Exact Evidence is routed by `docs/decisions/t11-b11-lock-evidence.md`. Temporary `docs/work/**` is absent from the acceptance candidate.
+Exact Evidence is routed by `docs/decisions/t11-b11-lock-evidence.md`. Temporary `docs/work/**` is absent from `main`.
 
 ## Exact next action
 
 ```text
-1. Verify the cleaned B11 acceptance candidate with the repository aggregate gate; `docs/work/**` must remain absent.
-2. Inspect current PR review conversations/findings and adjudicate only material current-authority defects.
-3. If required CI/review is clean, mark the complete candidate Ready.
-4. Stop for explicit operator merge authorization on the exact Ready HEAD.
-5. After B11 is accepted/integrated, update the roadmap to open B12 as the next FP1 block.
-6. FP2/P11, T12 and Product implementation remain BLOCKED.
+1. Create one B12 Document Governance Administration acceptance increment from current `main`.
+2. Recover only the B12 authority pack through AGENTS → roadmap → Engineering + Frontend methods → docs/index.
+3. Run conditional P6 reference study only where a consequential UX ambiguity is real.
+4. Produce P7 layout hypotheses and resolve any blocking upstream finding before functional P8.
+5. Iterate one browser-operable low-fidelity P8; only the operator may LOCK it.
+6. After LOCK, close exact P9/P10 and integrate the coherent B12 increment.
+7. FP2/P11, T12 and Product implementation remain BLOCKED until later roadmap authority opens them.
 ```
 
 ## Hard stops
@@ -134,9 +135,8 @@ Exact Evidence is routed by `docs/decisions/t11-b11-lock-evidence.md`. Temporary
 ```text
 no Product code/schema/OpenAPI/runtime/deploy implementation
 no T12 work
-no B12 before B11 accepted integration
 no FP2/P11 work
-no B01-B10 reopen without material Evidence
+no B01-B11 reopen without material Evidence
 no rewrite of Engineering Method or Frontend Method
 no force-push/shared-history rewrite
 no assistant/reviewer LOCK
