@@ -8,7 +8,7 @@ summary: Local repository operating method for authority recovery, selective con
 # DevelopmentConexus Repository Operating Method
 
 **Version:** 1.0.0  
-**Status:** CANDIDATE — MetalDocs governance rebaseline  
+**Status:** ACCEPTED / OPERATOR-APPROVED — 2026-08-25  
 **Scope:** repository operation and continuity; not Product or architecture meaning
 
 ## Objective
