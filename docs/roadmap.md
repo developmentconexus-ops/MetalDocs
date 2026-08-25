@@ -11,18 +11,18 @@ summary: Sole mutable MetalDocs stage, gate, implementation-status, blocker, and
 
 ```text
 REPOSITORY MODE       CLEAN-SLATE / ARCHITECTURE-FIRST
+REPOSITORY GOVERNANCE REBASELINED / OPERATOR-APPROVED
 T1 → T10              CLOSED / OPERATOR-RATIFIED / INTEGRATED
 T11                   OPEN / ACTIVE
 T11 checkpoint        B01-B10 ACCEPTED / INTEGRATED
-CURRENT INCREMENT     REPOSITORY GOVERNANCE REBASELINE / ACTIVE CANDIDATE
-B11                   NOT OPEN ON INTEGRATED MAIN / CONTINUATION PAUSED
+B11                   NOT OPEN ON INTEGRATED MAIN / CONTINUATION PAUSED FOR REBASELINE
 B12                   NOT OPEN
 FP2 / P11             NOT OPEN
 T12                   NOT OPEN
 IMPLEMENTATION         BLOCKED
 ```
 
-This branch changes **repository operation only**. Product, architecture, accepted B01–B10 frontend LOCKs, 89-operation census and implementation permission are not reopened by this increment.
+The governance rebaseline changes repository operation only. Product, architecture, accepted B01–B10 frontend LOCKs, the 89-operation census and implementation permission are unchanged.
 
 ## Current system census
 
@@ -38,22 +38,33 @@ exact-byte resources         4
 
 `docs/decisions/api-operation-census.md` owns the detailed census.
 
-## Local method baseline
-
-Target operating model for this acceptance increment:
+## Local methods
 
 ```text
 engineering-method.md
-  DevelopmentConexus Engineering Method v1.0.0
+  DevelopmentConexus Engineering Method v1.0.0 / ACCEPTED
 
 repository-method.md
-  DevelopmentConexus Repository Operating Method v1.0.0 / CANDIDATE
+  DevelopmentConexus Repository Operating Method v1.0.0 / OPERATOR-APPROVED
 
 frontend-product-experience-planning-method.md
-  Frontend Product Experience Planning Method v2.3
+  Frontend Product Experience Planning Method v2.3 / ACCEPTED
 ```
 
-Engineering and Frontend method bytes remain unchanged. The Repository Operating Method restores local fresh-session recovery, selective context, documentation/Git/Evidence and acceptance-increment continuity without an external methodology router/pin.
+Operating route:
+
+```text
+revalidate repository / branch / main / PR / required
+→ AGENTS.md
+→ roadmap
+→ applicable local method(s)
+→ docs/index.md
+→ 1–2 task owners by default
+→ relevant section / operation first
+→ expand only when material Evidence can change the conclusion
+```
+
+The roadmap is a snapshot, not an execution journal. Detailed iteration/review history belongs to temporary work, Git/PR history, owning decisions or exact Evidence locators when required.
 
 ## Frontend Product Experience Program
 
@@ -83,49 +94,34 @@ B11   Access Administration                       NOT OPEN ON INTEGRATED MAIN
 B12   Document Governance Administration          NOT OPEN
 ```
 
-B01–B10 exact frontend Evidence remains recoverable through their durable locators. Evidence identity/details live in those locators rather than in this roadmap.
+B01–B10 exact frontend Evidence remains recoverable through their durable locators; Evidence identity/details do not belong in this roadmap.
 
-## Active governance increment
-
-Goal:
+## Repository operating baseline
 
 ```text
-restore fast repository-local operating model
-→ AGENTS bootstrap/router
-→ three local methods
-→ selective task/intention index
-→ compact roadmap snapshot
-→ compact decision register
-→ accurate provenance/CI descriptions
+AGENTS.md                  compact bootstrap + method router
+docs/index.md              task/intention → Start / Add when / Do not read by default
+docs/decisions/index.md    compact current disposition router
+docs/roadmap.md            sole mutable current-status snapshot
+repository-method.md       selective context + documentation + Git/Evidence + PR continuity
+engineering-rules.md       MetalDocs-specific execution/CI/provenance controls only
+Git                        normal archive
+docs/work/**               temporary Draft-only work, absent before Ready/main
 ```
 
-Acceptance conditions:
-
-```text
-Engineering Method unchanged
-Frontend Method unchanged
-repository-method present and routed
-no active external methodology router/pin claim
-no duplicate documentation-governance authority
-roadmap remains snapshot, not journal
-decision register routes rather than retells
-repository-reset describes current controls truthfully
-required stays objective and single-entry
-docs/work/** absent before Ready
-no Product/B11 semantic delta
-```
+Frontend discovery remains allowed to falsify earlier Product/backend planning when real Evidence proves it insufficient. Engineering + Frontend methods then reopen only the smallest owning authority and boundedly rebaseline affected frontend work.
 
 ## Exact next action
 
+After this governance baseline is integrated:
+
 ```text
-1. Complete and verify this repository-governance rebaseline on its isolated branch/PR.
-2. Remove temporary docs/work/** and make the governance PR Ready only after the complete consistency sweep passes.
-3. Obtain explicit operator merge authorization; squash merge if authorized.
-4. After governance integration, run a separate repository-hygiene increment:
-   - classify branches/refs KEEP / DELETE / NEEDS PROOF;
-   - present the deletion list to the operator before deleting anything;
-   - evaluate head-branch auto-delete and CI checkout-history cost.
-5. Only after governance/hygiene alignment, rebaseline B11 from updated main and continue frontend work under the restored operating model.
+1. Open a separate repository-hygiene acceptance increment.
+2. Classify branches/refs as KEEP / DELETE / NEEDS PROOF.
+3. Present every proposed deletion to the operator before deleting anything.
+4. Evaluate ordinary merged-head auto-delete and CI checkout-history cost with measured proof.
+5. Rebaseline B11 from the updated main using the restored operating route.
+6. Continue B11 frontend planning from current accepted Product/architecture truth, preserving valid prior Evidence and reopening only material contradictions.
 ```
 
 ## Hard stops
@@ -133,11 +129,11 @@ no Product/B11 semantic delta
 ```text
 no Product code/schema/OpenAPI/runtime/deploy implementation
 no T12 work
-no B11/B12 frontend execution in this governance increment
+no B11/B12 frontend execution before the governance/hygiene rebaseline sequence permits it
 no FP2/P11 work
 no B01-B10 reopen without material Evidence
 no rewrite of Engineering Method or Frontend Method
-no branch/ref deletion in this increment
+no branch/ref deletion without explicit operator review of the deletion set
 no force-push/shared-history rewrite
 no assistant/reviewer LOCK
 no merge without explicit operator authorization
@@ -154,5 +150,3 @@ Integrated Whole-R10 coherence = PASS
 fresh independent challenge = converged
 operator implementation authorization = explicit
 ```
-
-Frontend discovery may still falsify earlier Product/backend planning when real Evidence proves it insufficient; the Engineering + Frontend methods then reopen only the smallest affected authority.
