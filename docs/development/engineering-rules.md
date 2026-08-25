@@ -51,6 +51,21 @@ DEFERRED → preserve seam/counterexample; no dormant implementation
 
 When an obligation closes or materially refines, update the durable register rather than creating amendment chains.
 
+## Ratified-snapshot refinement markers
+
+When a later bounded MetalDocs decision supersedes current-tense meaning inside a ratified Product/architecture snapshot that remains in active routing:
+
+```text
+current decision owns the new meaning
++ touched row/section in the older snapshot carries a compact:
+  REFINED → <current decision>
++ the marker points; it does not restate the new semantics
+```
+
+The snapshot may retain original stage counts, proof and historical language when clearly identified as historical. Its current-tense header/routing must not present an obsolete census or reopen condition as current truth.
+
+Do not create a refinement registry or amendment chain. If markers proliferate enough that targeted retrieval is no longer clear, treat that as Evidence to consolidate the current owner through a material decision rather than layering more routing machinery.
+
 ## Independent adversarial review
 
 MetalDocs retains the useful **ClaudeCode/FABLE-style review posture** without restoring the historical `.claude/skills` framework or introducing a fourth methodology.
@@ -74,7 +89,83 @@ Reviewer output is Evidence, not authority. A finding that implies new Product m
 
 Do **not** require a fresh independent review for every normal P7/P8 iteration, copy/layout correction, mechanical trace update or already-owned bounded fix. Use targeted proof during the inner loop and one strong independent challenge when a material candidate reaches its real gate.
 
-If actual ClaudeCode/FABLE transport is unavailable, do not claim independent FABLE convergence. Lead/self-review may use the same doctrine, but independent gates remain independent when required.
+### Stable-candidate convergence bound
+
+For one stable material candidate scope:
+
+```text
+one independent material challenge
+→ one bounded correction / re-challenge round when required
+→ if material findings remain on already-swept scope in that second challenge:
+   candidate = NOT CONVERGED
+   stop patching
+   reopen / rebaseline / split the implicated structure
+→ no third finding-by-finding round on the same stable candidate scope
+```
+
+A material finding that legitimately changes Product/architecture authority or the candidate scope produces a **new candidate and a new review cycle** after the old candidate is declared structurally not converged. It is not permission to relabel Round 3 as a new cycle while continuing the same patch chain.
+
+### Git-mediated FABLE dialogue protocol
+
+When an independent ClaudeCode/FABLE review is requested through Git, the review is isolated from candidate authority.
+
+```text
+exact candidate branch / HEAD
+→ create review/<scope>-fable from that exact HEAD
+→ review branch differs from candidate only by:
+   docs/work/current/ai-dialog.md
+→ Lead writes REVIEW_REQUEST and pushes
+→ FABLE reads candidate + request, appends FABLE_RESPONSE and pushes
+→ Lead verifies findings against repository authority, appends LEAD_ADJUDICATION and pushes
+→ FABLE may append follow-up response
+→ converge
+```
+
+The reviewer MUST NOT edit Product, architecture, method, plan, P8/P9/P10, code, or any other candidate file on the review branch. Corrections belong on the candidate branch only after lead/operator adjudication.
+
+`docs/work/current/ai-dialog.md` is append-only transport for the active review. Existing turns are never rewritten to make later reasoning look cleaner. The single header `status:` field is the one explicit exemption: the Lead updates it in place on convergence/supersession, in the same commit as the turn that justifies the transition.
+
+Use this turn grammar:
+
+```text
+# AI Dialog — <scope>
+
+candidate_branch: <branch>
+candidate_head: <exact SHA>
+review_branch: <review/...-fable>
+status: OPEN | CONVERGED | SUPERSEDED
+
+## REVIEW_REQUEST R1 — LEAD
+<objective, authority pack, falsifiers, required output>
+
+## FABLE_RESPONSE R1 — FABLE
+<findings, evidence, verdict>
+
+## LEAD_ADJUDICATION R1 — LEAD
+<accepted / disproved / operator-decision-required per finding>
+
+## FABLE_RESPONSE R2 — FABLE
+<only unresolved or new material findings, if needed>
+```
+
+Each actor commits and pushes its own turn before the other actor responds. A chat-only answer that is not pushed to the review branch is not repository review Evidence.
+
+If candidate bytes change after a material correction, the current review branch remains Evidence of the old reviewed HEAD. Create a new review branch from the new exact candidate HEAD instead of mixing candidate corrections into the old review branch.
+
+Convergence handling:
+
+```text
+review findings resolved/adjudicated
+→ absorb accepted durable meaning into candidate owners
+→ run candidate proof
+→ review branch remains temporary Evidence only
+→ NEVER merge review branch or ai-dialog.md
+→ candidate/main must contain no docs/work/**
+```
+
+A review branch may be deleted after its conclusions are durably absorbed and no exact provenance consumer requires it. Until then it is Evidence, never authority.
+
+If actual ClaudeCode/FABLE model transport is unavailable, do not claim independent FABLE convergence. Lead/self-review may use the same doctrine, but independent gates remain independent when required.
 
 ## Repository protection
 

@@ -2,14 +2,21 @@
 id: executable-wire-contract
 kind: authority
 owner: architecture
-summary: Owns the exact 78-operation OpenAPI application wire, reusable schemas, headers, Problems, concurrency, pagination, upload, exact-byte and conformance laws.
+summary: Preserves the operator-ratified T8-E 78-operation executable-wire snapshot and its wire laws; current T11 bounded refinements are owned by the current census and named decisions.
 ---
 
 # T8-E executable wire contract
 
 > **Ratification:** OPERATOR-RATIFIED on 2026-08-21. Program stage/status and implementation permission remain exclusively in `../roadmap.md`.
+>
+> **Current refinement notice:** this file preserves the ratified T8-E **78-operation snapshot**. The sole current numeric application census is `../decisions/api-operation-census.md`, currently 89 after later T11 bounded reopens. Current non-consolidated wire refinements are owned by:
+> - `../decisions/discussion-notifications-launch.md` — operations 79–86;
+> - `../decisions/audit-investigation-read.md` — operation 78 refinement + operations 87–89;
+> - `../decisions/access-assignment-read.md` — operation 31 read/query refinement.
+>
+> A targeted row/section superseded by a bounded decision carries `REFINED → <decision>`. The marker points to current meaning; this snapshot keeps its original proof/census context.
 
-Product/API meaning remains in `../product/journeys.md` + `../decisions/api-operation-census.md`. This authority owns only the executable application-wire realization of the accepted **78 application operations**. Operation 79 is a material Product/T6 reopen.
+Product/API meaning remains in `../product/journeys.md` + `../decisions/api-operation-census.md`. At original T8-E ratification this authority closed **78 application operations** and operation 79 required a Product/T6 reopen; later accepted T11 decisions performed those bounded reopens. The ledger below therefore remains the ratified 78-row executable-wire snapshot, not the current numeric census.
 
 The two bounded upstream contradictions exposed by this ledger were **operator-approved and durably reconciled on 2026-08-20**:
 
@@ -71,7 +78,7 @@ MetalDocsSession:
   name: __Host-metaldocs_session
 ```
 
-All 78 operations require it. OIDC `/auth/login` and `/auth/callback` remain outside this SSOT. OpenAPI security scopes never encode MetalDocs AuthZ.
+All 78 operations in this ratified snapshot require it. OIDC `/auth/login` and `/auth/callback` remain outside this SSOT. OpenAPI security scopes never encode MetalDocs AuthZ.
 
 Cookie law remains `Secure; HttpOnly; SameSite=Lax; Path=/; Domain absent`.
 
@@ -677,6 +684,8 @@ CreateUser establishes enabled User + required profile + binding atomically. New
 
 ## 3.3 Authorization
 
+> **REFINED → `../decisions/access-assignment-read.md` for current operation 31 query/filter behavior and human-recognizable RoleAssignment read subject/scope projection.** The id-only mutation input shapes below remain current.
+
 Exact role projection:
 
 ```text
@@ -691,7 +700,7 @@ governance_viewer  scopes[company,area]  document.read_effective,document.read_h
 ```text
 RoleView { code:RoleCode, permissions:unique PermissionCode[], allowed_scope_kinds:unique RoleAssignmentScopeKind[] }
 RoleListView { items in order governance_admin,area_manager,author,approver,viewer,governance_viewer }
-RoleAssignmentView { assignment_id:Uuid, subject:RoleAssignmentSubject, role:RoleCode, scope:RoleAssignmentScope }
+RoleAssignmentView { assignment_id:Uuid, subject:RoleAssignmentSubject, role:RoleCode, scope:RoleAssignmentScope } // historical T8-E snapshot; current op31 read projection REFINED above
 RoleAssignmentPage { items:RoleAssignmentView[], page:Page }
 CreateRoleAssignmentRequest { subject:RoleAssignmentSubject, role:RoleCode, scope:RoleAssignmentScope }
 CreateRoleAssignmentResult { assignment_id:Uuid }
@@ -1149,7 +1158,7 @@ All path `*_id` parameters are required `Uuid`. `PAGED` means §2.7. JSON reques
 |28|`addGroupMember`|`PUT /api/v1/groups/{group_id}/members/{user_id}`|no body / `UNSAFE_CSRF`|`201` first; `204` existing relation|`NO_STORE`|none|`U + N + S`|
 |29|`removeGroupMember`|`DELETE /api/v1/groups/{group_id}/members/{user_id}`|no body / `UNSAFE_CSRF`|`204`, including absent relation when parent exists|`NO_STORE`|absent/non-disclosable Group->404|`U + N`|
 |30|`listRoles`|`GET /api/v1/roles`|`SAFE_READ`|`200 RoleListView`|`JSON_NO_STORE`|fixed T3 role order|`A`|
-|31|`listRoleAssignments`|`GET /api/v1/role-assignments`|`SAFE_READ`|`200 RoleAssignmentPage`|`JSON_NO_STORE`|`PAGED`; assignment_id ASC|`A`|
+|31|`listRoleAssignments`|`GET /api/v1/role-assignments`|`SAFE_READ`|`200 RoleAssignmentPage`|`JSON_NO_STORE`|`PAGED`; assignment_id ASC; **REFINED → `../decisions/access-assignment-read.md`**|`A`|
 |32|`createRoleAssignment`|`POST /api/v1/role-assignments`|`CreateRoleAssignmentRequest` / `IDEMPOTENT_CREATE`|`201 CreateRoleAssignmentResult`|`JSON_NO_STORE`|none|`U + J + I + S`|
 |33|`deleteRoleAssignment`|`DELETE /api/v1/role-assignments/{assignment_id}`|no body / `UNSAFE_CSRF`|`204` first revoke|`NO_STORE`|absent->404|`U + N`|
 |34|`listDocumentTypes`|`GET /api/v1/document-types`|`SAFE_READ`|`200 DocumentTypePage`|`JSON_NO_STORE`|`PAGED`; document_type_id ASC|`A`|
@@ -1206,11 +1215,13 @@ Row59 is fully expressible through existing T8-C after §2.10 consumer precision
 
 ## 6.3 Audit — 78
 
+> **REFINED → `../decisions/audit-investigation-read.md` for current operation 78 query/inspection behavior; the same bounded decision adds current operations 87–89.**
+
 |#|operationId|Method + path|Request/profile|Success|Headers|Query/order|Problems|
 |---:|---|---|---|---|---|---|---|
-|78|`listAuditEvents`|`GET /api/v1/audit/events`|`SAFE_READ`|`200 AuditEventPage`|`JSON_NO_STORE`|`PAGED`; occurred_at DESC,event_id DESC|`A`|
+|78|`listAuditEvents`|`GET /api/v1/audit/events`|`SAFE_READ`|`200 AuditEventPage`|`JSON_NO_STORE`|`PAGED`; occurred_at DESC,event_id DESC; **REFINED → `../decisions/audit-investigation-read.md`**|`A`|
 
-Count proof:
+Original T8-E snapshot count proof:
 
 ```text
 Session/AuthN                         3
@@ -1221,6 +1232,8 @@ Controlled Documents / Work          34
 Audit                                 1
 TOTAL                                78
 ```
+
+Current numeric census is not derived from this block; use `../decisions/api-operation-census.md`.
 
 ---
 
@@ -1336,7 +1349,7 @@ Multipart, recursive archive inspection, compression-ratio thresholds and DAM-sc
 
 # 8. Bounded upstream reconciliations
 
-Both findings below were evidence-triggered bounded corrections, explicitly operator-approved on 2026-08-20 and reconciled in their owning durable authorities. Neither reopened Product, lifecycle, ownership, topology, or the 78-operation census.
+Both findings below were evidence-triggered bounded corrections, explicitly operator-approved on 2026-08-20 and reconciled in their owning durable authorities. Neither reopened Product, lifecycle, ownership, topology, or the original 78-operation T8-E snapshot.
 
 ## 8.1 T8-D — Governance Step label preservation — RESOLVED
 
@@ -1607,7 +1620,7 @@ family partition                    3 / 26 / 4 / 10 / 34 / 1
 Idempotency-Key POST creations      exact accepted 10
 ETag concurrency domains            13 GET/mutation domains
 exact-byte application resources    exact accepted 4
-operation 79                         absent
+operation 79                         absent in original T8-E snapshot
 ```
 
 The proof also checks that unsafe application operations use a CSRF-bearing request profile and that JSON-body operations carry the closed structural/media/size validation family where applicable.
@@ -1653,7 +1666,7 @@ Therefore MetalDocs does **not** add a second schema/validation framework. The e
 Required negative/edge fixture classes:
 
 ```text
-all 78 rows and no 79th
+all 78 rows and no 79th in this original snapshot
 unknown path ->404; undeclared method ->405 exact Allow
 unknown JSON/query member and duplicate scalar/member rejection
 bodyless operation rejects a body
@@ -1692,13 +1705,13 @@ External evidence checked during T8-E includes OpenAPI 3.0.3, RFC9110, RFC9457, 
 This authority remains true if legacy API/schema shape were opposite:
 
 ```text
-78 semantic operations derive from Product/T6
+78 semantic operations derive from the original Product/T6 snapshot
 ETag/idempotency/CSRF/pagination derive from accepted invariants
 exact-content wire derives from T4
 component registry + operation ledger close Writer choices
 ```
 
-Subtracted / not introduced:
+Subtracted / not introduced in the T8-E snapshot:
 
 ```text
 universal response envelope
@@ -1709,7 +1722,7 @@ provider/job state
 persisted permission snapshot
 editable Role/Permission/policy engine
 separate Approval API
-operation79
+operation79 in the original snapshot
 server-side cursor state
 new T8-C presign signature
 S3 POST-form/multipart without measured need
@@ -1724,4 +1737,4 @@ second request-schema/route-parameter validation authority
 dormant future capability
 ```
 
-The earlier Step-label/impossible-binding-Audit findings, the final evidence-triggered §§8.4–8.6 package and the frontend read-symmetry precision consolidated in §3.5 are all resolved. None changes Product scope, the 78-operation census, ownership topology or Launch lifecycle.
+The earlier Step-label/impossible-binding-Audit findings, the final evidence-triggered §§8.4–8.6 package and the frontend read-symmetry precision consolidated in §3.5 are resolved inside this ratified snapshot. Later T11 bounded overlays are current only through `../decisions/api-operation-census.md` plus the named decisions in the refinement notice above; they do not retroactively change the original 78-row proof history.
