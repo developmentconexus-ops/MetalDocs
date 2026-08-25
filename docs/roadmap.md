@@ -14,7 +14,7 @@ REPOSITORY MODE       CLEAN-SLATE / ARCHITECTURE-FIRST
 T1 → T10              CLOSED / OPERATOR-RATIFIED / INTEGRATED
 T11                   OPEN / ACTIVE
 T11 checkpoint        B01-B10 ACCEPTED / INTEGRATED
-METHODOLOGY ADOPTION  ACCEPTED / INTEGRATED
+LOCAL METHODS         RESTORED / ENGINEERING v1.0.0 + FRONTEND v2.3
 T12                   NOT OPEN
 IMPLEMENTATION         BLOCKED
 ```
@@ -35,26 +35,32 @@ exact-byte resources             4
 
 `docs/decisions/api-operation-census.md` owns the current application-operation / Idempotency / ETag / exact-byte census.
 
-## Organizational methodology baseline
+## Local methodology baseline
 
-The exact accepted organizational methodology pin and method-selection route are owned by `AGENTS.md`. Method selection starts at that pin's `ROUTER.md`.
-
-The reusable local Frontend Product Experience Planning Method v2.3 was superseded by the central `FRONTEND-METHOD.md`, whose lineage explicitly consolidates the MetalDocs v2.3 generation. MetalDocs-specific P8 rendered-Evidence handling remains local in `docs/development/engineering-rules.md`.
-
-Adoption impact sweep at integration time:
+MetalDocs uses the repository-local shared method files:
 
 ```text
-B01-B09 protected structure / Screen Contracts  UNAFFECTED
-Product/backend authority                       UNAFFECTED
-89-operation / 11-route census                  UNAFFECTED
-exact P8 LOCK Evidence                           UNAFFECTED
-FP2 / P11                                        NOT OPEN
-B10-B12                                          NOT OPEN at methodology-adoption integration
+docs/development/engineering-method.md
+  DevelopmentConexus Engineering Method v1.0.0
+
+docs/development/frontend-product-experience-planning-method.md
+  Frontend Product Experience Planning Method v2.3
 ```
 
-The independent methodology-adoption review converged with `MATERIAL=0` and `IMPORTANT=0`. Methodology adoption did not reopen Product/architecture/frontend LOCKs and did not authorize implementation.
+Both files are the unchanged previously accepted methods also used by the other DevelopmentConexus product repositories. There is no external methodology router/pin in the active operating path.
 
-Aggregate verification enforces the concrete bootstrap properties it owns, including the exact AGENTS methodology pin/ROUTER presence, context budget, temporary-work hygiene, known local-method removal, active-router de-reference, and exact Evidence-ref protections. Broader semantic duplicate-authority defects remain hard stops/review concerns rather than falsely claimed as exhaustively grep-detectable.
+Restoring the local methods changes operating mechanics only. It does not reopen Product/architecture/frontend decisions and does not authorize implementation.
+
+```text
+B01-B10 protected structure / Screen Contracts  UNAFFECTED
+Product/backend authority                       UNAFFECTED
+89-operation / 11-route census                  UNAFFECTED
+exact P8 LOCK Evidence                          UNAFFECTED
+FP2 / P11                                        NOT OPEN
+B11-B12                                          NOT OPEN
+```
+
+Required CI is intentionally limited to objective repository properties. Global Maximum, UX/architecture quality, evidence sufficiency, repository-reading depth, and methodology reasoning are review/method concerns rather than grep-based CI assertions.
 
 ## Frontend Product Experience Program
 
@@ -112,14 +118,14 @@ evidence/t11-pr170-b10-locks-20260824
 → b8c607cbd30d61d6bcf6ec1ea734ed1653d2569e
 ```
 
-Both Evidence refs are exact-SHA checked and non-authoritative. B10 `docs/work/**` is absent from integrated `main` after exact Evidence preservation.
+The Evidence refs are non-authoritative recovery/provenance inputs. B10 `docs/work/**` is absent from integrated `main` after exact Evidence preservation.
 
 ## Exact next action
 
 ```text
-1. Revalidate accepted main and recover authority through AGENTS → docs/index → docs/roadmap → pinned ROUTER.
-2. Select METHOD + FRONTEND-METHOD for the next frontend-planning increment.
-3. Revalidate the smallest B11 authority pack and forward obligations before deciding whether B11 is ready to open.
+1. Revalidate accepted main and recover current authority through AGENTS → docs/roadmap plus useful routes in docs/index.
+2. Use local engineering-method.md + frontend-product-experience-planning-method.md for the next frontend-planning increment.
+3. Revalidate all Product/architecture/Evidence context that can materially affect B11 before deciding whether B11 is ready to open.
 4. Do not treat B11 as opened merely because B10 is integrated.
 5. T11 remains OPEN; B11-B12 remain NOT OPEN until explicitly opened by a later acceptance increment.
 6. FP2/P11 remains NOT OPEN until the block program reaches its accepted assembly boundary.
@@ -136,9 +142,7 @@ no FP2/P11 work
 no B01-B10 reopen without material Evidence
 no invented B10 search/filter/read API for UI convenience
 no assistant/reviewer LOCK
-no local reusable methodology fork
-no floating methodology main as normative authority
-no methodology sync bot/submodule/generated copies/framework
+no ad-hoc local rewrite of the shared method files
 no merge without explicit operator authorization
 ```
 
@@ -154,4 +158,4 @@ fresh independent challenge = converged
 operator implementation authorization = explicit
 ```
 
-Accepted Product/R10/frontend LOCK decisions reopen only on material Evidence under the pinned DevelopmentConexus Engineering Method; methodology-migration ceremony alone is not a reopen trigger.
+Accepted Product/R10/frontend LOCK decisions reopen only on material Evidence under the DevelopmentConexus Engineering Method; methodology-storage changes alone are not a reopen trigger.

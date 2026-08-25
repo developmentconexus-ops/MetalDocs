@@ -1,59 +1,55 @@
 # MetalDocs Agent Bootstrap
 
-## Fresh-session recovery
+## Start
 
-Before relying on chat, handoff, or remembered state, revalidate as applicable:
+Before relying on chat, handoff, or remembered state:
 
-```text
-repository / remote identity
-current branch + HEAD
-remote main HEAD
-active PR base/head
-required aggregate check
-unowned worktree state
-```
+1. revalidate repository identity, current branch/HEAD, remote `main`, and the relevant PR state;
+2. read [`docs/roadmap.md`](docs/roadmap.md) to understand the current Product/planning state and implementation gate;
+3. for material engineering decisions, follow [`docs/development/engineering-method.md`](docs/development/engineering-method.md);
+4. for frontend Product Experience planning, follow [`docs/development/frontend-product-experience-planning-method.md`](docs/development/frontend-product-experience-planning-method.md);
+5. use [`docs/index.md`](docs/index.md) as a navigation aid when useful, never as a reading boundary.
 
-Then read, in order:
+There is **no fixed file count, owner count, or context budget**. Investigate any repository area, Git history, Evidence, code, contracts, runtime behavior, research, or external source that can materially change, challenge, or falsify the conclusion. Whole-repository review is explicitly allowed when the task calls for it. Context efficiency is an optimization, not a correctness boundary.
 
-```text
-AGENTS.md
-→ docs/index.md
-→ docs/roadmap.md
-→ pinned methodology ROUTER.md
-→ selected methodology profile
-→ only the 1–2 repository-local owners required by the task
-```
+## Methods and authority
 
-Default repository-local task context is at most five files. Do not recursively read `docs/`, Git history, closed PRs, Evidence, or removed implementation without a named material reason.
+The repository adopts these local method files:
 
-## Organizational methodology pin
+- [`engineering-method.md`](docs/development/engineering-method.md) — DevelopmentConexus Engineering Method v1.0.0;
+- [`frontend-product-experience-planning-method.md`](docs/development/frontend-product-experience-planning-method.md) — Frontend Product Experience Planning Method v2.3.
 
-Canonical methodology repository:
+Their contents are intentionally shared unchanged across the DevelopmentConexus product repositories. Do not locally rewrite or reinterpret them by convenience.
 
-```text
-developmentconexus-ops/conexus-methodology
-@ 9c7210d1504bef01c0d134a6c3ae8627deebb535
-```
+- Current accepted repository authority outranks chat, handoff, memory, historical snapshots, and reviewer preference.
+- `docs/roadmap.md` owns current stage/status/allowed work/next action.
+- Accepted Product, architecture, contract, and decision artifacts own their stated semantics.
+- Evidence, code, tests, research, Git history, and reviewer output support decisions; they do not become Product authority merely by existing.
+- Seek the **Global Maximum**, not merely the best answer inside the current structure.
+- If downstream Evidence falsifies an upstream decision, stop only the affected scope and reopen the smallest owning authority according to the adopted methods. Do not silently patch around the contradiction.
 
-Start method selection at `ROUTER.md` from that exact commit. Never auto-follow moving methodology `main`, and do not maintain a parallel reusable methodology copy in MetalDocs.
+## MetalDocs safety rails
 
-Repository-local Product, architecture, status, and engineering specialization remain owned by MetalDocs; organizational methods do not replace Product meaning.
+Unless explicitly reopened by accepted authority:
 
-## MetalDocs hard stops
-
-- `docs/roadmap.md` is the sole mutable stage/status/next-action authority.
-- If the roadmap blocks implementation, do not add application code, schema/migrations, executable OpenAPI/generated code, frontend/runtime/deploy, dependency manifests, or dormant capability.
+- Product implementation remains blocked while `docs/roadmap.md` says `IMPLEMENTATION BLOCKED`.
 - Do not restore removed legacy implementation merely because it existed or was tested.
 - Historical mechanism reuse requires a current named consumer and the proof-backed gate in `docs/architecture/technical-baseline.md`.
 - Embedded pre-reset `wiki/...` paths are provenance only, not current routing.
-- A material contradiction with current Product/R10 authority is a STOP / bounded reopen, never a silent local patch.
+- B01–B10 LOCKs remain accepted unless material Evidence falsifies them.
+- B11/B12, FP2/P11, T12, and later implementation work open only when `docs/roadmap.md` explicitly permits them.
+- Assistant/reviewer/tool output cannot set operator-only LOCK state.
 
-## Repository-local Git and verification
+## Git and verification
 
-- No direct commits to `main`; no force-push or shared-history rewrite.
-- Normal integration is squash merge after explicit operator merge authorization.
-- Current aggregate gate is GitHub Actions job `required` in `.github/workflows/ci.yml`.
-- Required unmerged provenance/Evidence refs are recorded in current repository authority and must remain reachable while they have a named consumer.
-- Independent review uses the pinned `ADVERSARIAL-REVIEW-METHOD.md` selected through `ROUTER.md`; review transport remains Evidence and never enters candidate/main.
+Preserve unowned state. Never force-push or rewrite shared history. Never merge without explicit operator authorization.
+
+Required CI is intentionally one objective aggregate check named `required`:
+
+```text
+GitHub Actions → required
+```
+
+Run additional targeted proof when the current claim requires it. A red required CI check should mean an objective repository property is broken, not that a planning preference, context budget, router convention, methodology pin, Evidence-branch SHA, or documentation ceremony was violated.
 
 `CLAUDE.md` has no independent Product, architecture, roadmap, status, or methodology authority.
