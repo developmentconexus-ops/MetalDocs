@@ -1,6 +1,6 @@
 # T11 — B11 Access Administration — P9 R6 pagination delta
 
-> **Status:** CANDIDATE / AWAITING OPERATOR PARTIAL RE-LOCK.  
+> **Status:** COMPLETE / OPERATOR PARTIAL RE-LOCK / PASS.  
 > **P8 delta:** `docs/work/current/t11-b11-access-administration-p8-r6.html`  
 > **P8 R6 blob:** `26e8905c5c5012aba59280b1001f62529ed4dfd0`  
 > **Finding:** `docs/work/current/t11-b11-p8-r6-review-finding.md`  
@@ -8,7 +8,7 @@
 
 ## 1. Preserved contract
 
-The following R5/P9 decisions remain protected and are not redesigned by R6:
+The following R5/P9 decisions remain protected and were not redesigned by R6:
 
 ```text
 /admin/access route
@@ -26,15 +26,15 @@ no custom Role / Permission editor
 no operation 90+
 ```
 
-## 2. Reopened material surfaces
+## 2. Re-locked material surfaces
 
 | ID | Surface | Accepted read truth | R6 interaction proof | Client state | Failure rule | Forbidden shortcut | Status |
 |---|---|---|---|---|---|---|---|
-| R6-01 | Selected Group members | op27 `listGroupMembers` / `GroupMemberPage` | visible Previous/Next traversal; later-page member can be inspected and removed | current page + server cursor/history presentation state | continuation failure preserves loaded page and does not call it complete | hidden all-page crawl; first page labeled full membership | CANDIDATE |
-| R6-02 | Add-member User picker | op6 `listUsers` / `UserPage` | visible Previous/Next traversal; later-page enabled User can be selected and reviewed | current page + selected `user_id` | continuation failure preserves loaded candidates/draft | preload all Users; frontend-owned User directory | CANDIDATE |
-| R6-03 | Grant User subject picker | op6 `listUsers` / `UserPage` | paged list replaces complete `<select>`; later-page User can reach final grant review | current page + selected `user_id` | continuation failure preserves page and existing grant draft | preload/crawl all Users; invent search | CANDIDATE |
-| R6-04 | Grant Group subject picker | op22 `listGroups` / `GroupPage` | paged list; later-page Group can reach final grant review | current page + selected `group_id` | continuation failure preserves page/draft | preload/crawl all Groups; Authorization owning Group identity | CANDIDATE |
-| R6-05 | Grant Area scope picker | op16 `listAreas` / `AreaPage` | paged list; later-page Area can reach final grant review | current page + selected `area_id` | continuation failure preserves page/draft | preload/crawl all Areas; synthetic global Area search | CANDIDATE |
+| R6-01 | Selected Group members | op27 `listGroupMembers` / `GroupMemberPage` | visible Previous/Next traversal; later-page member can be inspected and removed | current page + server cursor/history presentation state | continuation failure preserves loaded page and does not call it complete | hidden all-page crawl; first page labeled full membership | READY |
+| R6-02 | Add-member User picker | op6 `listUsers` / `UserPage` | visible Previous/Next traversal; later-page enabled User can be selected and reviewed | current page + selected `user_id` | continuation failure preserves loaded candidates/draft | preload all Users; frontend-owned User directory | READY |
+| R6-03 | Grant User subject picker | op6 `listUsers` / `UserPage` | paged list replaces complete `<select>`; later-page User can reach final grant review | current page + selected `user_id` | continuation failure preserves page and existing grant draft | preload/crawl all Users; invent search | READY |
+| R6-04 | Grant Group subject picker | op22 `listGroups` / `GroupPage` | paged list; later-page Group can reach final grant review | current page + selected `group_id` | continuation failure preserves page/draft | preload/crawl all Groups; Authorization owning Group identity | READY |
+| R6-05 | Grant Area scope picker | op16 `listAreas` / `AreaPage` | paged list; later-page Area can reach final grant review | current page + selected `area_id` | continuation failure preserves page/draft | preload/crawl all Areas; synthetic global Area search | READY |
 
 ## 3. Cursor / continuation law
 
@@ -123,9 +123,15 @@ grant Area Previous/Next
 
 No new operation or semantic owner is introduced.
 
-## 6. Targeted proof already executed
+## 6. Proof and operator disposition
 
-On the exact local bytes whose Git blob is `26e8905c5c5012aba59280b1001f62529ed4dfd0`:
+Exact R6 Git blob:
+
+```text
+26e8905c5c5012aba59280b1001f62529ed4dfd0
+```
+
+Targeted proof on the exact byte-identical candidate:
 
 ```text
 structural R6 verifier    12 / 12 PASS
@@ -150,21 +156,22 @@ mobile structure remains operable without horizontal body overflow
 
 GitHub remote R6 is byte-identical to that verified candidate via blob `26e8905c5c5012aba59280b1001f62529ed4dfd0`.
 
-## 7. Exit gate
+**Operator disposition:** APPROVED / PARTIAL RE-LOCK.
 
-This delta is **not COMPLETE yet** because P8 interaction structure is operator-owned.
+The operator explicitly approved the R6 bounded pagination delta after being asked to judge only those reopened surfaces. Therefore R6-01..R6-05 are READY and this P9 delta is PASS.
 
-Required transition:
+## 7. Closure
 
 ```text
-operator operates exact R6 pagination delta
-→ explicit partial re-LOCK
-→ mark R6-01..R6-05 READY
-→ P9 delta PASS
-→ preserve exact amended Evidence
-→ update durable B11 Evidence locator
-→ remove docs/work/** from merge candidate
-→ resolve PR #173 review thread only with exact proof attached
+reopened P8 surfaces                 5 / 5 OPERATOR RE-LOCKED
+P9 pagination-delta controls         5 / 5 READY
+supporting reads                     op6 / op16 / op22 / op27 BOUND WITH VISIBLE CONTINUATION
+new application operations           0
+operation 90+ consumed               0
+hidden collection crawls             0
+unresolved P9 R6 findings            0
 ```
 
-If operator use exposes new material friction, reopen only the smallest affected surface or upstream authority.
+**P9 R6 verdict:** PASS.
+
+The original R5/P9 proof remains valid for all unaffected semantics. R6 supersedes R5 only for the five pagination/identity-picker surfaces listed above. Preserve exact amended Evidence before removing temporary `docs/work/**` from the merge candidate.
