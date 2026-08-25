@@ -14,7 +14,7 @@ REPOSITORY MODE       CLEAN-SLATE / ARCHITECTURE-FIRST
 T1 → T10              CLOSED / OPERATOR-RATIFIED / INTEGRATED
 T11                   OPEN / ACTIVE
 T11 checkpoint        B01-B10 ACCEPTED / INTEGRATED
-T11 acceptance        B11 EXPLICITLY OPENED IN THIS INCREMENT / BOUNDED R7 USER-PICKER REOPEN / CANDIDATE
+T11 acceptance        B11 EXPLICITLY OPENED IN THIS INCREMENT / LOCKED / R6 BASE + R7 AMENDMENT / P9-P10 COMPLETE / PENDING INTEGRATION
 LOCAL METHODS         RESTORED / ENGINEERING v1.0.0 + FRONTEND v2.3
 T12                   NOT OPEN
 IMPLEMENTATION         BLOCKED
@@ -52,17 +52,17 @@ Both files are the unchanged accepted methods also used by the other Development
 
 PR #172 restored these local methods after B11 planning had already begun on its feature branch. The restoration changed operating mechanics only; it did not change Product, Authorization, wire, UX or existing frontend truth.
 
-Current bounded impact sweep after the second PR #173 review finding:
+Final bounded impact sweep after both PR #173 review findings:
 
 ```text
 B01-B10 protected structure / Screen Contracts  UNAFFECTED
 B11 IA / frame / non-pagination semantics       PRESERVED
 B11 R6 member/add-member/Group/Area pagination PRESERVED / RE-LOCKED
-B11 R6 grant User picker                        BOUNDED REOPEN ONLY
+B11 grant User picker                           RE-LOCKED BY R7 AMENDMENT
 B11-F1 Access Assignment read precision        UNAFFECTED
-B11 P9 bidirectional trace                     REOPEN R6-03 ONLY
+B11 P9 bidirectional trace                     COMPLETE / R7 SUPERSEDES R6-03 ONLY
 B11 P10 pattern consolidation                  UNAFFECTED / COMPLETE
-B11 R6 exact LOCK Evidence                     PRESERVED
+B11 exact LOCK Evidence                        R6 BASE + R7 AMENDMENT CURRENT
 89-operation / 11-route census                 UNAFFECTED
 FP2 / P11                                      NOT OPEN
 B12                                            NOT OPEN
@@ -82,7 +82,8 @@ PR #173 acceptance candidate
   explicitly opens B11
   + integrates B11-F1
   + consumes operator-operated B11 Evidence
-  + must close every material review finding
+  + closes both material review findings through bounded re-LOCKs
+  + records P9/P10 closure
   + leaves B12/FP2/T12/implementation blocked
 
 integration of PR #173
@@ -120,10 +121,10 @@ R6 structural verification       12 / 12 PASS
 R6 Chromium behavior             23 / 23 PASS
 R6 JavaScript parse              PASS
 R6 operator partial re-LOCK      APPROVED
-P9 R6 controls                   5 / 5 READY / PASS
+P9 R6 controls                   5 / 5 READY / PASS at that checkpoint
 ```
 
-## PR #173 grant User picker page-fidelity finding — OPEN
+## PR #173 grant User picker page-fidelity finding — closed by R7
 
 A later review found one narrower contradiction in the exact R6 artifact.
 
@@ -155,31 +156,9 @@ CURRENT STRUCTURE CONFIRMED
 + smallest P8/P9 correction
 ```
 
-No Product/backend/wire reopen is justified.
+No Product/backend/wire reopen was justified.
 
-Reopened only:
-
-```text
-Grant User subject picker
-P9 R6-03 op6 traversal proof
-```
-
-Preserved:
-
-```text
-all other R6 pagination surfaces
-R6 member pagination
-R6 add-member User pagination
-R6 grant Group pagination
-R6 grant Area pagination
-Por Área / Grupos / Funções IA
-R4/R5/R6 low-fi frame and non-picker semantics
-B11-F1
-P10
-89-operation census
-```
-
-Target invariant:
+R7 re-LOCKed target invariant:
 
 ```text
 server UserPage boundary remains authoritative
@@ -188,19 +167,24 @@ server UserPage boundary remains authoritative
 → DISABLED visible but unavailable
 → no pre-pagination client filter
 → no hidden all-page crawl
+→ no invented op6 state filter/search
 ```
 
-R7 candidate Evidence:
+R7 exact Evidence:
 
 ```text
 P8 R7 delta path       docs/work/current/t11-b11-grant-user-picker-p8-r7.html
 P8 R7 Git blob         3e9130fd7b9e5b6b414b5c8e96faf6c6644cb4df
-R7 finding             docs/work/current/t11-b11-p8-r7-review-finding.md
-P9 R7 delta            docs/work/current/t11-b11-screen-contract-r7-delta.md
+R7 Evidence ref        evidence/t11-b11-r7-amendment-20260825
+R7 Evidence commit     5c3b407c1bc0e789da823570a27c33e5f8f777c3
+R7 Evidence tree       077b25ffb9e5460f563ed84f7eedd4ed3a01d52f
 static + Chromium      12 / 12 PASS
 JavaScript parse       PASS
-operator disposition   AWAITING USER-PICKER RE-LOCK
+operator disposition   APPROVED / RE-LOCK
+P9 R7                  READY / PASS
 ```
+
+R7 supersedes only the grant User picker row previously named R6-03. All other R6 pagination and B11 semantics remain protected.
 
 ## Frontend Product Experience Program
 
@@ -240,28 +224,33 @@ B10   Organization Administration                  LOCKED / P8-P10 COMPLETE / OP
        operation 27+ consumed                       0
        B10-A1 paginated-browse sufficiency          VALIDATED FOR CURRENT LAUNCH P8
        unresolved material B10 Findings             0
-B11   Access Administration                        BOUNDED P8/P9 REOPEN / R7 USER-PICKER CANDIDATE / RE-LOCK REQUIRED
+B11   Access Administration                        LOCKED / R6 BASE + R7 AMENDMENT / P9-P10 COMPLETE / OPERATOR-RATIFIED / ACCEPTANCE CANDIDATE
        durable Evidence locator                     docs/decisions/t11-b11-lock-evidence.md
-       current complete R6 Evidence ref             evidence/t11-b11-r6-locks-20260825
-       current complete R6 Evidence commit          6dbcec41a43dc2a74629351e22b748188e5c6dc4
-       current complete R6 Evidence tree            c5054688c68068457a6c46add198c1797cddec0a
-       canonical R6 full P8 blob                    26e8905c5c5012aba59280b1001f62529ed4dfd0
+       R6 complete base Evidence ref                evidence/t11-b11-r6-locks-20260825
+       R6 complete base Evidence commit             6dbcec41a43dc2a74629351e22b748188e5c6dc4
+       R6 complete base Evidence tree               c5054688c68068457a6c46add198c1797cddec0a
+       R6 full P8 blob                              26e8905c5c5012aba59280b1001f62529ed4dfd0
+       R7 User-picker amendment ref                 evidence/t11-b11-r7-amendment-20260825
+       R7 User-picker amendment commit              5c3b407c1bc0e789da823570a27c33e5f8f777c3
+       R7 User-picker amendment tree                077b25ffb9e5460f563ed84f7eedd4ed3a01d52f
+       R7 User-picker delta blob                    3e9130fd7b9e5b6b414b5c8e96faf6c6644cb4df
        B11-F1 Access Assignment Read Precision      OPERATOR-RATIFIED / DURABLE CANDIDATE
        application-operation delta                  +0 / CENSUS REMAINS 89
        first PR #173 finding                        CLOSED / R6 RE-LOCKED
-       second PR #173 finding                       OPEN / MATERIAL / R6-03 ONLY
-       R7 delta Git blob                            3e9130fd7b9e5b6b414b5c8e96faf6c6644cb4df
+       second PR #173 finding                       CLOSED / R7 RE-LOCKED
+       R6 structural verification                   12 / 12 PASS
+       R6 Chromium behavior                         23 / 23 PASS
        R7 static + Chromium                         12 / 12 PASS
        R7 JavaScript parse                          PASS
-       R7 operator disposition                      AWAITING USER-PICKER RE-LOCK
-       P9 original material regions/controls        36 / 36 TRACED except reopened R6-03
+       R7 operator disposition                      RE-LOCK / APPROVED
+       P9 original material regions/controls        36 / 36 TRACED subject to R6/R7 supersession on affected rows
        P9 primary B11 operations                    7 / 7 BOUND (ops 27-33)
        P9 supporting Organization reads             ops 6 / 16 / 22
-       P9 R6 pagination delta                       4 / 5 PRESERVED; grant User row REOPENED
-       P9 R7 User picker delta                      CANDIDATE / AWAITING RE-LOCK
+       P9 R6 pagination delta                       4 / 5 PRESERVED; R6-03 SUPERSEDED BY R7
+       P9 R7 User picker delta                      READY / PASS
        P10                                          PRESERVED / COMPLETE
        operation 90+ consumed                       0
-       unresolved material B11 Findings             1
+       unresolved material B11 Findings             0
 B12   Document Governance Administration           NOT OPEN
 ```
 
@@ -278,33 +267,32 @@ docs/decisions/t11-b10-lock-evidence.md
 evidence/t11-pr170-b10-locks-20260824
 → b8c607cbd30d61d6bcf6ec1ea734ed1653d2569e
 
-B11 R6 Evidence
+B11 R6 complete base Evidence
 docs/decisions/t11-b11-lock-evidence.md
 evidence/t11-b11-r6-locks-20260825
 → 6dbcec41a43dc2a74629351e22b748188e5c6dc4
+
+B11 R7 User-picker amendment Evidence
+evidence/t11-b11-r7-amendment-20260825
+→ 5c3b407c1bc0e789da823570a27c33e5f8f777c3
 
 B11 prior R5 Evidence
 evidence/t11-b11-locks-20260825
 → 469a753904041e7800400dc1074510456aa50df8
 ```
 
-The R6 Evidence remains valid for every B11 semantic except the reopened grant User picker page-fidelity claim. R7 is a bounded amendment candidate, not a redesign of the whole block.
+Current B11 reconstruction law is R6 complete base + R7 amendment. R5 remains historical Evidence.
 
 ## Exact next action
 
 ```text
-1. Operator operates exact R7 delta blob 3e9130fd7b9e5b6b414b5c8e96faf6c6644cb4df.
-2. Verify page 2 remains the raw op6 page: Bruno Vieira / Carla Nunes / Paulo Mendes DISABLED / Sofia Barros.
-3. Verify Paulo Mendes is visible but cannot be selected.
-4. Arm continuation failure on page 2 and verify the loaded page remains visible and is not labeled complete.
-5. Continue to page 3 and verify Luciana Prado / Diego Ramos / Mariana Costa / Felipe Moraes.
-6. Select Mariana Costa and verify exact grant review reaches Quem=Mariana Costa / Função=Visualizador / Onde=Toda a empresa.
-7. If operator explicitly re-LOCKs this User-picker delta, mark P9 R7 READY/PASS and restore B11 to LOCKED.
-8. Preserve exact R7 amendment Evidence and update the durable B11 locator without rewriting R6 historical meaning.
-9. Remove `docs/work/**` from the merge candidate and resolve the second PR #173 review thread only with exact proof attached.
-10. Mark PR #173 Ready only after the cleaned candidate is mergeable and `required` is green.
-11. Because accepted Evidence changed again after prior merge authorization, obtain fresh explicit operator merge authorization before squash merge.
-12. B12 and FP2/P11 remain NOT OPEN. T12 and Product implementation remain BLOCKED.
+1. Remove `docs/work/**` from the PR #173 merge candidate now that exact R7 amendment Evidence is preserved.
+2. Reply to the second PR #173 review thread with the exact R7 blob, operator re-LOCK, P9 R7 PASS and amendment Evidence ref; resolve the thread because its material finding is now closed.
+3. Revalidate PR #173 against current main; the branch must remain mergeable with no unresolved material review conversation.
+4. Update the PR description to the final R6-base + R7-amendment state and mark PR #173 Ready only after the cleaned candidate contains no `docs/work/**`.
+5. Run/inspect the final objective aggregate check `required` on the Ready candidate.
+6. Because accepted Evidence changed again after prior merge authorization, obtain fresh explicit operator merge authorization before squash merge.
+7. B12 and FP2/P11 remain NOT OPEN. T12 and Product implementation remain BLOCKED.
 ```
 
 ## Hard stops
@@ -315,7 +303,7 @@ no T12 work
 no B12 work
 no FP2/P11 work
 no B01-B10 reopen without material Evidence
-no widening of B11 beyond the grant User picker finding without new Evidence
+no widening of B11 without new material Evidence
 no application operation 90+ for B11 without a new lawful bounded reopen
 no invented op6 state filter/search for UI convenience
 no pre-pagination client filter that changes server page boundaries
@@ -325,9 +313,7 @@ no Group single-Area ownership inferred from access scope
 no custom Role/Permission editor
 no ad-hoc rewrite of the shared local method files
 no assistant/reviewer LOCK
-no declaring B11/P9 closed while R7 lacks operator re-LOCK
-no resolving the second material PR #173 review thread before exact R7 re-LOCK/P9 proof exists
-no merge while the R7 finding remains open
+no merge while any material review thread remains unresolved
 no merge without fresh explicit operator authorization after the changed accepted Evidence
 ```
 
@@ -343,4 +329,4 @@ fresh independent challenge = converged
 operator implementation authorization = explicit
 ```
 
-Accepted Product/R10/frontend LOCK decisions reopen only on material Evidence under the DevelopmentConexus Engineering Method. The current reopen is bounded solely to the grant User picker page-fidelity defect found in PR #173 review.
+Accepted Product/R10/frontend LOCK decisions reopen only on material Evidence under the DevelopmentConexus Engineering Method. Both PR #173 findings were closed by bounded frontend corrections and operator re-LOCKs; no broader B11 authority was reopened.
