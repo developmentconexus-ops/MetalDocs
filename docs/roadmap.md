@@ -95,14 +95,17 @@ B10   Organization Administration                  LOCKED / P8-P10 COMPLETE / OP
        operation 27+ consumed                       0
        B10-A1 paginated-browse sufficiency          VALIDATED FOR CURRENT LAUNCH P8
        unresolved material B10 Findings             0
-B11   Access Administration                        OPEN / ACTIVE / P7 CANDIDATE APPROVED IN CHAT
+B11   Access Administration                        OPEN / ACTIVE / P8 CANDIDATE / OPERATOR REVIEW
        P6 reference study                           COMPLETE / OFFICIAL SOURCES
        written P6/P7 spec                           docs/work/current/t11-b11-access-administration-p6-p7.md
-       written-spec disposition                     AWAITING OPERATOR REVIEW
-       blocking upstream Findings                  0 proven
-       B11-A1 findability                           OPEN / FALSIFIABLE DURING P8
-       B11-A2 membership consequence                OPEN / FALSIFIABLE DURING P8
-       B11-A3 access explanation                    OPEN / FALSIFIABLE DURING P8
+       written-spec disposition                     OPERATOR-APPROVED
+       P8 artifact                                  docs/work/current/t11-b11-access-administration-p8.html
+       P8 Git blob                                  c04ff56efa7aae72c59dc0ee9c4d56c9357c4de7
+       structural browser verification              40 / 40 PASS
+       blocking upstream Findings                  0 proven before operator walkthrough
+       B11-A1 findability                           OPEN / FALSIFIABLE DURING OPERATOR WALKTHROUGH
+       B11-A2 membership consequence                OPEN / FALSIFIABLE DURING OPERATOR WALKTHROUGH
+       B11-A3 access explanation                    OPEN / FALSIFIABLE DURING OPERATOR WALKTHROUGH
 B12   Document Governance Administration           NOT OPEN
 ```
 
@@ -125,14 +128,15 @@ Both Evidence refs are exact-SHA checked and non-authoritative. B10 `docs/work/*
 ## Exact next action
 
 ```text
-1. Operator reviews the exact written B11 P6/P7 specification at docs/work/current/t11-b11-access-administration-p6-p7.md.
-2. Do not begin P8 until the operator explicitly approves that written specification.
-3. After written-spec approval, materialize browser-operable functional P8 low-fidelity Evidence under docs/work/current/*.html only.
-4. P8 must actively falsify B11-A1 findability, B11-A2 membership-consequence sufficiency, and B11-A3 access-explanation sufficiency; do not fake global search, complete effective access, or access explanation in the browser.
-5. If P8/operator Evidence proves current authority insufficient, STOP only the affected B11 scope and route the smallest UPSTREAM FINDING before continuing.
-6. Operator operates P8; only the operator may LOCK. After explicit B11 LOCK, run P9 bidirectional trace and P10 bounded pattern consolidation.
-7. docs/work/** must be absent from the eventual B11 merge candidate/main after exact Evidence preservation.
-8. B12 and FP2/P11 remain NOT OPEN. T12 and Product implementation remain BLOCKED.
+1. Operator operates the exact B11 P8 artifact at docs/work/current/t11-b11-access-administration-p8.html; only the operator may LOCK.
+2. Explicitly test B11-A1 by locating the later-page Group `Segurança Operacional`, User `Mariana Costa`, Area `Jurídico` and RoleAssignment `A-017` without fake global search/filter and judge browse sufficiency.
+3. Explicitly test B11-A2 by adding/removing Mariana from a security-bearing Group and judge whether bounded consequence language is sufficient without a complete effective-access projection.
+4. Explicitly test B11-A3 by granting/revoking access while direct and Group-mediated paths can coexist and judge whether safe administration is possible without a separate access-explanation surface.
+5. Exercise fixed Role meaning, Subject × Role × Scope review, Company/Area scope restrictions, ambiguous createRoleAssignment retry with the same logical command/Idempotency-Key, and 403/404/409/422 states.
+6. If operator/P8 Evidence proves current authority materially insufficient, STOP only the affected B11 scope and route the smallest UPSTREAM FINDING; do not invent search/filter/effective-access/explanation authority in the browser.
+7. If disposition REVISE, revise P8 and repeat affected walkthrough. Only after explicit B11 LOCK run P9 bidirectional trace and P10 bounded pattern consolidation.
+8. docs/work/** must be absent from the eventual B11 merge candidate/main after exact Evidence preservation.
+9. B12 and FP2/P11 remain NOT OPEN. T12 and Product implementation remain BLOCKED.
 ```
 
 ## Hard stops
