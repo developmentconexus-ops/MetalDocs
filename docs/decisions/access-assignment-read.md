@@ -8,9 +8,9 @@ summary: Bounded T11 authority for human-recognizable RoleAssignment inspection 
 # Access Assignment Read — bounded T11 authority
 
 > **Status:** OPERATOR-RATIFIED / BOUNDED T11 REOPEN.  
-> **Ratified:** 2026-08-24.  
-> **Trigger:** B11 P8 R1 operator walkthrough.  
-> **Method:** pinned DevelopmentConexus `METHOD.md + FRONTEND-METHOD.md`.  
+> **Ratified:** 2026-08-24; revalidated 2026-08-25 against restored local methods.  
+> **Trigger:** B11 functional P8 operator walkthrough.  
+> **Method:** `docs/development/engineering-method.md` v1.0.0 + `docs/development/frontend-product-experience-planning-method.md` v2.3.  
 > **Implementation:** BLOCKED by `../roadmap.md`.
 
 ## 1. Authority and supersession
@@ -29,6 +29,8 @@ api-operation-census.md
 All unchanged Authorization equations, Role/Permission vocabulary, GroupMembership semantics, mutation contracts, Audit, offboarding, scope compatibility and security laws remain current.
 
 Historical stage snapshots remain truthful for the stage at which they were ratified.
+
+The 2026-08-25 repository-method restoration changed operating mechanics only. Revalidation against local Engineering Method v1.0.0 and Frontend Product Experience Planning Method v2.3 found no Product, Authorization, wire, UX, proof or reopen-trigger contradiction in this bounded decision.
 
 ## 2. Proven human jobs
 
@@ -313,7 +315,7 @@ Read filters never grant access and never widen current disclosure.
 
 ## 10. Proof strategy
 
-B11 P8 R2 must be capable of falsifying this decision with deterministic fixtures.
+The B11 functional P8 must be capable of falsifying this decision with deterministic fixtures.
 
 Required probes:
 
@@ -327,6 +329,8 @@ Required probes:
 7. no screen claims complete per-User effective access from memberships + grants;
 8. no Group.area_id or equivalent single-Area ownership is introduced.
 ```
+
+Canonical P8 R5 satisfied these probes and was operator-LOCKED; P9 traced the locked structure bidirectionally with no unresolved finding.
 
 A control/projection counts only if the P8 can make an omission or false-completeness defect visible to the operator.
 
