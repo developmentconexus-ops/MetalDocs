@@ -14,7 +14,7 @@ REPOSITORY MODE       CLEAN-SLATE / ARCHITECTURE-FIRST
 T1 → T10              CLOSED / OPERATOR-RATIFIED / INTEGRATED
 T11                   OPEN / ACTIVE
 T11 checkpoint        B01-B10 ACCEPTED / INTEGRATED
-T11 current block     B11 ACCESS ADMINISTRATION / OPEN / ACTIVE / P8 R4 FRAME APPROVED / CONTENT WALKTHROUGH
+T11 current block     B11 ACCESS ADMINISTRATION / OPEN / ACTIVE / P8 R5 CANDIDATE / CONTENT WALKTHROUGH
 METHODOLOGY ADOPTION  ACCEPTED / INTEGRATED
 T12                   NOT OPEN
 IMPLEMENTATION         BLOCKED
@@ -95,7 +95,7 @@ B10   Organization Administration                  LOCKED / P8-P10 COMPLETE / OP
        operation 27+ consumed                       0
        B10-A1 paginated-browse sufficiency          VALIDATED FOR CURRENT LAUNCH P8
        unresolved material B10 Findings             0
-B11   Access Administration                        OPEN / ACTIVE / P8 R4 FRAME APPROVED / CONTENT WALKTHROUGH
+B11   Access Administration                        OPEN / ACTIVE / P8 R5 CANDIDATE / CONTENT WALKTHROUGH
        P6 reference study                           COMPLETE / OFFICIAL SOURCES
        P7 R1 written spec                           docs/work/current/t11-b11-access-administration-p6-p7.md
        P7 R1 disposition                            SUPERSEDED ONLY WHERE B11-F1 CHANGES IA
@@ -117,14 +117,11 @@ B11   Access Administration                        OPEN / ACTIVE / P8 R4 FRAME A
        P8 R2 plan                                   docs/work/current/t11-b11-access-administration-p8-r2-plan.md
        P8 R2 artifact                               docs/work/current/t11-b11-access-administration-p8-r2.html
        P8 R2 Git blob                               8940238a5234c81ba0651693a0fe36c1da7f10a5
-       P8 R2 SHA-256                                57e28ca2fbadbb8555d1287dc311860cc1480e5f52df4f8ab46db5e9ac2af41f
-       P8 R2 structural browser verification        73 / 73 PASS
        P8 R2 operator disposition                   REVISE / VISUAL TOPOLOGY REGRESSION
        P8 R2 topology continuity                    4 / 13 PASS
        P8 R2 revise evidence                        docs/work/current/t11-b11-p8-r2-operator-revise.md
        P8 R3 artifact                               docs/work/current/t11-b11-access-administration-p8-r3.html
        P8 R3 Git blob                               273b9d16f23c37663024a5a0ec638d08e52002f0
-       P8 R3 SHA-256                                6ae81779f3ac810ac408cb2bb232acc1aa427ef8e752292c8e6380a336484c60
        P8 R3 topology continuity                    13 / 13 PASS against wrong B11/B10-derived baseline
        P8 R3 functional browser verification        42 / 42 PASS
        P8 R3 operator disposition                   REVISE / LOCKED-WIREFRAME FIDELITY FAILURE
@@ -132,13 +129,17 @@ B11   Access Administration                        OPEN / ACTIVE / P8 R4 FRAME A
        canonical wireframe fidelity baseline        B01 / B01N / B07 / B08 exact LOCK Evidence
        P8 R4 artifact                               docs/work/current/t11-b11-access-administration-p8-r4.html
        P8 R4 Git blob                               a9c4ef8f558771848079ce74e221be40bc5c2ad4
-       P8 R4 SHA-256                                d74102ca2315b61fcd1aaf9b80be9de8b67da668bd759f31e3a636b0170fd655
        P8 R4 LOCKED-wireframe fidelity               30 / 30 PASS
        P8 R4 functional/browser verification        34 / 34 PASS
        P8 R4 combined verification                  64 / 64 PASS
        P8 R4 frame fidelity                         OPERATOR-APPROVED
-       P8 R4 content disposition                    OPERATOR WALKTHROUGH PENDING
-       P8 R4 walkthrough evidence                   docs/work/current/t11-b11-p8-r4-operator-walkthrough.md
+       P8 R4 content disposition                    REVISE / LOCAL P8 CONTENT FINDINGS
+       P8 R4 content findings                       docs/work/current/t11-b11-p8-r4-content-findings.md
+       P8 R5 artifact                               docs/work/current/t11-b11-access-administration-p8-r5.html
+       P8 R5 Git blob                               96094773435a88c357e308779639415d9853b327
+       P8 R5 frame                                  INHERITED FROM OPERATOR-APPROVED R4 / NO REDESIGN
+       P8 R5 corrections                            USER PICKER + DYNAMIC MEMBERSHIP REVIEW + REMOVE CONFIRM + CONTEXTUAL GRANT
+       P8 R5 operator disposition                   AWAITING CONTENT WALKTHROUGH
        B11-R2-A Group footprint comprehension       OPEN / FALSIFIABLE DURING CONTENT WALKTHROUGH
        B11-R2-B Area configuration comprehension    OPEN / FALSIFIABLE DURING CONTENT WALKTHROUGH
        B11-R2-C membership consequence              OPEN / FALSIFIABLE DURING CONTENT WALKTHROUGH
@@ -166,17 +167,18 @@ Both Evidence refs are exact-SHA checked and non-authoritative. B10 `docs/work/*
 ## Exact next action
 
 ```text
-1. Continue only the B11 P8 R4 content walkthrough; frame/wireframe fidelity is already OPERATOR-APPROVED and must not be redesigned.
-2. Test B11-R2-A in Grupos using `Aprovadores Financeiro`: confirm Aprovador @ Financeiro, Visualizador @ Comercial, Visualizador @ Toda a empresa and Visualizador de governança @ Jurídico are immediately understandable without implying one Group-owned Area.
+1. Operator operates the exact B11 P8 R5 artifact at docs/work/current/t11-b11-access-administration-p8-r5.html. The R4 frame/wireframe fidelity is already OPERATOR-APPROVED and is inherited; do not redesign it.
+2. Test B11-R2-A in Grupos using `Aprovadores Financeiro`: confirm different Roles across Financeiro, Comercial, Company and Jurídico are immediately understandable without implying one Group-owned Area.
 3. Test B11-R2-B in Por Área using `Comercial`: confirm Area-specific grants and Company-wide grants that also apply remain visibly separate and truthful.
-4. Test B11-R2-C by adding Mariana to `Aprovadores Financeiro` while the group's footprint remains visible; judge whether the visible footprint + bounded consequence copy is sufficient.
-5. Test B11-R2-D while direct and Group grants coexist: judge whether Launch access administration remains safe without a per-User effective-access troubleshooter.
-6. Test B11-R2-E by paging Area-specific, Company, Group and Role-filtered slices; judge whether filtered pagination is operationally sufficient without global matrix/search capability.
-7. Exercise Funções read-only meaning, grant review Subject × Role × Scope, role scope restrictions, exact revoke, ambiguous retry with same logical command/Idempotency-Key, membership conflict and 403/404/409/failure fixtures.
-8. If disposition REVISE, revise only the smallest affected P8 content scope unless operator Evidence exposes a new semantic insufficiency; then route the smallest UPSTREAM FINDING.
-9. Only the operator may LOCK B11. Only after explicit B11 LOCK run P9 bidirectional trace and P10 bounded pattern consolidation.
-10. docs/work/** must be absent from the eventual B11 merge candidate/main after exact Evidence preservation.
-11. B12 and FP2/P11 remain NOT OPEN. T12 and Product implementation remain BLOCKED.
+4. Test B11-R2-C using the R5 membership flow: choose an existing User through the paginated picker, review exact User + Group consequence, add membership, and separately confirm a removal; judge whether visible Group footprint + bounded copy is sufficient.
+5. Test contextual grant entry from both Area and Group lenses: Area preselects its real scope; Group preselects its exact subject; Role/remaining dimensions remain deliberate and the final Subject × Role × Scope review remains mandatory.
+6. Test B11-R2-D while direct and Group grants coexist: judge whether Launch access administration remains safe without a per-User effective-access troubleshooter.
+7. Test B11-R2-E by paging Area-specific, Company, Group, Role and membership-User slices; judge whether filtered pagination is operationally sufficient without global matrix/search capability.
+8. Exercise Funções read-only meaning, role scope restrictions, exact revoke, ambiguous retry with same logical command/Idempotency-Key, membership conflict and 403/404/409/failure fixtures.
+9. If disposition REVISE, revise only the smallest affected P8 content scope unless operator Evidence exposes a new semantic insufficiency; then route the smallest UPSTREAM FINDING.
+10. Only the operator may LOCK B11. Only after explicit B11 LOCK run P9 bidirectional trace and P10 bounded pattern consolidation.
+11. docs/work/** must be absent from the eventual B11 merge candidate/main after exact Evidence preservation.
+12. B12 and FP2/P11 remain NOT OPEN. T12 and Product implementation remain BLOCKED.
 ```
 
 ## Hard stops
@@ -193,7 +195,7 @@ no client-side crawl/post-filter over incomplete pages presented as complete
 no frontend effective-permission authority or inferred inherited-access matrix
 no Group single-Area ownership inferred from access scope
 no custom Role/Permission editor
-no P8 R5 before explicit operator disposition of P8 R4 content
+no P8 R6 before explicit operator disposition of P8 R5 content
 no unapproved shell/sidebar/header/local-nav topology redesign inside a block P8
 no production-like visual design in P8
 no assistant/reviewer LOCK
