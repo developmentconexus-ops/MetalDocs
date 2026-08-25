@@ -95,8 +95,10 @@ B10   Organization Administration                  LOCKED / P8-P10 COMPLETE / OP
        operation 27+ consumed                       0
        B10-A1 paginated-browse sufficiency          VALIDATED FOR CURRENT LAUNCH P8
        unresolved material B10 Findings             0
-B11   Access Administration                        OPEN / ACTIVE / P7 CANDIDATE OPERATOR-APPROVED
+B11   Access Administration                        OPEN / ACTIVE / P7 CANDIDATE APPROVED IN CHAT
        P6 reference study                           COMPLETE / OFFICIAL SOURCES
+       written P6/P7 spec                           docs/work/current/t11-b11-access-administration-p6-p7.md
+       written-spec disposition                     AWAITING OPERATOR REVIEW
        blocking upstream Findings                  0 proven
        B11-A1 findability                           OPEN / FALSIFIABLE DURING P8
        B11-A2 membership consequence                OPEN / FALSIFIABLE DURING P8
@@ -123,9 +125,9 @@ Both Evidence refs are exact-SHA checked and non-authoritative. B10 `docs/work/*
 ## Exact next action
 
 ```text
-1. Continue only B11 — Access Administration from the operator-approved P6/P7 candidate.
-2. Materialize the written B11 P6/P7 Evidence under docs/work/current/ and have the operator review that exact written specification before P8.
-3. After explicit approval of the written specification, materialize browser-operable functional P8 low-fidelity Evidence under docs/work/current/*.html only.
+1. Operator reviews the exact written B11 P6/P7 specification at docs/work/current/t11-b11-access-administration-p6-p7.md.
+2. Do not begin P8 until the operator explicitly approves that written specification.
+3. After written-spec approval, materialize browser-operable functional P8 low-fidelity Evidence under docs/work/current/*.html only.
 4. P8 must actively falsify B11-A1 findability, B11-A2 membership-consequence sufficiency, and B11-A3 access-explanation sufficiency; do not fake global search, complete effective access, or access explanation in the browser.
 5. If P8/operator Evidence proves current authority insufficient, STOP only the affected B11 scope and route the smallest UPSTREAM FINDING before continuing.
 6. Operator operates P8; only the operator may LOCK. After explicit B11 LOCK, run P9 bidirectional trace and P10 bounded pattern consolidation.
