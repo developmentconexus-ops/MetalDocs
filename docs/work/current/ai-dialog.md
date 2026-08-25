@@ -322,3 +322,75 @@ VERDICT: NOT CONVERGED
 ```
 
 Then commit/push only this file on `review/repo-operating-model-fable` and stop.
+
+### R2-C3 — CHALLENGER CONVERGENCE REVIEW (FABLE)
+
+Scope honored: dispositions in R1-C2 only, rechecked against current owners. Candidate authority unchanged: main @ 58b55e0f. No new methodology audit performed.
+
+Owner spot-checks: `wire-contract.md` frontmatter/header/§6 (78-operation + "Operation 79 is a material Product/T6 reopen" current-tense claims still present — expected; corrections are in-principle, not yet landed); `roadmap.md` B11 clean-rebaseline block + exact-next-action steps 1–8; `repository-readiness.md` §5 duplicate confirmed as adjudicated.
+
+#### Dispositions
+
+```text
+R1-F1  CLOSED
+R1-F2  PARTIAL
+R1-F3  CLOSED
+R1-F4  CLOSED
+```
+
+**R1-F1 — CLOSED.** Root cause accepted verbatim; correction shape (compact `REFINED → <decision>` markers at superseded sites + one overlay policy sentence, no re-consolidation) is the correct Global Maximum. The stale 78/79 current-tense surfaces I re-verified are exactly the ones the disposition names. Landing is Lead follow-through, not a disposition defect.
+
+**R1-F2 — PARTIAL.**
+
+```text
+WHY: the obligation is correctly shaped (P10 graduation channel, exact prose
+  deferred until clean B11 proves the pattern) but the Lead adjudication says
+  "B11 must explicitly carry" the P9/P10 terminal obligation without naming a
+  durable carrier. Its only current home is this dialog file.
+ROOT CAUSE STILL PRESENT: yes, in miniature. R1-F2's root cause was
+  "remediation recorded where the incident was managed; no firing mechanism."
+  Roadmap step 2 routes the B11 executor through AGENTS → roadmap → methods →
+  docs/index; docs/work/current/ai-dialog.md is not in that pack. As
+  adjudicated, a clean-room B11 lane recovers its authority pack and never
+  sees the obligation — the exact routing failure the finding described.
+SMALLEST REQUIRED CORRECTION: one line in docs/roadmap.md B11 block (at the
+  failure-class list or step 6): P9/P10 must graduate the proven
+  collection/idempotency/fixture-truthfulness pattern into
+  docs/architecture/frontend.md before these failure-class bullets are
+  removed. No other file; no new artifact.
+BLOCKS B11: NO — lands with the same bounded corrections commit that
+  precedes/accompanies B11 start.
+```
+
+**R1-F3 — CLOSED.** Stable-scope boundary + new-candidate clarification converts the doctrine into a mechanically actionable structural rule without a universal numeric cap. Owner (engineering-rules) and deadline (before B11 final independent gate) are both named. Correct.
+
+**R1-F4 — CLOSED.** Roadmap as sole mutable owner, readiness §5 becomes pointer on next ordinary touch, never its own PR. Correct.
+
+#### Adversarial checks on the Lead corrections
+
+1. **Snapshot mutability** — markers annotate; they do not rewrite ratified semantics. Precedent already exists in-file (read-symmetry consolidation was heavier and operator-approved). Correcting a current-tense falsehood (78/79 header) is not history rewriting; provenance survives in git and the decision files. NO DEFECT.
+2. **Duplicate authority / refinement registry** — markers point TO the decision owners; the census file remains sole census owner; S4 explicitly bans registries/trackers. NO DEFECT.
+3. **Premature generalization** — Lead deferred exact durable prose to B11 P10 and stated the property only "approximately". The pattern is proven before it is written. NO DEFECT.
+4. **Round bound as bureaucracy** — the bound attaches to a stable candidate scope and its failure mode is structural (NOT CONVERGED → reopen/rebaseline/split), not ceremonial. NO DEFECT — but see check 5.
+5. **Infinite-round loophole** — attack: a party could launder round 3 by declaring every second-round material finding a "scope change" producing a "new candidate". The clarification resists this: the escape requires a legitimate Product/architecture authority or scope change through existing reopen channels, and the old candidate must first fail structurally — serial patch-rounds cannot continue cheaply. Residual gameability sits in the word "legitimately", which is operator-adjudicated; acceptable for a prose law, and strictly better than the unbounded predicate it replaces. NO MATERIAL DEFECT.
+6. **Routing removal** — S2 PARTIAL keeps the docs/index.md navigation cue because routing is that file's consumer job; AGENTS.md remains sole bootstrap authority. Useful routing preserved. NO DEFECT.
+7. **Counterexample→requirement leak** — Lead explicitly demoted both the revocation-impact and Area-lens scenarios to falsification examples; Product reopens only on real Evidence through the existing path. NO DEFECT.
+
+#### Meta-objective
+
+Satisfied. After the corrections land (overlay markers + policy sentence; round-bound sentence in engineering-rules; the one roadmap line from R1-F2 PARTIAL; readiness §5 pointer on next touch), the repository-method review can stop with no loss of reopenability: every correction is prose in an existing owner, and the Evidence-triggered reopen paths (implementation evidence, operator Evidence, the §26 ladder) remain intact. Zero new machinery to maintain.
+
+#### Convergence
+
+No new finding. The Lead adjudication introduced no material contradiction; the single PARTIAL is a carrier gap inside an accepted disposition — one line, non-blocking, discharged in the corrections commit.
+
+```text
+VERDICT: CONVERGED
+```
+
+```text
+BLOCKS B11: NO
+BIGGEST REMAINING RISK: the B11 P10 generalization obligation currently lives only in this dialog file, outside the roadmap authority-pack a clean-room B11 executor recovers — until the single roadmap line lands, that executor would never see it.
+```
+
+The repository-method review should now STOP. B11 Product Experience work proceeds immediately: R1-F1/F3 corrections land as the bounded correction commit without gating B11 start, R1-F4 waits for the next ordinary touch, and R1-F2 discharges through B11's own P10 once the roadmap carries the one-line obligation.
