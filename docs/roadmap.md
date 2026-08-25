@@ -96,9 +96,11 @@ B10   Organization Administration                  LOCKED / P8-P10 COMPLETE / OP
        B10-A1 paginated-browse sufficiency          VALIDATED FOR CURRENT LAUNCH P8
        unresolved material B10 Findings             0
 B11   Access Administration                        LOCKED / P8-P10 COMPLETE / OPERATOR-RATIFIED
-       canonical P8                                docs/work/current/t11-b11-access-administration-p8-r5.html
+       durable Evidence locator                     docs/decisions/t11-b11-lock-evidence.md
+       Evidence ref                                evidence/t11-b11-locks-20260825
+       Evidence exact commit                       469a753904041e7800400dc1074510456aa50df8
+       Evidence exact tree                         c4f04b75c3676dcde00caa07279824b3c653c7f3
        locked P8 Git blob                          96094773435a88c357e308779639415d9853b327
-       operator LOCK                               docs/work/current/t11-b11-operator-lock.md
        B11-F1 Access Assignment Read Precision      CLOSED / OPERATOR-RATIFIED / DURABLE
        B11-F1 authority                             docs/decisions/access-assignment-read.md
        op31 listRoleAssignments                     REFINED / FILTERED + HUMAN-RECOGNIZABLE READ
@@ -119,7 +121,7 @@ B11   Access Administration                        LOCKED / P8-P10 COMPLETE / OP
 B12   Document Governance Administration           NOT OPEN
 ```
 
-Exact locked frontend Evidence already integrated remains recoverable through:
+Exact locked frontend Evidence remains recoverable through:
 
 ```text
 B01-B09
@@ -131,21 +133,25 @@ B10
 docs/decisions/t11-b10-lock-evidence.md
 evidence/t11-pr170-b10-locks-20260824
 → b8c607cbd30d61d6bcf6ec1ea734ed1653d2569e
+
+B11
+docs/decisions/t11-b11-lock-evidence.md
+evidence/t11-b11-locks-20260825
+→ 469a753904041e7800400dc1074510456aa50df8
 ```
 
-B11 temporary `docs/work/**` Evidence must likewise be preserved by exact Git identity before cleanup; it must not enter the eventual merge candidate/main.
+All Evidence refs are non-authoritative provenance and must remain reachable while current T11/P11/P13/P14 proof depends on them.
 
 ## Exact next action
 
 ```text
-1. Preserve the exact B11 LOCK/P9/P10 planning tree by an immutable/reachable Evidence ref before deleting temporary docs/work/** from the acceptance candidate.
-2. Add a durable B11 LOCK Evidence locator under docs/decisions/** naming the exact Evidence commit/ref and canonical P8 blob 96094773435a88c357e308779639415d9853b327.
-3. Remove B11 temporary docs/work/** from the merge candidate only after the exact Evidence ref is confirmed reachable.
-4. Revalidate the cleaned B11 acceptance candidate against AGENTS.md, engineering rules, B11-F1, the 89-operation census and the required aggregate gate.
-5. Use independent adversarial review if required by the pinned Method/repository governance for the final acceptance claim; reviewer output remains Evidence, never authority.
-6. Do not open B12 merely because B11 is LOCKED. B12 requires an explicit later opening/acceptance increment after B11 integration.
-7. FP2/P11 remains NOT OPEN until the block program reaches the accepted assembly boundary.
-8. T12 and Product implementation remain BLOCKED.
+1. Ensure the B11 merge candidate contains no docs/work/** after exact Evidence preservation.
+2. Revalidate the cleaned B11 acceptance candidate against AGENTS.md, docs/index.md, engineering rules, B11-F1, the 89-operation census and repository conformance checks.
+3. Prepare one B11 acceptance-increment PR against main; Draft is the default while final review/conformance is incomplete.
+4. Use independent adversarial review if required by the pinned Method/repository governance for the final acceptance claim; reviewer output remains Evidence, never authority.
+5. Do not open B12 merely because B11 is LOCKED. B12 requires an explicit later opening/acceptance increment after B11 integration.
+6. FP2/P11 remains NOT OPEN until the block program reaches the accepted assembly boundary.
+7. T12 and Product implementation remain BLOCKED.
 ```
 
 ## Hard stops
