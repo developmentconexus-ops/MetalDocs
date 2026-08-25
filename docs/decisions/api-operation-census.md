@@ -2,7 +2,7 @@
 id: api-operation-census
 kind: authority
 owner: architecture
-summary: Owns the current 89-operation /api/v1 application census after the operator-ratified T11 Discussion/Notifications and Audit investigation bounded reopens.
+summary: Owns the current 89-operation /api/v1 application census after operator-ratified T11 bounded reopens, including B11 Access Assignment read precision.
 ---
 
 # API operation census
@@ -15,6 +15,7 @@ Current semantic authority is the combination of:
 docs/product/journeys.md
 + docs/decisions/discussion-notifications-launch.md
 + docs/decisions/audit-investigation-read.md
++ docs/decisions/access-assignment-read.md
 ```
 
 The bounded T8-E read-symmetry precision previously added two reads to the original 76-operation census:
@@ -71,6 +72,17 @@ The T11 B09 Audit investigation bounded reopen preserves operation 78 `listAudit
 
 Operation 78 remains the sole Audit evidence traversal authority and is refined by `audit-investigation-read.md`; it is not counted twice.
 
+The T11 B11 Access Administration bounded reopen refines existing operation 31 only:
+
+```text
+31 GET /api/v1/role-assignments
+   operationId: listRoleAssignments
+   REFINED — server-side User / Group / Scope / Role filters
+             + human-recognizable subject/scope read projection
+```
+
+No B11 operation is added or removed. Mutation operations 28, 29, 32 and 33 remain unchanged.
+
 ## Count proof
 
 ```text
@@ -78,6 +90,7 @@ original journeys census                    76
 bounded read-symmetry precision             +2
 T11 Discussion/Mention/Notifications reopen +8
 T11 Audit investigation bounded reopen      +3
+T11 B11 op31 read precision                  +0
                                             ---
 current application census                  89
 ```
@@ -91,6 +104,8 @@ createDocumentDiscussionMessage
 ```
 
 The three Audit investigation additions are all `SAFE_READ` and add no Idempotency-Key creation, ETag domain or exact-byte resource.
+
+The B11 op31 refinement is a `SAFE_READ` precision and likewise adds no Idempotency-Key creation, ETag domain or exact-byte resource.
 
 Current cross-contract counts are:
 
@@ -109,7 +124,9 @@ The T11 Discussion creation reuses the current global durable Idempotency-Key la
 
 `docs/decisions/audit-investigation-read.md` is the bounded current authority for the op78 structured-query/inspection refinement and operations 87–89.
 
-Together they supersede only the conflicting current-tense Product/T6/T8-E/T8-F/T8-H/T9 statements on those bounded subjects.
+`docs/decisions/access-assignment-read.md` is the bounded current authority for the op31 Access Assignment read/query refinement. It does not create operation 90, a new semantic owner or an effective-access engine.
+
+Together these bounded decisions supersede only the conflicting current-tense Product/T6/T8-E/T8-F/T8-H/T9 statements on their exact subjects.
 
 This page is the **sole current numeric census authority**. Therefore older `78`, `78/78`, `86`, `operation 79 absent`, `operation 87 absent`, `no operation 79`, `operation 87+ requires reopen`, or equivalent closed-count statements found in:
 
@@ -144,4 +161,4 @@ All unchanged journey and wire laws remain owned by `docs/product/journeys.md` a
 
 Any operation **90 or later** requires unchanged semantic normalization already permitted by current authority or a new explicit bounded Product/T6 reopen. Framework convenience, screen shape or implementation preference is not authority to add an operation.
 
-T8-E executable realization must prove exactly **89** application operations and the current 11/13/4 supporting censuses.
+T8-E executable realization must prove exactly **89** application operations and the current 11/13/4 supporting censuses, with operation 31 realized according to `access-assignment-read.md`.
