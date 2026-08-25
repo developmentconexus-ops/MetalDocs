@@ -32,7 +32,8 @@ Expand into any Product, architecture, decision, contract, Evidence, research, G
 | User journeys / application API meaning | [Product journeys](product/journeys.md) + [API operation census](decisions/api-operation-census.md); add bounded decision authorities when their operations are implicated |
 | Domain state / invariants | [Domain model](architecture/domain-model.md) |
 | Governance / effectivity / transactions | [Lifecycle](architecture/lifecycle.md) |
-| Authorization / Audit | [Authorization and audit](architecture/authorization-and-audit.md); add bounded discussion/audit authorities when implicated |
+| Authorization / Audit | [Authorization and audit](architecture/authorization-and-audit.md); add bounded discussion/audit/access authorities when implicated |
+| Access Administration / RoleAssignment inspection by User, Group, Area/Company scope or Role | [Access Assignment read](decisions/access-assignment-read.md) + [Authorization and audit](architecture/authorization-and-audit.md) + [API operation census](decisions/api-operation-census.md) |
 | Responsible-owner eligibility | [Responsible owner](architecture/responsible-owner.md) |
 | Document Official management affordances / `allowed_actions` | [Document Official action precision](decisions/document-official-actions-read.md) + [Wire contract](architecture/wire-contract.md) |
 | My Work governance row recognition | [My Work governance read precision](decisions/my-work-governance-identification-read.md) + [Wire contract](architecture/wire-contract.md) + [Frontend](architecture/frontend.md) |
@@ -48,7 +49,7 @@ Expand into any Product, architecture, decision, contract, Evidence, research, G
 | Current decision dispositions | [Decision register](decisions/index.md) |
 | Preserved / reopen / deferred obligations | [Forward obligations](decisions/forward-obligations.md) |
 | Repository reset / provenance | [Repository reset](decisions/repository-reset.md) |
-| Frontend LOCK/P8 evidence recovery for later P11 | [T11 B01-B09 LOCK Evidence Locator](decisions/t11-b01-b09-lock-evidence.md) + [T11 B10 LOCK Evidence Locator](decisions/t11-b10-lock-evidence.md) |
+| Frontend LOCK/P8 evidence recovery for later P11 | [T11 B01-B09 LOCK Evidence Locator](decisions/t11-b01-b09-lock-evidence.md) + [T11 B10 LOCK Evidence Locator](decisions/t11-b10-lock-evidence.md) + [T11 B11 LOCK Evidence Locator](decisions/t11-b11-lock-evidence.md) |
 | Documentation governance | [Documentation rules](development/documentation.md) |
 | Repository-local engineering / CI / Git | [Engineering rules](development/engineering-rules.md) |
 | Executable application wire | [Wire contract](architecture/wire-contract.md) + [API census](decisions/api-operation-census.md) + the exact bounded authority implicated by the operation/surface |
