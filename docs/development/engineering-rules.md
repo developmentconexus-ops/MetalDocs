@@ -51,6 +51,21 @@ DEFERRED → preserve seam/counterexample; no dormant implementation
 
 When an obligation closes or materially refines, update the durable register rather than creating amendment chains.
 
+## Ratified-snapshot refinement markers
+
+When a later bounded MetalDocs decision supersedes current-tense meaning inside a ratified Product/architecture snapshot that remains in active routing:
+
+```text
+current decision owns the new meaning
++ touched row/section in the older snapshot carries a compact:
+  REFINED → <current decision>
++ the marker points; it does not restate the new semantics
+```
+
+The snapshot may retain original stage counts, proof and historical language when clearly identified as historical. Its current-tense header/routing must not present an obsolete census or reopen condition as current truth.
+
+Do not create a refinement registry or amendment chain. If markers proliferate enough that targeted retrieval is no longer clear, treat that as Evidence to consolidate the current owner through a material decision rather than layering more routing machinery.
+
 ## Independent adversarial review
 
 MetalDocs retains the useful **ClaudeCode/FABLE-style review posture** without restoring the historical `.claude/skills` framework or introducing a fourth methodology.
