@@ -124,9 +124,9 @@ new Evidence refs for every intermediate P8 revision
 
 ## 5. B11 continuation pointer
 
-B11 may resume as a new acceptance increment from current `main`, preserving integrated B11-F1 and treating the old B11 workspace as Evidence only.
+At this closeout, B11 was authorized to resume as a new acceptance increment from current `main`, preserving integrated B11-F1 and treating the old B11 workspace as Evidence only. That clean rebaseline has since been accepted; `docs/decisions/t11-b11-lock-evidence.md` routes its exact Evidence.
 
-`docs/roadmap.md` is the **sole mutable owner** of the current B11 failure-class inputs, terminal P9/P10 obligation, exact next action and progression gate. This closeout decision intentionally does not restate that mutable list.
+`docs/roadmap.md` is the **sole mutable owner** of B11 stage/state, remaining obligations, exact next action and progression gate. This closeout decision intentionally does not restate that mutable content.
 
 ## 6. Review convergence verdict
 
