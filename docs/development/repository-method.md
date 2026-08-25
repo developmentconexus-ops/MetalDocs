@@ -181,23 +181,6 @@ owner: owner-name
 summary: one sentence
 ```
 
-### 4.1 Bounded refinement overlays on ratified snapshots
-
-A ratified snapshot may remain valuable historical/proof context after a later bounded decision supersedes one of its current-tense clauses. Selective retrieval must not make that superseded clause look current.
-
-For each later bounded refinement that leaves the older owner in active routing:
-
-```text
-current decision owns the new meaning
-+ touched row/section in the older snapshot carries a compact:
-  REFINED → <current decision>
-+ marker points; it does not restate the new semantics
-```
-
-The snapshot may retain original counts, proof and stage language when they are explicitly historical. Its header/current-tense guidance must not present an obsolete census or reopen condition as current truth.
-
-Do not create a refinement registry or amendment chain. If markers become numerous enough that targeted retrieval is no longer clear, treat that as evidence to consolidate the current owner through a material decision instead of layering more markers.
-
 ## 5. Roadmap law — snapshot, not journal
 
 `docs/roadmap.md` owns mutable current program truth and should remain compact.
