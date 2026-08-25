@@ -14,6 +14,7 @@ REPOSITORY MODE       CLEAN-SLATE / ARCHITECTURE-FIRST
 T1 → T10              CLOSED / OPERATOR-RATIFIED / INTEGRATED
 T11                   OPEN / ACTIVE
 T11 checkpoint        B01-B10 ACCEPTED / INTEGRATED
+T11 current block     B11 ACCESS ADMINISTRATION / OPEN / ACTIVE
 METHODOLOGY ADOPTION  ACCEPTED / INTEGRATED
 T12                   NOT OPEN
 IMPLEMENTATION         BLOCKED
@@ -94,7 +95,12 @@ B10   Organization Administration                  LOCKED / P8-P10 COMPLETE / OP
        operation 27+ consumed                       0
        B10-A1 paginated-browse sufficiency          VALIDATED FOR CURRENT LAUNCH P8
        unresolved material B10 Findings             0
-B11   Access Administration                        NOT OPEN
+B11   Access Administration                        OPEN / ACTIVE / P7 CANDIDATE OPERATOR-APPROVED
+       P6 reference study                           COMPLETE / OFFICIAL SOURCES
+       blocking upstream Findings                  0 proven
+       B11-A1 findability                           OPEN / FALSIFIABLE DURING P8
+       B11-A2 membership consequence                OPEN / FALSIFIABLE DURING P8
+       B11-A3 access explanation                    OPEN / FALSIFIABLE DURING P8
 B12   Document Governance Administration           NOT OPEN
 ```
 
@@ -117,13 +123,14 @@ Both Evidence refs are exact-SHA checked and non-authoritative. B10 `docs/work/*
 ## Exact next action
 
 ```text
-1. Revalidate accepted main and recover authority through AGENTS → docs/index → docs/roadmap → pinned ROUTER.
-2. Select METHOD + FRONTEND-METHOD for the next frontend-planning increment.
-3. Revalidate the smallest B11 authority pack and forward obligations before deciding whether B11 is ready to open.
-4. Do not treat B11 as opened merely because B10 is integrated.
-5. T11 remains OPEN; B11-B12 remain NOT OPEN until explicitly opened by a later acceptance increment.
-6. FP2/P11 remains NOT OPEN until the block program reaches its accepted assembly boundary.
-7. T12 and Product implementation remain BLOCKED.
+1. Continue only B11 — Access Administration from the operator-approved P6/P7 candidate.
+2. Materialize the written B11 P6/P7 Evidence under docs/work/current/ and have the operator review that exact written specification before P8.
+3. After explicit approval of the written specification, materialize browser-operable functional P8 low-fidelity Evidence under docs/work/current/*.html only.
+4. P8 must actively falsify B11-A1 findability, B11-A2 membership-consequence sufficiency, and B11-A3 access-explanation sufficiency; do not fake global search, complete effective access, or access explanation in the browser.
+5. If P8/operator Evidence proves current authority insufficient, STOP only the affected B11 scope and route the smallest UPSTREAM FINDING before continuing.
+6. Operator operates P8; only the operator may LOCK. After explicit B11 LOCK, run P9 bidirectional trace and P10 bounded pattern consolidation.
+7. docs/work/** must be absent from the eventual B11 merge candidate/main after exact Evidence preservation.
+8. B12 and FP2/P11 remain NOT OPEN. T12 and Product implementation remain BLOCKED.
 ```
 
 ## Hard stops
@@ -131,10 +138,13 @@ Both Evidence refs are exact-SHA checked and non-authoritative. B10 `docs/work/*
 ```text
 no Product code/schema/OpenAPI/runtime/deploy implementation
 no T12 work
-no B11-B12 work until a later explicit acceptance increment opens it
+no B12 work
 no FP2/P11 work
 no B01-B10 reopen without material Evidence
-no invented B10 search/filter/read API for UI convenience
+no invented B11 search/filter/effective-access/explanation API for UI convenience
+no client-side fake global search over a loaded page
+no frontend effective-permission authority or inferred inherited-access matrix
+no custom Role/Permission editor
 no assistant/reviewer LOCK
 no local reusable methodology fork
 no floating methodology main as normative authority
