@@ -14,7 +14,7 @@ REPOSITORY MODE       CLEAN-SLATE / ARCHITECTURE-FIRST
 T1 → T10              CLOSED / OPERATOR-RATIFIED / INTEGRATED
 T11                   OPEN / ACTIVE
 T11 checkpoint        B01-B10 ACCEPTED / INTEGRATED
-T11 current block     B11 ACCESS ADMINISTRATION / OPEN / ACTIVE / P8 R5 CANDIDATE / CONTENT WALKTHROUGH
+T11 current block     B11 ACCESS ADMINISTRATION / LOCKED / P8-P10 COMPLETE
 METHODOLOGY ADOPTION  ACCEPTED / INTEGRATED
 T12                   NOT OPEN
 IMPLEMENTATION         BLOCKED
@@ -95,60 +95,31 @@ B10   Organization Administration                  LOCKED / P8-P10 COMPLETE / OP
        operation 27+ consumed                       0
        B10-A1 paginated-browse sufficiency          VALIDATED FOR CURRENT LAUNCH P8
        unresolved material B10 Findings             0
-B11   Access Administration                        OPEN / ACTIVE / P8 R5 CANDIDATE / CONTENT WALKTHROUGH
-       P6 reference study                           COMPLETE / OFFICIAL SOURCES
-       P7 R1 written spec                           docs/work/current/t11-b11-access-administration-p6-p7.md
-       P7 R1 disposition                            SUPERSEDED ONLY WHERE B11-F1 CHANGES IA
-       P8 R1 artifact                               docs/work/current/t11-b11-access-administration-p8.html
-       P8 R1 Git blob                               c04ff56efa7aae72c59dc0ee9c4d56c9357c4de7
-       P8 R1 structural verification                40 / 40 PASS
-       P8 R1 operator disposition                   REVISE / UPSTREAM FINDING
-       B11-A1 findability / inspectability          FAIL
-       B11-A2 membership consequence                FAIL
-       B11-A3 access explanation                    REFINED / FULL ENGINE NOT PROVEN
+B11   Access Administration                        LOCKED / P8-P10 COMPLETE / OPERATOR-RATIFIED
+       canonical P8                                docs/work/current/t11-b11-access-administration-p8-r5.html
+       locked P8 Git blob                          96094773435a88c357e308779639415d9853b327
+       operator LOCK                               docs/work/current/t11-b11-operator-lock.md
        B11-F1 Access Assignment Read Precision      CLOSED / OPERATOR-RATIFIED / DURABLE
        B11-F1 authority                             docs/decisions/access-assignment-read.md
        op31 listRoleAssignments                     REFINED / FILTERED + HUMAN-RECOGNIZABLE READ
        application-operation delta                  +0 / CENSUS REMAINS 89
-       unresolved blocking upstream Findings        0 after B11-F1 reconciliation
-       P7 R2 written spec                           docs/work/current/t11-b11-access-administration-p7-r2.md
-       P7 R2 leading IA                             POR ÁREA / GRUPOS / FUNÇÕES
-       P7 R2 written disposition                    OPERATOR-APPROVED
-       P8 R2 plan                                   docs/work/current/t11-b11-access-administration-p8-r2-plan.md
-       P8 R2 artifact                               docs/work/current/t11-b11-access-administration-p8-r2.html
-       P8 R2 Git blob                               8940238a5234c81ba0651693a0fe36c1da7f10a5
-       P8 R2 operator disposition                   REVISE / VISUAL TOPOLOGY REGRESSION
-       P8 R2 topology continuity                    4 / 13 PASS
-       P8 R2 revise evidence                        docs/work/current/t11-b11-p8-r2-operator-revise.md
-       P8 R3 artifact                               docs/work/current/t11-b11-access-administration-p8-r3.html
-       P8 R3 Git blob                               273b9d16f23c37663024a5a0ec638d08e52002f0
-       P8 R3 topology continuity                    13 / 13 PASS against wrong B11/B10-derived baseline
-       P8 R3 functional browser verification        42 / 42 PASS
-       P8 R3 operator disposition                   REVISE / LOCKED-WIREFRAME FIDELITY FAILURE
-       P8 R3 revise evidence                        docs/work/current/t11-b11-p8-r3-operator-revise.md
-       canonical wireframe fidelity baseline        B01 / B01N / B07 / B08 exact LOCK Evidence
-       P8 R4 artifact                               docs/work/current/t11-b11-access-administration-p8-r4.html
-       P8 R4 Git blob                               a9c4ef8f558771848079ce74e221be40bc5c2ad4
-       P8 R4 LOCKED-wireframe fidelity               30 / 30 PASS
-       P8 R4 functional/browser verification        34 / 34 PASS
-       P8 R4 combined verification                  64 / 64 PASS
-       P8 R4 frame fidelity                         OPERATOR-APPROVED
-       P8 R4 content disposition                    REVISE / LOCAL P8 CONTENT FINDINGS
-       P8 R4 content findings                       docs/work/current/t11-b11-p8-r4-content-findings.md
-       P8 R5 artifact                               docs/work/current/t11-b11-access-administration-p8-r5.html
-       P8 R5 Git blob                               96094773435a88c357e308779639415d9853b327
-       P8 R5 frame                                  INHERITED FROM OPERATOR-APPROVED R4 / NO REDESIGN
-       P8 R5 corrections                            USER PICKER + DYNAMIC MEMBERSHIP REVIEW + REMOVE CONFIRM + CONTEXTUAL GRANT
-       P8 R5 operator disposition                   AWAITING CONTENT WALKTHROUGH
-       B11-R2-A Group footprint comprehension       OPEN / FALSIFIABLE DURING CONTENT WALKTHROUGH
-       B11-R2-B Area configuration comprehension    OPEN / FALSIFIABLE DURING CONTENT WALKTHROUGH
-       B11-R2-C membership consequence              OPEN / FALSIFIABLE DURING CONTENT WALKTHROUGH
-       B11-R2-D remaining effective-access gap      OPEN / FALSIFIABLE DURING CONTENT WALKTHROUGH
-       B11-R2-E filtered pagination sufficiency     OPEN / FALSIFIABLE DURING CONTENT WALKTHROUGH
+       P9 material regions/controls                 36 / 36 TRACED
+       P9 primary B11 operations                    7 / 7 BOUND (ops 27-33)
+       P9 supporting Organization reads             ops 6 / 16 / 22
+       operation 90+ consumed                       0
+       P10 existing shared behaviors reused         4
+       P10 new shared semantic patterns             0
+       P10 B11-local protected patterns             9
+       B11-R2-A Group footprint comprehension       VALIDATED FOR CURRENT LAUNCH P8
+       B11-R2-B Area configuration comprehension    VALIDATED FOR CURRENT LAUNCH P8
+       B11-R2-C membership consequence              VALIDATED FOR CURRENT LAUNCH P8
+       B11-R2-D no per-User troubleshooter          SUFFICIENT / VALIDATED FOR CURRENT LAUNCH P8
+       B11-R2-E filtered pagination sufficiency     VALIDATED FOR CURRENT LAUNCH P8
+       unresolved material B11 Findings             0
 B12   Document Governance Administration           NOT OPEN
 ```
 
-Exact locked frontend Evidence remains recoverable through:
+Exact locked frontend Evidence already integrated remains recoverable through:
 
 ```text
 B01-B09
@@ -162,23 +133,19 @@ evidence/t11-pr170-b10-locks-20260824
 → b8c607cbd30d61d6bcf6ec1ea734ed1653d2569e
 ```
 
-Both Evidence refs are exact-SHA checked and non-authoritative. B10 `docs/work/**` is absent from integrated `main` after exact Evidence preservation.
+B11 temporary `docs/work/**` Evidence must likewise be preserved by exact Git identity before cleanup; it must not enter the eventual merge candidate/main.
 
 ## Exact next action
 
 ```text
-1. Operator operates the exact B11 P8 R5 artifact at docs/work/current/t11-b11-access-administration-p8-r5.html. The R4 frame/wireframe fidelity is already OPERATOR-APPROVED and is inherited; do not redesign it.
-2. Test B11-R2-A in Grupos using `Aprovadores Financeiro`: confirm different Roles across Financeiro, Comercial, Company and Jurídico are immediately understandable without implying one Group-owned Area.
-3. Test B11-R2-B in Por Área using `Comercial`: confirm Area-specific grants and Company-wide grants that also apply remain visibly separate and truthful.
-4. Test B11-R2-C using the R5 membership flow: choose an existing User through the paginated picker, review exact User + Group consequence, add membership, and separately confirm a removal; judge whether visible Group footprint + bounded copy is sufficient.
-5. Test contextual grant entry from both Area and Group lenses: Area preselects its real scope; Group preselects its exact subject; Role/remaining dimensions remain deliberate and the final Subject × Role × Scope review remains mandatory.
-6. Test B11-R2-D while direct and Group grants coexist: judge whether Launch access administration remains safe without a per-User effective-access troubleshooter.
-7. Test B11-R2-E by paging Area-specific, Company, Group, Role and membership-User slices; judge whether filtered pagination is operationally sufficient without global matrix/search capability.
-8. Exercise Funções read-only meaning, role scope restrictions, exact revoke, ambiguous retry with same logical command/Idempotency-Key, membership conflict and 403/404/409/failure fixtures.
-9. If disposition REVISE, revise only the smallest affected P8 content scope unless operator Evidence exposes a new semantic insufficiency; then route the smallest UPSTREAM FINDING.
-10. Only the operator may LOCK B11. Only after explicit B11 LOCK run P9 bidirectional trace and P10 bounded pattern consolidation.
-11. docs/work/** must be absent from the eventual B11 merge candidate/main after exact Evidence preservation.
-12. B12 and FP2/P11 remain NOT OPEN. T12 and Product implementation remain BLOCKED.
+1. Preserve the exact B11 LOCK/P9/P10 planning tree by an immutable/reachable Evidence ref before deleting temporary docs/work/** from the acceptance candidate.
+2. Add a durable B11 LOCK Evidence locator under docs/decisions/** naming the exact Evidence commit/ref and canonical P8 blob 96094773435a88c357e308779639415d9853b327.
+3. Remove B11 temporary docs/work/** from the merge candidate only after the exact Evidence ref is confirmed reachable.
+4. Revalidate the cleaned B11 acceptance candidate against AGENTS.md, engineering rules, B11-F1, the 89-operation census and the required aggregate gate.
+5. Use independent adversarial review if required by the pinned Method/repository governance for the final acceptance claim; reviewer output remains Evidence, never authority.
+6. Do not open B12 merely because B11 is LOCKED. B12 requires an explicit later opening/acceptance increment after B11 integration.
+7. FP2/P11 remains NOT OPEN until the block program reaches the accepted assembly boundary.
+8. T12 and Product implementation remain BLOCKED.
 ```
 
 ## Hard stops
@@ -189,15 +156,15 @@ no T12 work
 no B12 work
 no FP2/P11 work
 no B01-B10 reopen without material Evidence
+no B11 reopen without material operator/Product/integration Evidence
 no application operation 90+ for B11 without a new lawful bounded reopen
 no global User/Group/Area search invented for UI convenience
 no client-side crawl/post-filter over incomplete pages presented as complete
 no frontend effective-permission authority or inferred inherited-access matrix
 no Group single-Area ownership inferred from access scope
 no custom Role/Permission editor
-no P8 R6 before explicit operator disposition of P8 R5 content
-no unapproved shell/sidebar/header/local-nav topology redesign inside a block P8
-no production-like visual design in P8
+no unapproved shell/sidebar/header/local-nav topology redesign
+no production-like visual design authority inferred from P8
 no assistant/reviewer LOCK
 no local reusable methodology fork
 no floating methodology main as normative authority
