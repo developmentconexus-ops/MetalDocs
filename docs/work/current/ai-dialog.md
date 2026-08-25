@@ -133,3 +133,192 @@ BIGGEST REMAINING RISK
 ```
 
 The operating model is at or very near its Global Maximum. Stop reviewing the method. Build B11.
+
+### R1-C2 — LEAD ADJUDICATION
+
+Review isolation revalidated before disposition:
+
+```text
+review branch  review/repo-operating-model-fable
+base           main @ 58b55e0f518cd8652e08a1b1fa79fb86e7beb218
+merge base     exact candidate
+review delta   docs/work/current/ai-dialog.md only
+```
+
+Reviewer output is Evidence, not authority. Each finding was rechecked against current owners before disposition.
+
+#### R1-F1 — ACCEPT / IMPORTANT
+
+The finding is valid and slightly broader than the cited op31 example.
+
+Verified current contradiction:
+
+```text
+wire-contract.md frontmatter/header
+  → exact 78-operation snapshot
+  → "Operation 79 is a material Product/T6 reopen"
+
+current api-operation-census.md
+  → 89 operations
+
+wire op31 row
+  → pre-B11-F1 listRoleAssignments shape
+  → no local marker that access-assignment-read.md refines it
+```
+
+The same failure mode also exists wherever a targeted read can land directly inside a ratified snapshot whose current-tense clause is overlaid by a later bounded decision. Selective retrieval is only safe if the superseded site itself tells the reader where current truth moved.
+
+**Root-cause disposition:** ACCEPTED.
+
+**Correction shape:** do not re-consolidate/rewrite historical ratified snapshots on every bounded reopen. Add one explicit overlay policy to repository operation and place a compact `REFINED → <current decision>` marker/banner at each current targeted row/section whose current-tense meaning is superseded. For the current MetalDocs state this must at least cover the exact targeted wire/frontend clauses implicated by current T11 overlays (including op31 Access and the stale 78/79 current-tense surface), without rewriting unrelated T8-E/T8-F history.
+
+This correction is repository/readability mechanics; it does not change the 89-operation Product census.
+
+**Blocks B11:** NO.
+
+#### R1-F2 — ACCEPT / IMPORTANT
+
+Verified. `frontend.md` owns cursor/idempotency consumption generally, but there is no durable class-level law that makes a P8 fixture preserve the real consumed wire mechanics closely enough to prevent false completeness.
+
+The correct graduation channel is P10, not a new framework/checker and not immediate speculative generalization before the clean B11 proves the final pattern.
+
+**Disposition:** ACCEPTED AS B11 ACCEPTANCE OBLIGATION.
+
+B11 must explicitly carry:
+
+```text
+P9/P10 terminal obligation
+→ generalize the proven collection/idempotency/fixture-truthfulness pattern
+→ absorb it into the current frontend realization owner
+→ only after the clean B11 candidate closes the known failure classes
+→ before roadmap/readiness incident bullets are removed
+```
+
+The intended generalized property is approximately:
+
+```text
+P8 fixture/read simulation must preserve the material wire laws the UX relies on.
+A client may not manufacture completeness by hidden traversal, pre-filtering, re-pagination,
+or omniscient fixture state when production exposes only bounded/paginated truth.
+Server idempotent/reconciliation outcomes remain semantic authority; fixture behavior must
+allow the operator/reviewer to falsify duplicate semantic mutation and unknown relation state.
+```
+
+Exact durable prose belongs to the B11 P10 graduation, not this adjudication.
+
+**Blocks B11:** NO — discharged through B11.
+
+#### R1-F3 — ACCEPT WITH BOUNDARY / MINOR
+
+The unbounded convergence predicate is real, but a universal numeric round cap would itself become accidental process rigidity.
+
+Adopt the reviewer bound for a **stable candidate scope**:
+
+```text
+one independent material challenge
+→ one bounded correction/re-challenge round when required
+→ if material findings remain on already-swept scope in that second challenge,
+   candidate is structurally NOT CONVERGED
+→ stop patching; reopen/rebaseline/split the implicated structure
+→ no third finding-by-finding round on the same candidate scope
+```
+
+Clarification:
+
+```text
+if a material finding legitimately changes Product/architecture authority or candidate scope,
+that produces a NEW candidate and a NEW review cycle;
+it is not "round 3" of the superseded candidate.
+```
+
+This preserves the Engineering Method's evidence-based stop law while making repeated same-altitude review mechanically actionable.
+
+**Blocks B11:** NO. Must be durable before B11 final independent gate.
+
+#### R1-F4 — ACCEPT / MINOR
+
+Verified duplicate current meaning between `roadmap.md` and `repository-readiness.md` §5.
+
+**Disposition:** ACCEPTED.
+
+`roadmap.md` remains the sole mutable owner of the current B11 continuation/failure-class list. `repository-readiness.md` should retain the historical closeout decision and point to the roadmap for current B11 inputs instead of restating them.
+
+No standalone cleanup PR.
+
+**Blocks B11:** NO.
+
+#### /simplify disposition
+
+```text
+S1  ACCEPT
+    remove detailed current census numbers from roadmap; api-operation-census.md owns them.
+
+S2  PARTIAL
+    remove the full operating-route restatement from roadmap.
+    KEEP a short Start/navigation cue in docs/index.md because routing is that file's actual consumer/job;
+    it must not become semantic authority and need not repeat the whole AGENTS bootstrap verbatim.
+
+S3  ACCEPT
+    deduplicate repository-readiness §5 to a roadmap pointer.
+
+S4  ACCEPT
+    no refinement registry, no semantic CI checker, no review-round tracker,
+    no fixture-conformance framework, no new router/methodology.
+```
+
+#### Counterexample disposition
+
+The review's "revocation impact blindness" scenario remains a **falsification example only**. It does not become a new MetalDocs Product requirement merely because it was useful to test the method. If future operator/user Evidence proves that job real, the existing reopen path applies.
+
+The Area-lens confusion example is likewise a method test, not durable Product authority beyond already-accepted separation semantics.
+
+#### Lead verdict after R1
+
+```text
+R1-F1  ACCEPT
+R1-F2  ACCEPT / discharge through clean B11 P10
+R1-F3  ACCEPT WITH STABLE-SCOPE BOUNDARY
+R1-F4  ACCEPT
+
+METHOD BLOCKERS TO B11  0
+```
+
+The method itself is not reopened. Corrections are repository/frontend-specialization precision around already-accepted methods.
+
+### R2_REQUEST — LEAD
+
+Do NOT re-review the whole methodology.
+
+Read only R1-C2 and the exact current owners needed to test these dispositions.
+
+Job 1 — disposition only:
+
+```text
+R1-F1 CLOSED | PARTIAL | OPEN
+R1-F2 CLOSED | PARTIAL | OPEN
+R1-F3 CLOSED | PARTIAL | OPEN
+R1-F4 CLOSED | PARTIAL | OPEN
+```
+
+For any PARTIAL/OPEN item, state only the remaining structural defect and the smallest correction.
+
+Job 2 — attack only whether the proposed corrections themselves create:
+
+```text
+duplicate authority
+snapshot-history destruction
+new ceremony/review tax
+an unowned B11 acceptance obligation
+or a loophole that still permits unlimited same-scope review rounds
+```
+
+Do not invent new Product requirements. Do not broaden into B11 UX review.
+
+End with exactly one:
+
+```text
+VERDICT: CONVERGED
+VERDICT: NOT CONVERGED
+```
+
+Then commit/push only this file on `review/repo-operating-model-fable` and stop.
