@@ -122,27 +122,11 @@ branch-cleanup gate before Product work
 new Evidence refs for every intermediate P8 revision
 ```
 
-## 5. B11 continuation contract
+## 5. B11 continuation pointer
 
-B11 may resume as a new acceptance increment from current `main`.
+B11 may resume as a new acceptance increment from current `main`, preserving integrated B11-F1 and treating the old B11 workspace as Evidence only.
 
-It must:
-
-```text
-preserve integrated B11-F1 op31 precision
-+ use prior B11 work only as Evidence
-+ address known failure classes in the first clean candidate
-+ produce one coherent current P8/P9/P10 line
-```
-
-Known failure classes to carry forward:
-
-1. paginated member/selector reads must use visible server-page traversal; no hidden all-page crawl;
-2. `listUsers` grant selection preserves raw server page boundaries — DISABLED Users remain visible but unavailable, never pre-filtered before pagination;
-3. add-member UX must not assume complete Group membership knowledge; idempotent op28 `PUT` reconciles first-add vs already-member truth;
-4. repeated grant confirmation / same Idempotency-Key must produce zero second semantic mutation.
-
-These are bounded frontend realization constraints. They do not create operation 90, `Group.area_id`, a custom Role editor or a browser effective-access engine.
+`docs/roadmap.md` is the **sole mutable owner** of the current B11 failure-class inputs, terminal P9/P10 obligation, exact next action and progression gate. This closeout decision intentionally does not restate that mutable list.
 
 ## 6. Review convergence verdict
 
