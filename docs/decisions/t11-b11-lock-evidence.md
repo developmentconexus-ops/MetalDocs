@@ -7,39 +7,76 @@ summary: Durable locator for the exact operator-LOCKED B11 Access Administration
 
 # T11 B11 LOCK Evidence Locator
 
-> **Status:** ACTIVE DURABLE EVIDENCE LOCATOR / R6 CURRENT.  
+> **Status:** ACTIVE DURABLE EVIDENCE LOCATOR / R6 BASE + R7 AMENDMENT CURRENT.  
 > **Scope:** B11 Access Administration operator-LOCKED P8 + P9/P10 proof Evidence.  
 > **T11:** remains OPEN.  
 > **Implementation:** BLOCKED by `../roadmap.md`.
 
-## 1. Current preserved Git identity
+## 1. Current reconstruction package
+
+B11 current frontend reconstruction is intentionally a two-part exact package:
 
 ```text
-repository     developmentconexus-ops/MetalDocs
-evidence ref   evidence/t11-b11-r6-locks-20260825
-exact commit   6dbcec41a43dc2a74629351e22b748188e5c6dc4
-exact tree     c5054688c68068457a6c46add198c1797cddec0a
+R6 complete base Evidence
+  ref      evidence/t11-b11-r6-locks-20260825
+  commit   6dbcec41a43dc2a74629351e22b748188e5c6dc4
+  tree     c5054688c68068457a6c46add198c1797cddec0a
+  full P8  docs/work/current/t11-b11-access-administration-p8-r6.html
+  blob     26e8905c5c5012aba59280b1001f62529ed4dfd0
+
+R7 grant-User-picker amendment Evidence
+  ref      evidence/t11-b11-r7-amendment-20260825
+  commit   5c3b407c1bc0e789da823570a27c33e5f8f777c3
+  tree     077b25ffb9e5460f563ed84f7eedd4ed3a01d52f
+  delta    docs/work/current/t11-b11-grant-user-picker-p8-r7.html
+  blob     3e9130fd7b9e5b6b414b5c8e96faf6c6644cb4df
 ```
 
-The Evidence ref must remain reachable while T11/P11/P13/P14 still depends on B11 LOCK reconstruction. The exact commit is the canonical locator; the ref name is a human convenience.
+R6 remains the complete B11 low-fidelity base. R7 supersedes only the grant User picker page-fidelity behavior. Neither artifact may be silently reconstructed from prose.
 
-## 2. Canonical B11 P8 LOCK artifact
+## 2. R7 amendment law
+
+R7 exists because PR #173 review proved one material defect in R6:
 
 ```text
-path on exact Evidence commit
-docs/work/current/t11-b11-access-administration-p8-r6.html
+R6 grant User picker
+  filtered ENABLED Users before pagination
 
-Git blob
-26e8905c5c5012aba59280b1001f62529ed4dfd0
+op6 authority
+  raw UserPage
+  PAGED
+  user_id ASC
+  no state filter
 ```
 
-R6 is now the canonical complete B11 functional low-fidelity LOCK Evidence because it contains the previously accepted R5 structure plus the operator re-locked pagination corrections.
+Current protected behavior is therefore:
 
-Later P11 assembly must consume this exact R6 artifact identity, not reconstruct B11 from prose, R5, or earlier R1–R4 candidates.
+```text
+raw op6 UserPage boundary
+→ render every returned User
+→ ENABLED selectable
+→ DISABLED visible but unavailable
+→ opaque cursor traversal
+→ failed continuation preserves loaded page/draft
+→ no pre-pagination client state filter
+→ no hidden all-page crawl
+→ no invented op6 filter/search
+```
 
-## 3. R6 re-LOCK / P9 proof Evidence
+R7 exact proof:
 
-The same exact R6 Evidence commit preserves:
+```text
+static + Chromium     12 / 12 PASS
+JavaScript parse      PASS
+operator re-LOCK      APPROVED
+P9 R7 delta           READY / PASS
+```
+
+R7 supersedes only the grant User picker row previously named R6-03. All other R6 re-LOCKed pagination surfaces remain current.
+
+## 3. R6 base proof remains protected
+
+The R6 Evidence commit preserves:
 
 ```text
 operator partial re-LOCK
@@ -52,21 +89,28 @@ P9 pagination delta
 docs/work/current/t11-b11-screen-contract-r6-delta.md
 ```
 
-The P9 R6 delta closes the five reopened collection-selection surfaces:
+R6 continues to own the accepted full B11 structure, including:
 
 ```text
-R6-01 selected Group member pagination          op27
-R6-02 add-member User pagination                op6
-R6-03 grant User pagination                     op6
-R6-04 grant Group pagination                    op22
-R6-05 grant Area pagination                     op16
+/admin/access
+Por Área / Grupos / Funções
+Area-specific vs Company-wide separation
+Group multi-scope footprint
+Group member pagination op27
+add-member User pagination op6
+grant Group pagination op22
+grant Area pagination op16
+fixed Role meaning
+membership consequence
+contextual Area/Group grant entry
+Subject × Role × Scope review
+exact revoke
+same-key ambiguous retry
 ```
 
-All five were operator re-LOCKED. The delta P9 verdict is PASS.
+R7 changes none of those semantics.
 
-## 4. Prior R5 Evidence remains preserved
-
-The earlier Evidence checkpoint remains reachable:
+## 4. Prior R5 Evidence remains historical
 
 ```text
 evidence ref   evidence/t11-b11-locks-20260825
@@ -75,9 +119,7 @@ exact tree     c4f04b75c3676dcde00caa07279824b3c653c7f3
 R5 Git blob    96094773435a88c357e308779639415d9853b327
 ```
 
-R5 remains valid historical Evidence for the B11 learning path and for semantics not falsified by the PR #173 pagination finding. It is **not** the current complete reconstruction artifact because its Group-member and grant identity-picker pagination proof was insufficient.
-
-The original R5 Evidence commit also preserves the original operator LOCK, full P9 Screen Contract, P10 Pattern Consolidation, and the prior R1–R4 learning/finding artifacts.
+R5 remains useful historical Evidence for the learning path and unaffected early LOCK semantics. It is not the current complete reconstruction package.
 
 ## 5. Durable semantic authority
 
@@ -95,8 +137,6 @@ This locator is Evidence provenance, not a second Authorization/Product authorit
 
 ## 6. Current protected structure summary
 
-The exact R6 artifact protects:
-
 ```text
 /admin/access
 → Por Área / Grupos / Funções
@@ -105,9 +145,9 @@ Area lens
   Area-specific grants separate from Company-wide grants
 
 Group lens
-  one Group may hold different Roles across Company and multiple Areas
-  Group access footprint visible before membership mutation
-  Group members traverse op27 pagination visibly
+  Group may hold different Roles across Company and multiple Areas
+  footprint visible before membership mutation
+  member continuation is visible
   no Group.area_id
 
 Role lens
@@ -115,58 +155,41 @@ Role lens
 
 grant
   contextual Area/Group preselection where applicable
-  paginated User / Group / Area identity selection
+  Group / Area pickers preserve R6 cursor law
+  User picker uses raw op6 page boundaries per R7
+  DISABLED User remains visible but unavailable
   explicit Subject × Role × Scope review
   same-key ambiguous retry
 
 membership
   paginated existing-User selection
-  exact User + Group consequence review for add/remove
-
-continuation
-  supporting read cursors remain opaque
-  visible page survives failed continuation
-  loaded page is never presented as complete when more may exist
+  exact User + Group consequence review
 
 boundary
   no browser effective-access engine
   no hidden all-page crawl
   no global matrix/search invention
   no custom Role/Permission editor
+  no application operation 90+
 ```
 
-## 7. Proof summary
-
-R6 targeted verification on the exact canonical blob:
-
-```text
-structural verifier          12 / 12 PASS
-Chromium behavior            23 / 23 PASS
-JavaScript parse             PASS
-operator partial re-LOCK     APPROVED
-P9 R6 pagination delta       PASS
-operation 90+ consumed       0
-```
-
-The original R5 proof and P10 remain valid for unaffected behavior.
-
-## 8. Retrieval law
+## 7. Retrieval law
 
 When FP2/P11 opens:
 
 ```text
 read current Product/architecture authority
 → read current roadmap
-→ use this locator only for exact retained B11 LOCK identity
-→ fetch R6 from exact R6 Evidence commit/blob
-→ use prior R5 Evidence only when historical comparison is materially useful
+→ fetch exact R6 full base from its Evidence ref/blob
+→ apply exact R7 grant-User-picker amendment from its Evidence ref/blob
+→ do not reuse the superseded R6 User-picker pre-pagination filtering behavior
 → assemble disposable P11 Evidence
-→ preserve B11 protected semantics
+→ preserve all other R6 protected semantics
 → reopen only on material integration Evidence
 ```
 
-Do not edit the LOCKED blob in place. Any material correction requires the normal smallest-owner reopen and a newly operator-LOCKED artifact identity.
+Do not edit either LOCKED Evidence artifact in place. Any further material correction requires the normal smallest-owner reopen and a newly operator-LOCKED Evidence identity.
 
-## 9. Retirement trigger
+## 8. Retirement trigger
 
-Keep this locator and the current R6 Evidence ref while any accepted frontend conformance/reconstruction proof depends on B11. Repository cleanup preference alone is not a retirement trigger.
+Keep the R6 base ref, R7 amendment ref, and this locator while any accepted frontend conformance/reconstruction proof depends on B11. Repository cleanup preference alone is not a retirement trigger.
