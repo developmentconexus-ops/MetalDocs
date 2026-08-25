@@ -43,7 +43,7 @@ This file is a **router of current dispositions**, not a historical ledger. The 
 | T11-AUDIT | Audit investigation | CURRENT / OPERATOR-RATIFIED | op78 structured investigation + purpose-built op87–op89 Query Assist; Audit remains evidence | `audit-investigation-read.md` + `api-operation-census.md` |
 | T11-GOV-REVIEW | Governance Review Layer seam | CURRENT / OPERATOR-RATIFIED / FUTURE-SEAM ONLY | Future selected-range review binds to immutable reviewed snapshot; current Launch unchanged | `governance-review-layer-seam.md` + `forward-obligations.md` |
 | RESET | Repository clean-slate reset | CURRENT / OPERATOR-RATIFIED | Superseded implementation remains absent; required unmerged provenance remains reachable | `repository-reset.md` |
-| REPO-OPS | Repository operating model | CANDIDATE / OPERATOR-APPROVED DESIGN | Local Engineering + Repository + Frontend methods; `AGENTS` bootstrap, selective `docs/index`, roadmap snapshot, Git/Evidence continuity | `../development/repository-method.md` + `../development/engineering-rules.md` |
+| REPO-OPS | Repository operating model | CURRENT / OPERATOR-APPROVED | Local Engineering + Repository + Frontend methods; `AGENTS` bootstrap, selective `docs/index`, roadmap snapshot, Git/Evidence continuity | `../development/repository-method.md` + `../development/engineering-rules.md` |
 
 ## Consumption law
 
