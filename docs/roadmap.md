@@ -14,7 +14,7 @@ REPOSITORY MODE       CLEAN-SLATE / ARCHITECTURE-FIRST
 T1 → T10              CLOSED / OPERATOR-RATIFIED / INTEGRATED
 T11                   OPEN / ACTIVE
 T11 checkpoint        B01-B10 ACCEPTED / INTEGRATED
-T11 current block     B11 ACCESS ADMINISTRATION / OPEN / ACTIVE / P7 REBASELINE
+T11 current block     B11 ACCESS ADMINISTRATION / OPEN / ACTIVE / P7 R2 CANDIDATE / OPERATOR REVIEW
 METHODOLOGY ADOPTION  ACCEPTED / INTEGRATED
 T12                   NOT OPEN
 IMPLEMENTATION         BLOCKED
@@ -95,7 +95,7 @@ B10   Organization Administration                  LOCKED / P8-P10 COMPLETE / OP
        operation 27+ consumed                       0
        B10-A1 paginated-browse sufficiency          VALIDATED FOR CURRENT LAUNCH P8
        unresolved material B10 Findings             0
-B11   Access Administration                        OPEN / ACTIVE / P7 REBASELINE
+B11   Access Administration                        OPEN / ACTIVE / P7 R2 CANDIDATE / OPERATOR REVIEW
        P6 reference study                           COMPLETE / OFFICIAL SOURCES
        P7 R1 written spec                           docs/work/current/t11-b11-access-administration-p6-p7.md
        P7 R1 disposition                            SUPERSEDED ONLY WHERE B11-F1 CHANGES IA
@@ -111,6 +111,9 @@ B11   Access Administration                        OPEN / ACTIVE / P7 REBASELINE
        op31 listRoleAssignments                     REFINED / FILTERED + HUMAN-RECOGNIZABLE READ
        application-operation delta                  +0 / CENSUS REMAINS 89
        unresolved blocking upstream Findings        0 after B11-F1 reconciliation
+       P7 R2 written spec                           docs/work/current/t11-b11-access-administration-p7-r2.md
+       P7 R2 leading IA                             POR ÁREA / GRUPOS / FUNÇÕES
+       P7 R2 written disposition                    AWAITING OPERATOR REVIEW
        P8 R2                                        NOT STARTED
 B12   Document Governance Administration           NOT OPEN
 ```
@@ -134,21 +137,22 @@ Both Evidence refs are exact-SHA checked and non-authoritative. B10 `docs/work/*
 ## Exact next action
 
 ```text
-1. Rebaseline only B11 P7 against operator-ratified B11-F1; do not reopen B01-B10.
-2. P7 R2 must compare/close the human IA around the proven jobs and current leading structure:
+1. Operator reviews the exact written B11 P7 R2 at docs/work/current/t11-b11-access-administration-p7-r2.md.
+2. Do not begin P8 R2 until the operator explicitly approves that written P7 R2.
+3. P7 R2 leading structure is:
      Acessos
      ├── Por Área
      ├── Grupos
      └── Funções
-3. The Group lens must expose one Group's canonical RoleAssignments across Company and multiple Areas; never add Group.area_id.
-4. The Area lens must show Area-scoped grants and Company-scoped grants in separate truthful regions; do not merge them into fake Area-owned assignments.
-5. The Funções lens uses fixed read-only RoleView meaning; no custom Role/Permission editor.
-6. P7 R2 may use only op31 precision in docs/decisions/access-assignment-read.md plus accepted supporting Organization reads. Global User/Group/Area search and per-User effective-access explanation remain unproven/not authorized.
-7. Operator reviews the exact written P7 R2 before P8 R2. P8 R2 must actively test Group access footprint, Area/Company grant visibility, membership consequence and whether the remaining lack of per-User effective-access explanation is acceptable.
-8. If P8 R2 exposes another material insufficiency, STOP only the affected B11 scope and route the smallest UPSTREAM FINDING. Only the operator may LOCK.
-9. After explicit B11 LOCK, run P9 bidirectional trace and P10 bounded pattern consolidation.
-10. docs/work/** must be absent from the eventual B11 merge candidate/main after exact Evidence preservation.
-11. B12 and FP2/P11 remain NOT OPEN. T12 and Product implementation remain BLOCKED.
+4. The Group lens must expose one Group's canonical RoleAssignments across Company and multiple Areas; never add Group.area_id.
+5. The Area lens must show Area-scoped grants and Company-scoped grants in separate truthful regions; do not merge them into fake Area-owned assignments.
+6. The Funções lens uses fixed read-only RoleView meaning; no custom Role/Permission editor.
+7. P8 R2 may use only op31 precision in docs/decisions/access-assignment-read.md plus accepted supporting Organization reads. Global User/Group/Area search and per-User effective-access explanation remain unproven/not authorized.
+8. After written P7 R2 approval, P8 R2 must actively test Group access footprint, Area/Company grant visibility, membership consequence, filtered pagination sufficiency and whether the remaining lack of per-User effective-access explanation is acceptable.
+9. If P8 R2 exposes another material insufficiency, STOP only the affected B11 scope and route the smallest UPSTREAM FINDING. Only the operator may LOCK.
+10. After explicit B11 LOCK, run P9 bidirectional trace and P10 bounded pattern consolidation.
+11. docs/work/** must be absent from the eventual B11 merge candidate/main after exact Evidence preservation.
+12. B12 and FP2/P11 remain NOT OPEN. T12 and Product implementation remain BLOCKED.
 ```
 
 ## Hard stops
