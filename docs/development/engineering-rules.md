@@ -51,6 +51,31 @@ DEFERRED → preserve seam/counterexample; no dormant implementation
 
 When an obligation closes or materially refines, update the durable register rather than creating amendment chains.
 
+## Independent adversarial review
+
+MetalDocs retains the useful **ClaudeCode/FABLE-style review posture** without restoring the historical `.claude/skills` framework or introducing a fourth methodology.
+
+Use an independent fresh challenger when required by the Engineering Method, when a material Product/architecture/trust-boundary decision is being ratified, at major stage/global-coherence closeout, at the integrated frontend P11/P12 challenge, and before implementation authorization.
+
+The challenger must be read-only with respect to the candidate and should:
+
+```text
+verify anchors / premises first
+→ root cause before patch
+→ Local Maximum vs Global Maximum
+→ simplify / YAGNI pass
+→ classify findings against current authority
+→ dispose prior findings explicitly
+→ attack new material uncertainty
+→ stop on convergence
+```
+
+Reviewer output is Evidence, not authority. A finding that implies new Product meaning returns to the owning decision. Repeated same-altitude findings are a signal to stop patching and revisit structure once, not to create unlimited review rounds.
+
+Do **not** require a fresh independent review for every normal P7/P8 iteration, copy/layout correction, mechanical trace update or already-owned bounded fix. Use targeted proof during the inner loop and one strong independent challenge when a material candidate reaches its real gate.
+
+If actual ClaudeCode/FABLE transport is unavailable, do not claim independent FABLE convergence. Lead/self-review may use the same doctrine, but independent gates remain independent when required.
+
 ## Repository protection
 
 Current required aggregate status context:
