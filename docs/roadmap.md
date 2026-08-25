@@ -15,14 +15,15 @@ REPOSITORY GOVERNANCE REBASELINED / OPERATOR-APPROVED
 T1 → T10              CLOSED / OPERATOR-RATIFIED / INTEGRATED
 T11                   OPEN / ACTIVE
 T11 checkpoint        B01-B10 ACCEPTED / INTEGRATED
-B11                   NOT OPEN ON INTEGRATED MAIN / CONTINUATION PAUSED FOR REBASELINE
+B11-F1                ACCESS ASSIGNMENT READ PRECISION / OPERATOR-RATIFIED / INTEGRATED
+B11                   NOT OPEN / CONTINUATION PAUSED FOR CLEAN REBASELINE
 B12                   NOT OPEN
 FP2 / P11             NOT OPEN
 T12                   NOT OPEN
 IMPLEMENTATION         BLOCKED
 ```
 
-The governance rebaseline changes repository operation only. Product, architecture, accepted B01–B10 frontend LOCKs, the 89-operation census and implementation permission are unchanged.
+The repository-governance rebaseline changed repository operation only. B11-F1 separately preserves the already-ratified op31 Access Assignment read precision needed when B11 resumes. Neither increment opens B11 implementation/frontend execution by itself.
 
 ## Current system census
 
@@ -36,7 +37,7 @@ ETag read / mutation domains 13 / 13
 exact-byte resources         4
 ```
 
-`docs/decisions/api-operation-census.md` owns the detailed census.
+`docs/decisions/api-operation-census.md` owns the detailed census. `docs/decisions/access-assignment-read.md` owns the bounded op31 Access read precision.
 
 ## Local methods
 
@@ -90,11 +91,13 @@ B07   Document History                            LOCKED / P8-P10 COMPLETE
 B08   Notifications Full Inbox                    LOCKED / P8-P10 COMPLETE
 B09   Audit                                       LOCKED / P8-P10 COMPLETE
 B10   Organization Administration                 LOCKED / P8-P10 COMPLETE / INTEGRATED
-B11   Access Administration                       NOT OPEN ON INTEGRATED MAIN
+B11   Access Administration                       NOT OPEN / CLEAN REBASELINE NEXT
 B12   Document Governance Administration          NOT OPEN
 ```
 
 B01–B10 exact frontend Evidence remains recoverable through their durable locators; Evidence identity/details do not belong in this roadmap.
+
+B11-F1 is integrated upstream authority only. Prior B11 candidate PR/history remains Evidence of exploration and known findings, not a current complete P8/P9 baseline.
 
 ## Repository operating baseline
 
@@ -113,15 +116,13 @@ Frontend discovery remains allowed to falsify earlier Product/backend planning w
 
 ## Exact next action
 
-After this governance baseline is integrated:
-
 ```text
-1. Open a separate repository-hygiene acceptance increment.
-2. Classify branches/refs as KEEP / DELETE / NEEDS PROOF.
-3. Present every proposed deletion to the operator before deleting anything.
-4. Evaluate ordinary merged-head auto-delete and CI checkout-history cost with measured proof.
-5. Rebaseline B11 from the updated main using the restored operating route.
-6. Continue B11 frontend planning from current accepted Product/architecture truth, preserving valid prior Evidence and reopening only material contradictions.
+1. Finish current PR/branch cleanup so no obsolete active PR remains.
+2. Run repository hygiene: classify ordinary branches/refs KEEP / DELETE / NEEDS PROOF before any deletion.
+3. Rebaseline B11 from current main under the restored operating model.
+4. Preserve B11-F1 as integrated upstream authority.
+5. Use prior B11 P8/P9 work only as Evidence of validated structure/findings; rebuild one clean current candidate rather than continuing the 80+ commit workspace.
+6. Continue block-by-block frontend planning; reopen upstream authority only when material frontend Evidence proves it necessary.
 ```
 
 ## Hard stops
@@ -129,7 +130,7 @@ After this governance baseline is integrated:
 ```text
 no Product code/schema/OpenAPI/runtime/deploy implementation
 no T12 work
-no B11/B12 frontend execution before the governance/hygiene rebaseline sequence permits it
+no B11/B12 frontend execution before the cleanup/hygiene rebaseline permits it
 no FP2/P11 work
 no B01-B10 reopen without material Evidence
 no rewrite of Engineering Method or Frontend Method
