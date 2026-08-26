@@ -133,6 +133,13 @@ READ / DOWNLOAD    exact bytes for every format under the §2.9 delivery law, wi
 
 No format receives a weaker governance, audit or access rule.
 
+Template role is likewise format-neutral (operator adjudication, 2026-08-26): a non-DOCX Document
+may carry the Template role and seed an independent Document of the same format. The derived
+Document is then governed through download/edit-externally/upload rather than in-app editing.
+This is accepted, not a defect: Template is an ordinary governed Document role (`contract §4`),
+and restricting it to DOCX would import the editing-mechanism constraint back into Product scope —
+the exact contradiction §1 corrects.
+
 ## 6. Official rendition and converter availability
 
 `RepresentationPolicy` keeps its two accepted kinds. The requirement binds to converter availability:
@@ -147,15 +154,20 @@ source in a format with NO accepted converter -> require_official_rendition is I
 
 Launch accepted converters: `docx -> pdf` (existing). `xlsx`/`pptx` converters may be added later as bounded mechanism decisions without changing this law.
 
-Consequences that must remain visible to humans rather than silently inferred:
+Semantic law owned by this decision:
 
 ```text
-the creation/upload surface states, before the author commits bytes, that a Document Type
-requiring an official PDF accepts only convertible sources
-
-a non-convertible source under a PDF-requiring type fails with a named validation problem;
+a non-convertible source under a PDF-requiring Document Type is INADMISSIBLE
+the attempt fails with a named validation problem and mutates nothing
 the frontend never silently downgrades the type's representation policy
+the human learns the constraint from server truth, never from client inference
 ```
+
+The **realization point** of that law — whether the constraint is surfaced by restricting the
+selectable sources at creation time, or by an explicit named failure at a later gate — is a
+frontend UX question, deliberately NOT decided here. It is carried as an open B13 P7 hypothesis
+question and settled by operator walkthrough. Either realization satisfies this decision provided
+the four semantic clauses above hold.
 
 This preserves `contract §4` ("a representation cannot silently change the governed content") and adds no per-format policy matrix to the Document Type configuration surface (B12 stays LOCKED).
 
@@ -175,6 +187,8 @@ Unchanged: every byte-exactness, malware, admission, GC, restore, ETag, idempote
 
 ```text
 generic file drive / uncontrolled document class   (excluded by contract §1 North Star)
+CAD / engineering-drawing formats (dwg, dxf, step)  DEFERRED — operator: no current consumer
+legacy binary Office formats (doc, xls, ppt)        DEFERRED — operator: no current consumer
 per-format Document Type policy matrix
 in-app editing for non-DOCX formats
 format-specific permissions, lifecycle or numbering
@@ -200,5 +214,7 @@ unbounded "any binary" acceptance
 a named consumer requires in-app editing of a non-DOCX format
 a converter for xlsx/pptx becomes a committed requirement
 a proven need arises for a format outside the vocabulary
+a real controlled CAD/engineering-drawing estate appears (deferred in §8)
+a real legacy doc/xls/ppt estate must be governed rather than converted on intake (deferred in §8)
 records/retention semantics start differing by format
 ```
