@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MetalDocs — B12 Document Governance Administration — P8 R1 CANDIDATE</title>
+  <link rel="stylesheet" href="./t11-b12-document-governance-p8.css">
+</head>
+<body>
+  <div class="review">
+    <header class="review-head">
+      <div>
+        <div class="kicker">T11 · B12 · Document Governance Administration · P8 · R1</div>
+        <h1>Governança documental — Functional Low-Fi</h1>
+        <div>Tipos de documento · Modelos</div>
+      </div>
+      <div class="status">R1 CANDIDATE · AGUARDANDO OPERADOR</div>
+    </header>
+
+    <p class="note">
+      <strong>Escopo R1:</strong> terceira seção do Admin Center (journeys §22) sobre as operações 34–43 e 50–51.
+      Base, rota de governança e modelos elegíveis são três verdades If-Match separadas (journeys §24) e gravam separadamente.
+      Deadlines de step seguem <code>due_in_days</code> opcional (dias corridos inteiros positivos). B12-F1 (imutabilidade de
+      code/scope ilegível antes da escrita) permanece aberto para adjudicação do operador: este candidato apresenta o caminho
+      honesto de falha de estado, sem simular um indicador que a autoridade atual não projeta.
+    </p>
+
+    <section class="fixture" aria-label="Controles determinísticos de Evidence">
+      <div class="fixture-head">
+        <strong>Controles de fixture <span class="review-mark">REVIEW ONLY</span></strong>
+        <span>Não fazem parte do Produto; tornam falhas e retries operáveis.</span>
+      </div>
+      <div class="fixture-grid">
+        <button id="fx-reset" type="button">Restaurar base</button>
+        <button id="fx-page-fail" type="button" aria-pressed="false">Próxima página → falha</button>
+        <button id="fx-create-conflict" type="button" aria-pressed="false">Próximo criar tipo → 409 code duplicado</button>
+        <button id="fx-create-ambiguous" type="button" aria-pressed="false">Próximo criar tipo → ambíguo após commit</button>
+        <button id="fx-stale" type="button" aria-pressed="false">Próxima gravação → 412 stale</button>
+        <button id="fx-in-use" type="button" aria-pressed="false">Base: tipo em uso → conflito de estado</button>
+        <button id="fx-403" type="button">/admin/document-governance → 403</button>
+        <button id="fx-404" type="button">Tipo selecionado → 404</button>
+      </div>
+      <div id="fixture-log" class="fixture-log" role="status" aria-live="polite">Fixture base restaurada. Mutations: criar 0 · gravar 0.</div>
+    </section>
+
+    <section class="shell" aria-label="MetalDocs Document Governance Administration wireframe">
+      <header class="top">
+        <button id="global-nav-toggle" class="global-toggle" type="button" aria-label="Abrir navegação global" aria-controls="global-nav" aria-expanded="false">☰</button>
+        <div class="brand">MetalDocs</div>
+        <div class="tagline">Sistema de documentos controlados</div>
+        <div class="grow"></div>
+        <div class="utility">
+          <button id="bell" class="bell" type="button" aria-label="Notificações, 3 novas">◇<span class="badge">3</span></button>
+          <div class="session">Sessão autenticada</div>
+        </div>
+      </header>
+
+      <aside id="global-nav" class="side" aria-label="Navegação global" tabindex="-1">
+        <button class="mainnav" type="button">⌂ &nbsp; Início</button>
+        <div class="section-label">Minha caixa</div>
+        <button class="nav indent" type="button">Para aprovação</button>
+        <button class="nav indent" type="button">Em edição</button>
+        <div class="section-label">Documentos</div>
+        <button class="nav" type="button">▣ &nbsp; Biblioteca</button>
+        <button class="nav" type="button">＋ &nbsp; Novo documento</button>
+        <button class="nav" type="button">M &nbsp; Criar a partir de modelo</button>
+        <div class="section-label">Gestão</div>
+        <button class="nav active" type="button" aria-current="page">G &nbsp; Governança documental</button>
+        <button class="nav" type="button">O &nbsp; Organização</button>
+        <button class="nav" type="button">A &nbsp; Acesso</button>
+        <div class="section-label">Evidência</div>
+        <button class="nav" type="button">H &nbsp; Auditoria</button>
+      </aside>
+
+      <main class="main" data-route="/admin/document-governance">
+        <div id="gov-content" class="content">
+          <section id="gov-denied" class="failure-panel" role="alert" aria-labelledby="gov-denied-title" hidden>
+            <div class="pill">403 · permission.denied</div>
+            <h2 id="gov-denied-title">Acesso indisponível</h2>
+            <p>O servidor negou esta superfície. Dados protegidos, lentes e ações não são apresentados como uma coleção vazia.</p>
+            <button id="gov-denied-reload" class="primary" type="button">Recarregar contexto autorizado</button>
+          </section>
+
+          <div class="mobile-hint"><strong>Responsivo:</strong> navegação global abre como drawer; painéis empilham; linhas viram blocos rotulados; reordenação de steps é por botões, nunca por drag.</div>
+
+          <div class="page-head">
+            <div>
+              <h2>Governança documental</h2>
+              <p>Tipos de documento, rota de governança, representação e modelos.</p>
+              <div class="route">/admin/document-governance · exige document_type.manage e/ou template_use.manage — co-location de UI não funde permissões</div>
+            </div>
+            <button id="open-create" class="primary" type="button">Novo tipo de documento</button>
+          </div>
+
+          <div class="tabs" role="tablist" aria-label="Lentes de governança documental">
+            <button id="tab-types" class="tab" role="tab" aria-selected="true" aria-controls="lens-types" type="button">Tipos de documento</button>
+            <button id="tab-templates" class="tab" role="tab" aria-selected="false" aria-controls="lens-templates" type="button">Modelos</button>
+          </div>
+
+          <!-- ======================= LENTE: TIPOS ======================= -->
+          <section id="lens-types" role="tabpanel" aria-label="Tipos de documento">
+            <div class="split">
+              <section class="panel" aria-label="Lista de tipos de documento">
+                <div class="panel-head">Tipos de documento <span class="pill">op34 · página do servidor</span></div>
+                <div class="panel-body">
+                  <p class="help">Página exata retornada pelo servidor, ordem document_type_id ASC. Sem total inventado.</p>
+                  <div id="types-list" class="list" role="list"></div>
+                  <div class="pager">
+                    <button id="types-prev" type="button">← Página anterior</button>
+                    <span id="types-page-label">página 1</span>
+                    <button id="types-next" type="button">Próxima página →</button>
+                  </div>
+                  <div id="types-state" class="state-line" role="status" aria-live="polite"></div>
+                </div>
+              </section>
+
+              <section class="panel" aria-label="Detalhe do tipo de documento">
+                <div class="panel-head"><span id="detail-title">Detalhe do tipo</span></div>
+                <div class="panel-body">
+                  <section id="type-404" class="section" hidden>
+                    <div class="state-line error" role="alert">
+                      <strong>404 · resource.not_found —</strong> o tipo solicitado não existe ou não é divulgável para esta sessão.
+                      Ausência não prova existência oculta. Selecione outro tipo na lista.
+                    </div>
+                  </section>
+
+                  <div id="type-detail">
+                    <section class="section" aria-labelledby="base-head">
+                      <div class="section-head">
+                        <h3 id="base-head">Base <span class="pill">op36 ETag · op37 If-Match</span></h3>
+                        <button id="edit-base" class="row-action" type="button">Editar base</button>
+                      </div>
+                      <p>code + escopo de numeração tornam-se imutáveis após o primeiro Documento comprometido usar o tipo (journeys §7). A leitura atual não projeta esse estado — B12-F1.</p>
+                      <div class="review-box"><dl id="base-facts"></dl></div>
+                      <div id="base-state" class="state-line" role="status" aria-live="polite"></div>
+                    </section>
+
+                    <section class="section" aria-labelledby="govpol-head">
+                      <div class="section-head">
+                        <h3 id="govpol-head">Rota de governança e representação <span class="pill">op38 ETag · op39 If-Match</span></h3>
+                        <button id="edit-governance" class="row-action" type="button">Editar governança</button>
+                      </div>
+                      <p>Rota sequencial; a ordem do array é a ordem da rota. Edição não altera attempts já criados (snapshot imutável).</p>
+                      <div id="govpol-view"></div>
+                      <div id="govpol-state" class="state-line" role="status" aria-live="polite"></div>
+                    </section>
+
+                    <section class="section" aria-labelledby="elig-head">
+                      <div class="section-head">
+                        <h3 id="elig-head">Modelos elegíveis <span class="pill">op40 ETag · op41 If-Match</span></h3>
+                        <button id="edit-eligible" class="row-action" type="button">Editar elegíveis</button>
+                      </div>
+                      <p>Conjunto de referências estáveis (code + id), ordem document.code ASC. Conjunto vazio é válido. Sem acesso a conteúdo/histórico (journeys §23).</p>
+                      <div id="eligible-view"></div>
+                      <div id="eligible-state" class="state-line" role="status" aria-live="polite"></div>
+                    </section>
+
+                    <section class="section" aria-labelledby="preview-head">
+                      <h3 id="preview-head">Preview de numeração <span class="pill">op42 · sem reserva</span></h3>
+                      <p>Preview não grava sequência; o código final só existe na criação atômica do Documento. Lacunas são permitidas.</p>
+                      <div class="actions">
+                        <label for="preview-area" id="preview-area-label">Área:</label>
+                        <select id="preview-area"></select>
+                        <button id="run-preview" class="row-action" type="button">Gerar preview</button>
+                      </div>
+                      <div id="preview-state" class="state-line" role="status" aria-live="polite"></div>
+                    </section>
+                  </div>
+                </div>
+              </section>
+            </div>
+          </section>
+
+          <!-- ======================= LENTE: MODELOS ======================= -->
+          <section id="lens-templates" role="tabpanel" aria-label="Modelos" hidden>
+            <section class="panel" aria-label="Configuração de modelos">
+              <div class="panel-head">Modelos <span class="pill">op43 · página do servidor · projeção limitada</span></div>
+              <div class="panel-body">
+                <p class="help">
+                  Projeção de configuração apenas: code, papel de modelo, indicador de revisão efetiva, título efetivo condicional e tipos elegíveis.
+                  Sem bytes, conteúdo, histórico ou autorização geral de leitura (journeys §23).
+                  Elegibilidade é gravada na seção do <em>tipo</em> dono (op41); aqui é leitura + navegação.
+                </p>
+                <div id="templates-list" class="grant-list" role="list"></div>
+                <div class="pager">
+                  <button id="templates-prev" type="button">← Página anterior</button>
+                  <span id="templates-page-label">página 1</span>
+                  <button id="templates-next" type="button">Próxima página →</button>
+                </div>
+                <div id="templates-state" class="state-line" role="status" aria-live="polite"></div>
+              </div>
+            </section>
+          </section>
+
+          <div class="boundary-note">
+            <strong>Fronteiras:</strong> conteúdo/histórico de documento continuam em B03/B07; caso de governança em B06; Organização em B10; Acesso em B11.
+            Nenhuma máquina de workflow genérica, editor de Role/Permission ou PolicyVersion existe nesta superfície.
+          </div>
+          <div class="foot">P8 low-fi — estrutura de interação apenas; sem paleta/tipografia finais. Fixtures locais determinísticos; código do protótipo é Evidence, nunca Produto.</div>
+        </div>
+      </main>
+    </section>
+  </div>
+
+  <!-- ================= DIALOG: criar tipo (op35) ================= -->
+  <dialog id="dlg-create" aria-labelledby="dlg-create-title">
+    <div class="dialog-head"><span id="dlg-create-title">Novo tipo de documento</span><button class="row-action" type="button" data-close="dlg-create">Fechar</button></div>
+    <div class="dialog-body">
+      <p class="help">POST idempotente (op35). Uma intenção lógica = uma Idempotency-Key; retry ambíguo reutiliza a mesma chave e nunca cria um segundo tipo.</p>
+      <div class="form-grid">
+        <label for="create-code">Code</label>
+        <div>
+          <input id="create-code" type="text" maxlength="12" autocomplete="off">
+          <div class="field-hint">Normalizado: trim, maiúsculas ASCII alfanuméricas; “-” proibido (o Produto é dono do separador). Único na Company.</div>
+        </div>
+        <label for="create-name">Nome</label>
+        <input id="create-name" type="text" maxlength="80" autocomplete="off">
+        <label for="create-scope">Numeração</label>
+        <select id="create-scope">
+          <option value="document_type">Por tipo (ex.: PO-001)</option>
+          <option value="document_type_area">Por tipo + Área (ex.: PO-RH-003)</option>
+        </select>
+        <label for="create-active">Ativo</label>
+        <div><label class="inline-check"><input id="create-active" type="checkbox" checked> disponível para novos documentos</label></div>
+      </div>
+      <div id="create-gov-editor"></div>
+      <div id="create-state" class="state-line" role="status" aria-live="polite"></div>
+      <div id="create-ambiguous" class="ambiguous" hidden>
+        <strong>Resultado ambíguo após envio.</strong> A resposta se perdeu depois do commit ser possível. A intenção permanece uma só:
+        repita com a mesma Idempotency-Key para recuperar o resultado exato armazenado. Composição congelada durante a ambiguidade.
+      </div>
+      <div id="create-result" class="result-box" hidden></div>
+    </div>
+    <div class="dialog-foot">
+      <button class="secondary" type="button" data-close="dlg-create">Cancelar</button>
+      <button id="create-submit" class="primary" type="button">Criar tipo</button>
+      <button id="create-retry" class="primary" type="button" hidden>Repetir com a mesma chave</button>
+    </div>
+  </dialog>
+
+  <!-- ================= DIALOG: editar base (op37) ================= -->
+  <dialog id="dlg-base" aria-labelledby="dlg-base-title">
+    <div class="dialog-head"><span id="dlg-base-title">Editar base do tipo</span><button class="row-action" type="button" data-close="dlg-base">Fechar</button></div>
+    <div class="dialog-body">
+      <p class="help">PUT integral com If-Match sobre o ETag lido (op37). Stale → 412, zero mutação, releia e reaplique.</p>
+      <div class="form-grid">
+        <label for="base-code">Code</label>
+        <input id="base-code" type="text" maxlength="12" autocomplete="off">
+        <label for="base-name">Nome</label>
+        <input id="base-name" type="text" maxlength="80" autocomplete="off">
+        <label for="base-scope">Numeração</label>
+        <select id="base-scope">
+          <option value="document_type">Por tipo</option>
+          <option value="document_type_area">Por tipo + Área</option>
+        </select>
+        <label for="base-active">Ativo</label>
+        <div><label class="inline-check"><input id="base-active" type="checkbox"> disponível para novos documentos</label></div>
+      </div>
+      <div id="dlg-base-state" class="state-line" role="status" aria-live="polite"></div>
+    </div>
+    <div class="dialog-foot">
+      <button class="secondary" type="button" data-close="dlg-base">Cancelar</button>
+      <button id="base-save" class="primary" type="button">Gravar base</button>
+      <button id="base-reload" class="row-action" type="button" hidden>Reler versão atual</button>
+    </div>
+  </dialog>
+
+  <!-- ================= DIALOG: editar governança (op39) ================= -->
+  <dialog id="dlg-governance" aria-labelledby="dlg-governance-title">
+    <div class="dialog-head"><span id="dlg-governance-title">Editar rota de governança</span><button class="row-action" type="button" data-close="dlg-governance">Fechar</button></div>
+    <div class="dialog-body">
+      <p class="help">PUT integral com If-Match (op39). Attempts existentes preservam o snapshot da rota; somente attempts futuros usam a nova configuração.</p>
+      <div id="gov-editor"></div>
+      <div id="dlg-governance-state" class="state-line" role="status" aria-live="polite"></div>
+    </div>
+    <div class="dialog-foot">
+      <button class="secondary" type="button" data-close="dlg-governance">Cancelar</button>
+      <button id="governance-save" class="primary" type="button">Gravar governança</button>
+      <button id="governance-reload" class="row-action" type="button" hidden>Reler versão atual</button>
+    </div>
+  </dialog>
+
+  <!-- ================= DIALOG: modelos elegíveis (op41) ================= -->
+  <dialog id="dlg-eligible" aria-labelledby="dlg-eligible-title">
+    <div class="dialog-head"><span id="dlg-eligible-title">Editar modelos elegíveis</span><button class="row-action" type="button" data-close="dlg-eligible">Fechar</button></div>
+    <div class="dialog-body">
+      <p class="help">Substituição integral do conjunto com If-Match (op41). Conjunto vazio é válido. Candidatos vêm da projeção limitada de modelos (op43).</p>
+      <div class="picker">
+        <div id="eligible-picker" class="list" role="list"></div>
+        <div class="pager">
+          <button id="eligible-picker-prev" type="button">←</button>
+          <span id="eligible-picker-label">página 1</span>
+          <button id="eligible-picker-next" type="button">→</button>
+        </div>
+        <div id="eligible-picker-state" class="picker-state state-line" role="status" aria-live="polite"></div>
+      </div>
+      <div id="dlg-eligible-state" class="state-line" role="status" aria-live="polite"></div>
+    </div>
+    <div class="dialog-foot">
+      <button class="secondary" type="button" data-close="dlg-eligible">Cancelar</button>
+      <button id="eligible-save" class="primary" type="button">Gravar conjunto</button>
+      <button id="eligible-reload" class="row-action" type="button" hidden>Reler versão atual</button>
+    </div>
+  </dialog>
+
+  <!-- ================= DIALOG: papel de modelo (op51) ================= -->
+  <dialog id="dlg-role" aria-labelledby="dlg-role-title">
+    <div class="dialog-head"><span id="dlg-role-title">Alterar papel de modelo</span><button class="row-action" type="button" data-close="dlg-role">Fechar</button></div>
+    <div class="dialog-body">
+      <p class="help">PUT com If-Match no recurso do Documento (op51) sob template_use.manage. Sem acesso a conteúdo/histórico.</p>
+      <div class="review-box"><dl id="role-facts"></dl><p id="role-consequence"></p></div>
+      <div id="dlg-role-state" class="state-line" role="status" aria-live="polite"></div>
+    </div>
+    <div class="dialog-foot">
+      <button class="secondary" type="button" data-close="dlg-role">Cancelar</button>
+      <button id="role-confirm" class="primary" type="button">Confirmar alteração</button>
+      <button id="role-reload" class="row-action" type="button" hidden>Reler versão atual</button>
+    </div>
+  </dialog>
+
+  <!-- ================= DIALOG: seletor de responsável do step (op6 / op22) ================= -->
+  <dialog id="dlg-selector" aria-labelledby="dlg-selector-title">
+    <div class="dialog-head"><span id="dlg-selector-title">Selecionar responsável do step</span><button class="row-action" type="button" data-close="dlg-selector">Fechar</button></div>
+    <div class="dialog-body">
+      <p id="selector-help" class="help"></p>
+      <div class="picker">
+        <div id="selector-picker" class="list" role="list"></div>
+        <div class="pager">
+          <button id="selector-prev" type="button">←</button>
+          <span id="selector-label">página 1</span>
+          <button id="selector-next" type="button">→</button>
+        </div>
+        <div id="selector-state" class="picker-state state-line" role="status" aria-live="polite"></div>
+      </div>
+    </div>
+    <div class="dialog-foot">
+      <button class="secondary" type="button" data-close="dlg-selector">Cancelar</button>
+    </div>
+  </dialog>
+
+  <script src="./t11-b12-document-governance-p8.js"></script>
+</body>
+</html>
