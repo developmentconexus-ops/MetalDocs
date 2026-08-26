@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MetalDocs — P11 Integrated Low-Fi Product — R1 CANDIDATE</title>
+  <style>
+    :root { --line:#d9d9d9; --soft:#f4f4f4; --soft-strong:#e8e8e8; --ink:#1c1c1c; --dim:#5f5f5f; }
+    * { box-sizing: border-box; }
+    body { margin:0; font:14px/1.45 system-ui, sans-serif; color:var(--ink); background:#ececec; }
+    .frame { display:grid; grid-template-rows:auto auto 1fr; height:100vh; }
+    header.p11 { display:flex; gap:12px; align-items:center; padding:8px 14px; background:#232323; color:#fff; font-size:12px; }
+    header.p11 strong { font-size:14px; }
+    header.p11 .status { margin-left:auto; background:#4a4a00; color:#ffe97a; padding:2px 8px; border-radius:3px; }
+    .bar { display:flex; flex-wrap:wrap; gap:4px; padding:6px 10px; background:#fff; border-bottom:1px solid var(--line); align-items:center; }
+    .bar .grp { color:var(--dim); font-size:10px; text-transform:uppercase; letter-spacing:.06em; margin:0 2px 0 10px; }
+    .bar a { display:inline-block; padding:5px 9px; border:1px solid var(--line); border-radius:4px; color:var(--ink); text-decoration:none; font-size:12px; background:var(--soft); }
+    .bar a[aria-current="page"] { background:#232323; color:#fff; border-color:#232323; }
+    .bar a:focus-visible { outline:2px solid #2b6cb0; outline-offset:1px; }
+    main { position:relative; min-height:0; }
+    iframe { width:100%; height:100%; border:0; background:#fff; }
+    .journeys { position:fixed; right:12px; bottom:12px; z-index:5; }
+    .journeys > button { padding:7px 11px; border:1px solid #232323; background:#232323; color:#fff; border-radius:5px; cursor:pointer; font-size:12px; }
+    .journeys .panel { display:none; position:absolute; right:0; bottom:40px; width:420px; max-height:60vh; overflow:auto;
+      background:#fff; border:1px solid var(--line); border-radius:6px; box-shadow:0 8px 30px rgba(0,0,0,.25); padding:12px 14px; font-size:12px; }
+    .journeys.open .panel { display:block; }
+    .journeys h2 { margin:.2em 0 .4em; font-size:13px; }
+    .journeys ol { margin:.3em 0 .8em; padding-left:18px; }
+    .journeys li { margin-bottom:4px; }
+    .journeys a { color:#2b6cb0; }
+    .note { background:#fffbe6; border:1px solid #e6d87a; padding:6px 8px; border-radius:4px; margin-top:8px; }
+    @media (max-width: 900px) { .bar { overflow-x:auto; flex-wrap:nowrap; } .journeys .panel { width:calc(100vw - 40px); } }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <header class="p11">
+      <strong>MetalDocs · P11</strong>
+      <span>Produto Low-Fi Integrado — montagem dos 13 blocos LOCKED (Evidence exato, sem modificação)</span>
+      <span class="status">R1 CANDIDATE · AGUARDANDO OPERADOR</span>
+    </header>
+
+    <nav class="bar" aria-label="Navegação global integrada (IA aceita do B01)">
+      <span class="grp">Início</span>
+      <a href="#/shell" data-route="shell">⌂ Shell + Home</a>
+      <span class="grp">Minha caixa</span>
+      <a href="#/my-work" data-route="my-work">Meu trabalho</a>
+      <a href="#/notifications" data-route="notifications">Notificações (inbox)</a>
+      <a href="#/notifications-chrome" data-route="notifications-chrome">Quick Inbox (chrome)</a>
+      <span class="grp">Documentos</span>
+      <a href="#/library" data-route="library">Biblioteca</a>
+      <a href="#/document-official" data-route="document-official">Documento oficial</a>
+      <a href="#/document-work" data-route="document-work">Documento em edição</a>
+      <a href="#/history" data-route="history">Histórico</a>
+      <span class="grp">Governança</span>
+      <a href="#/governance-case" data-route="governance-case">Caso de governança</a>
+      <span class="grp">Gestão</span>
+      <a href="#/admin/document-governance" data-route="admin/document-governance">Governança documental</a>
+      <a href="#/admin/organization" data-route="admin/organization">Organização</a>
+      <a href="#/admin/access" data-route="admin/access">Acesso</a>
+      <span class="grp">Evidência</span>
+      <a href="#/audit" data-route="audit">Auditoria</a>
+    </nav>
+
+    <main>
+      <iframe id="stage" title="Bloco LOCKED em operação" src="about:blank"></iframe>
+    </main>
+  </div>
+
+  <div class="journeys" id="journeys">
+    <button type="button" id="journeys-toggle" aria-expanded="false" aria-controls="journeys-panel">Jornadas cross-block ▾</button>
+    <div class="panel" id="journeys-panel" aria-label="Jornadas de teste cross-block">
+      <h2>Jornadas completas para operar</h2>
+      <ol>
+        <li><strong>Consumo:</strong> <a href="#/shell">Home</a> → <a href="#/library">Biblioteca</a> (buscar/filtrar) → <a href="#/document-official">Documento oficial</a> → <a href="#/history">Histórico</a>.</li>
+        <li><strong>Autoria:</strong> <a href="#/library">Biblioteca</a> → criar de modelo → <a href="#/document-work">Documento em edição</a> (upload, SUBMIT) → <a href="#/my-work">Meu trabalho</a>.</li>
+        <li><strong>Aprovação:</strong> <a href="#/notifications">Notificação</a> ou <a href="#/my-work">Meu trabalho</a> → <a href="#/governance-case">Caso de governança</a> (decidir/feedback) → <a href="#/document-official">Documento efetivo</a>.</li>
+        <li><strong>Administração de governança:</strong> <a href="#/admin/document-governance">tipos/rota/publicação/modelos</a> → modelo → "Abrir documento" (fronteira → <a href="#/document-official">B03</a>).</li>
+        <li><strong>Acesso &amp; organização:</strong> <a href="#/admin/organization">Organização</a> (usuário/área/grupo) → <a href="#/admin/access">Acesso</a> (grants por área/grupo/função).</li>
+        <li><strong>Evidência:</strong> <a href="#/audit">Auditoria</a> (query assist, travessia op78).</li>
+      </ol>
+      <h2>Deep links</h2>
+      <p>Cada rota tem hash próprio (ex.: <code>#/admin/access</code>); recarregar a página preserva o bloco ativo — teste F5 em qualquer rota.</p>
+      <div class="note">
+        <strong>Costura R1 (conhecida):</strong> dentro de cada bloco, os terminadores de fronteira ("continua em Bxx") permanecem os do Evidence LOCKED —
+        nesta montagem R1 os blocos estão byte-a-byte intactos, então a travessia entre blocos usa esta navegação global.
+        Converter terminadores internos em navegação real exige um shim de integração por bloco (candidato para R2, sob decisão do operador:
+        fidelidade absoluta vs. travessia embutida).
+      </div>
+    </div>
+  </div>
+
+  <script>
+  (() => {
+    "use strict";
+    const ROUTES = {
+      "shell":                    "blocks/t11-b01-app-shell-wireframe.html",
+      "notifications-chrome":     "blocks/t11-b01-notifications-wireframe.html",
+      "library":                  "blocks/t11-b02-library-wireframe.html",
+      "document-official":        "blocks/t11-b03-document-official-functional-wireframe.html",
+      "document-work":            "blocks/t11-b04-document-work-functional-wireframe.html",
+      "my-work":                  "blocks/t11-b05-my-work-functional-wireframe.html",
+      "governance-case":          "blocks/t11-b06-governance-case-functional-wireframe.html",
+      "history":                  "blocks/t11-b07-document-history-functional-wireframe.html",
+      "notifications":            "blocks/t11-b08-notifications-full-inbox-functional-wireframe.html",
+      "audit":                    "blocks/t11-b09-audit-functional-wireframe.html",
+      "admin/organization":       "blocks/t11-b10-organization-administration-p8.html",
+      "admin/access":             "blocks/t11-b11-access-administration-p8.html",
+      "admin/document-governance":"blocks/t11-b12-document-governance-p8.html"
+    };
+    const stage = document.getElementById("stage");
+
+    function currentRoute() {
+      const h = location.hash.replace(/^#\//, "");
+      return ROUTES[h] ? h : "shell";
+    }
+
+    function render() {
+      const route = currentRoute();
+      stage.src = ROUTES[route];
+      document.querySelectorAll(".bar a").forEach((a) => {
+        if (a.getAttribute("data-route") === route) a.setAttribute("aria-current", "page");
+        else a.removeAttribute("aria-current");
+      });
+      if (!location.hash) history.replaceState(null, "", "#/" + route);
+    }
+
+    window.addEventListener("hashchange", render);
+    render();
+
+    const j = document.getElementById("journeys");
+    const jt = document.getElementById("journeys-toggle");
+    jt.addEventListener("click", () => {
+      const open = j.classList.toggle("open");
+      jt.setAttribute("aria-expanded", String(open));
+    });
+    document.getElementById("journeys-panel").addEventListener("click", (e) => {
+      if (e.target.tagName === "A") { j.classList.remove("open"); jt.setAttribute("aria-expanded","false"); }
+    });
+  })();
+  </script>
+</body>
+</html>
