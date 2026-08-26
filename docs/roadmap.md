@@ -19,7 +19,7 @@ T11 checkpoint        B01-B11 ACCEPTED / INTEGRATED
 B11-F1                ACCESS ASSIGNMENT READ PRECISION / OPERATOR-RATIFIED / INTEGRATED
 B11                   LOCKED / P8-P10 COMPLETE / INTEGRATED
 B12                   LOCKED / P8-P10 COMPLETE / INTEGRATED
-FP2 / P11             OPEN / ACTIVE — OPERATOR-AUTHORIZED 2026-08-26
+FP2 / P11             COMPLETE / OPERATOR-ACCEPTED 2026-08-26 / INTEGRATION PENDING
 T12                   NOT OPEN
 IMPLEMENTATION         BLOCKED
 ```
@@ -39,7 +39,7 @@ Independent review uses the bounded ClaudeCode/FABLE posture and Git dialogue pr
 ```text
 FP0  Frontend Foundation                         CLOSED / 89 operations / 11 routes REBASELINED
 FP1  Block-by-block Product Experience           COMPLETE / B01-B12 LOCKED + INTEGRATED
-FP2  Integrated Low-Fidelity Product / P11       OPEN / ACTIVE
+FP2  Integrated Low-Fidelity Product / P11       COMPLETE / OPERATOR-ACCEPTED
 FP3  Whole-Product Adversarial Review / P12      NOT OPEN
 FP4  Visual Handoff + Readiness / P13-P14        NOT OPEN
 ```
@@ -103,14 +103,12 @@ B11 pattern-graduation obligation: **CLOSED 2026-08-26.** The collection / idemp
 ## Exact next action
 
 ```text
-1. Create one FP2/P11 acceptance increment from current `main`.
-2. Recover the exact LOCKED P8 Evidence of B01–B12 through the four lock-evidence locators.
-3. Assemble the already-LOCKED blocks into one integrated low-fidelity product: cross-block
-   navigation, complete journeys, deep links, shared shell/overlay behavior, cross-block
-   negative/recovery flows, cross-block responsive behavior (method §17). P11 does not
-   redesign blocks; integration findings reopen only the smallest affected scope.
-4. Operator operates the assembled product; only the operator may accept P11.
-5. FP3/P12, FP4/P13-P14, T12 and Product implementation remain BLOCKED until later roadmap
+1. Integrate the coherent FP2/P11 acceptance increment (Evidence preserved at
+   evidence/t11-p11-r1-accept-20260826, routed by decisions/t11-p11-acceptance-evidence.md);
+   merge only with explicit operator authorization.
+2. The next stage decision is operator-owned: open FP3/P12 (whole-product adversarial
+   walkthrough of the accepted assembled product) through an explicit roadmap update.
+3. FP3/P12, FP4/P13-P14, T12 and Product implementation remain BLOCKED until later roadmap
    authority opens them.
 ```
 
@@ -119,7 +117,7 @@ B11 pattern-graduation obligation: **CLOSED 2026-08-26.** The collection / idemp
 ```text
 no Product code/schema/OpenAPI/runtime/deploy implementation
 no T12 work
-no FP3/P12, FP4/P13-P14 work (FP2/P11 is OPEN)
+no FP3/P12, FP4/P13-P14 work
 no B01-B11 reopen without material Evidence
 no rewrite of Engineering Method or Frontend Method
 no force-push/shared-history rewrite
