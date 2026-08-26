@@ -138,29 +138,53 @@ Interações materiais: seleção progressiva tipo→área com re-leitura de op4
 
 Fora de escopo: edição de conteúdo (B04), governança/aprovação (B06), administração de tipos/modelos (B12), descoberta (B02).
 
-## 5. P8 R1 — artefato e prova
+## 5. P8 — artefato, conformidade de padrão e prova
 
 Artefato: `t11-b13-document-creation-p8.html` — HTML único auto-contido (CSS/JS inline).
 
-Correção estrutural durante a construção (achado próprio, não do operador): tipo, área, modo de partida e modelo eram botões de alternância — clicar de novo **desmarcava** a escolha obrigatória, semântica errada para grupo de escolha única e fraca para leitor de tela. Convertidos para `role="radiogroup"`/`role="radio"` com `aria-checked`, seleção idempotente, tabindex rotativo e navegação por setas (método §3.13/§24: acessibilidade é estrutural).
+### 5.1 R1 REJEITADO — desvio de padrão
 
-Prova automatizada (Chromium headless), 13/13:
+**REJECTED — wrong representation medium (método §4).** O R1 inventou vocabulário visual próprio (cartões numerados de passo, `.step`/`.modes`/`.opt`/`.drop`, tokens de cor próprios, `window.prompt` como seletor de arquivo) em vez de realizar o padrão low-fi já LOCKED em B10/B11/B12. Achado do operador. A rejeição atinge o artefato, não o requisito de Produto.
+
+### 5.2 R2 — conformidade ao padrão canônico
+
+O R2 reusa **verbatim** a folha de estilo e o esqueleto dos blocos LOCKED (recuperados de `evidence/t11-b12-p8-r4-locks-20260826`):
 
 ```text
-semântica de rádio nos 4 grupos + reseleção idempotente + setas             PASS
-lista de aceitos reflete o tipo (source_only aceita xlsx)                    PASS
-malware → 422 validation.content_malicious nomeado                          PASS
-estrutura inválida → 422 content_invalid + exclusão de macro nomeada         PASS
-formato detectado pelo servidor a partir dos bytes                          PASS
-410 upload_expired preserva o arquivo local; sem ressurreição de upload      PASS
-falha parcial pós-criação: documento existe, sem rollback falso,             PASS
-  sem oferta de repetir que criaria segundo documento
-hipótese A exclui fonte não conversível em tipo que exige PDF                PASS
-hipótese B aceita e avisa sobre o gate posterior                            PASS
-voltar de B para A limpa o arquivo incompatível com explicação honesta       PASS
-terminador de fronteira → B04                                               PASS
+tokens          --bg --paper --ink --muted --line --soft --soft-strong (idênticos)
+esqueleto       review > review-head > note > fixture > shell(top/side/main) > content
+                > page-head > split > panel(panel-head/panel-body) > section(section-head)
+componentes     list/list-button, mode-choice, picker, form-grid, field-hint, read-only,
+                review-box, state-line, pill, empty, result-box, ambiguous, actions,
+                boundary-note, foot, mobile-hint, failure-panel
+escrita          <dialog> canônico (dialog-head/body/foot + data-close) no lugar de window.prompt
+negação          a regra canônica enumera IDs de painel por bloco; B13 estende a enumeração
+                exatamente como B12 estendeu a de B11
+navegação        aside/side canônico reusado, com "Novo documento" como item ativo
+deltas locais    apenas .drop, .hypo e .tpl-row — sem redefinir token ou componente existente
 ```
 
-Sondas anteriores (17/17) cobriram disclosure progressivo op44, condicionamento do responsável a `owner.manage`, criação com código alocado pelo servidor, replay ambíguo com a mesma Idempotency-Key, 403 disclosure-safe e 404 não-divulgante.
+Semântica de rádio (grupos de escolha única) mantida do R1: `role="radiogroup"`/`role="radio"`, `aria-checked`, seleção idempotente, tabindex rotativo e navegação por setas — acessibilidade é estrutural (§3.13/§24).
 
-Status: **R1 CANDIDATE — aguardando operação do operador.** Decisão pendente do operador: **B13-Q1** (hipótese A vs B), comparável no próprio wireframe.
+### 5.3 Prova automatizada (Chromium headless) — 30/30
+
+```text
+conformidade de padrão (7)   shell canônico, split com dois painéis, sections com section-head,
+                             mode-choice, form-grid, <dialog> nativo, ausência de classes ad-hoc
+disclosure progressivo (5)   gate antes do tipo, modos após o tipo, responsável somente-leitura
+                             antes da área, seletor após a área, ausência de owner.manage
+seleção e teclado (2)        3 modelos para FRM; navegação por setas nos tipos
+criação (4)                  habilitação, código alocado pelo servidor + REV000, fronteira B04,
+                             congelamento na ambiguidade
+idempotência (1)             replay com a mesma chave mantém mutação 1 → 1
+conteúdo (4)                 lista de aceitos, malware nomeado, estrutura inválida com macro
+                             nomeada, formato derivado dos bytes
+falha parcial (1)            documento existe, sem rollback falso, sem repetição que duplicaria
+hipóteses B13-Q1 (4)         A exclui não conversível na lista e no diálogo; B aceita e avisa;
+                             voltar para A limpa o arquivo incompatível com explicação
+negativos (2)                403 substitui a superfície; 404 não divulgante
+```
+
+Zero erros de console.
+
+Status: **R2 CANDIDATE — aguardando operação do operador.** Decisão pendente: **B13-Q1** (hipótese A vs B), comparável no próprio wireframe.
