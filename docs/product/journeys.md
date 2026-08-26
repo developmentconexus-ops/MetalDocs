@@ -976,7 +976,7 @@ Presentation:
 SourceOnly PDF
 → direct PDF view of exact Release source
 
-SourceOnly DOCX
+SourceOnly source-format (DOCX shown; every ContentFormat vocabulary value behaves identically — `../decisions/content-format-vocabulary.md`)
 → read-only interactive DOCX adapter on exact Release source
 
 RequireOfficialRendition(PDF)

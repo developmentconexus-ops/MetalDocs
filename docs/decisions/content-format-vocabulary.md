@@ -7,7 +7,8 @@ summary: Bounded T11 authority restoring the Product-intended open-ended source-
 
 # Content Format Vocabulary — bounded T11 authority
 
-> **Status:** CANDIDATE / AWAITING OPERATOR RATIFICATION.
+> **Status:** OPERATOR-RATIFIED / BOUNDED T11 REOPEN.
+> **Ratified:** 2026-08-26.
 > **Trigger:** FP2-F2, post-P11 whole-product coherence alignment.
 > **Method:** `docs/development/engineering-method.md` v1.0.0 + `docs/development/frontend-product-experience-planning-method.md` v2.3 §3.10A.
 > **Implementation:** BLOCKED by `../roadmap.md`.
