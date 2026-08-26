@@ -591,4 +591,60 @@ DOCX interactive runtime          one adapter boundary
 Governance content                immutable/read-only
 ```
 
+## 19. Graduated realization laws — T11 frontend Evidence
+
+Graduated from repeated operator-LOCKED behavior proved by at least two independent blocks and routed by `../decisions/t11-b11-lock-evidence.md` and `../decisions/t11-b12-lock-evidence.md` (with earlier occurrences across the `../decisions/t11-b01-b09-lock-evidence.md` / `../decisions/t11-b10-lock-evidence.md` packages). These are durable class-level realization laws for production frontend work, not a component framework, checker or new semantic owner.
+
+### 19.1 Honest bounded-collection law
+
+Every bounded server collection surface:
+
+```text
+render exactly the returned page in the server's returned order
++ show whether continuation exists (server-owned cursor / has_more only)
++ continuation uses the returned cursor; first-page filters are never repeated on continuation
++ a failed continuation preserves the current page and offers explicit retry
++ no invented total, offset, reverse-cursor assumption or hidden complete-universe claim
++ server-side filter/search executes before pagination; changing any filter starts a new
+  first-page identity
++ an empty page under a valid filter identity is an ordinary result, never an error and
+  never proof of non-existence
+```
+
+Proved by B11 (op6/op22/op31 traversal and op31 server-side filter identity) and re-proved by B12 (op34/op43 traversal and the ratified op43 filter identity). Shared low-level rendering may exist at implementation time only while each operation's exact first-page/continuation law remains explicit; no universal pager abstraction is implied.
+
+### 19.2 Idempotent-creation recovery law
+
+Every semantic `IDEMPOTENT_CREATE` command surface:
+
+```text
+one logical intention = one client-generated Idempotency-Key
++ the composed input is frozen while an outcome is ambiguous
++ an ambiguous transport outcome retries the SAME normalized command with the SAME key
++ a committed retry recovers the exact stored result (same status/body/identity);
+  semantic mutation count stays 1 → 1
++ a second intention is a new key; a silent duplicate command never occurs
++ semantic conflicts (e.g. duplicate code) surface the server's named cause with zero mutation
+```
+
+Proved by B11 (op32 grant creation, completed-replay and ambiguous recovery) and re-proved by B12 (op35 type creation with duplicate-code 409 and same-key replay). The durable Idempotency-Key wire law remains owned by `wire-contract.md`; this law binds its user-facing realization.
+
+### 19.3 Fixture-truthfulness law
+
+Planning prototypes and, later, tests/storybook-class harnesses:
+
+```text
+a fixture may only simulate truth the accepted contracts actually supply
++ a state the current read models cannot express is presented through its honest failure/absence
+  path, never through an invented flag or precomputed client inference
++ prototype fixtures, simulated servers, fake cursors and mutation counters are Evidence
+  mechanics only — they never become Product state, read-model authority or production code
++ production realizes LOCKED semantics through the accepted architecture; it does not port
+  the simulator or its data
+```
+
+Proved by B11 (raw op6 eligibility truth, 201/204 reconciliation without client precomputation) and re-proved by B12 (B12-F1: code/scope immutability presented via the honest op37 409 path after the operator rejected an invented in-use flag).
+
+A violation of any law above in later planning, review or implementation is a defect against accepted architecture, not a stylistic preference.
+
 Current integration, stage progression, implementation permission and exact next action are owned exclusively by `../roadmap.md`.

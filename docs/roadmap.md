@@ -98,26 +98,17 @@ integration                                           OPERATOR-AUTHORIZED 2026-0
 
 Exact Evidence is routed by `docs/decisions/t11-b12-lock-evidence.md`. Temporary `docs/work/**` is absent from `main`.
 
-Open B11 pattern-graduation obligation:
-
-```text
-the accepted B11 P10 Evidence proves the reusable pattern
-→ graduate collection / idempotency / fixture-truthfulness realization law
-→ absorb the durable class-level rule into docs/architecture/frontend.md
-→ complete this graduation before FP2/P11 opens
-```
-
-The durable rule must be derived from the proved B11 P10 Evidence (`docs/decisions/t11-b11-lock-evidence.md`) rather than guessed in advance. No new checker/framework is implied.
+B11 pattern-graduation obligation: **CLOSED 2026-08-26.** The collection / idempotency / fixture-truthfulness realization laws are absorbed as durable class-level rules in `docs/architecture/frontend.md` §19, derived from the proved B11 + B12 P10 Evidence (`docs/decisions/t11-b11-lock-evidence.md` + `docs/decisions/t11-b12-lock-evidence.md`). No new checker/framework was introduced.
 
 ## Exact next action
 
 ```text
-1. Close the open B11 pattern-graduation obligation as its own small acceptance increment:
-   derive the collection / idempotency / fixture-truthfulness realization law from the proved
-   B11 + B12 P10 Evidence (t11-b11-lock-evidence.md + t11-b12-lock-evidence.md) and absorb the
-   durable class-level rule into docs/architecture/frontend.md. No new checker/framework.
-2. Only after that graduation closes may later roadmap authority open FP2/P11.
-3. FP2/P11, T12 and Product implementation remain BLOCKED until later roadmap authority opens them.
+1. FP1 is complete: B01–B12 LOCKED / INTEGRATED and the pre-FP2 pattern-graduation
+   obligation is CLOSED.
+2. The next stage decision is operator-owned: open FP2/P11 (assemble the already-LOCKED
+   blocks into the integrated low-fidelity product) through an explicit roadmap update.
+3. FP2/P11, T12 and Product implementation remain BLOCKED until later roadmap authority
+   opens them.
 ```
 
 ## Hard stops
