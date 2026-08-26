@@ -21,7 +21,7 @@ B11                   LOCKED / P8-P10 COMPLETE / INTEGRATED
 B12                   LOCKED / P8-P10 COMPLETE / INTEGRATED
 FP2 / P11             COMPLETE / OPERATOR-ACCEPTED / INTEGRATED
 FP2-F1                CREATION COVERAGE GAP / OPERATOR-DISPOSED → B13 OPEN
-FP2-F2                CONTENT-FORMAT SCOPE / UPSTREAM FINDING OPEN
+FP2-F2                CONTENT-FORMAT SCOPE / OPERATOR-RATIFIED → decisions/content-format-vocabulary.md
 B13                   OPEN / P6-P7 NEXT
 T12                   NOT OPEN
 IMPLEMENTATION         BLOCKED
@@ -107,17 +107,16 @@ B11 pattern-graduation obligation: **CLOSED 2026-08-26.** The collection / idemp
 ## Exact next action
 
 ```text
-1. FP2/P11 is INTEGRATED (#182). Post-P11 coherence alignment is OPEN (operator-initiated):
-   docs/work/current/t11-fp-coherence-alignment.md registers FP2-F1 and FP2-F2.
-2. FP2-F2 (content-format scope): operator Evidence contradicts the closed
-   ContentFormat=docx|pdf authority and no surviving decision exists post-reset.
-   Draft the bounded Product reopen from the operator's scope adjudication;
-   only the operator ratifies it. B13 P7 must not close before FP2-F2 is
-   ratified / rejected / deferred (blocking law, Frontend Method §13).
-3. Run B13 Document Creation P6-P7 (references may consult pre-reset legacy flow as
-   provenance through the technical-baseline gate) and iterate functional P8;
-   only the operator may LOCK. Then close P9/P10 and integrate.
-4. FP3/P12 opens only after B13 and FP2-F2 close (operator sequencing decision).
+1. FP2-F2 is RATIFIED and applied: docs/decisions/content-format-vocabulary.md owns the
+   widened ContentFormat vocabulary, per-format structural admission and converter-bound
+   official rendition. Census stays 89; no operation/concept/permission added.
+2. Run B13 Document Creation P6-P7 over the recovered authority pack (op44/op46 + the
+   ratified format decision). P7 carries one open UX question adjudicated by operator
+   walkthrough: where the non-convertible-source constraint surfaces (creation-time
+   restriction vs named failure at a later gate).
+3. Iterate one browser-operable low-fidelity P8 including source-file attachment at
+   creation; only the operator may LOCK it. Then close P9/P10 and integrate.
+4. FP3/P12 opens only after B13 closes (operator sequencing decision).
 5. FP4/P13-P14, T12 and Product implementation remain BLOCKED.
 ```
 

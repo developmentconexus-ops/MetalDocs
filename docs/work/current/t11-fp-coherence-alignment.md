@@ -65,6 +65,8 @@ Portanto: **não existe classe "documento não controlado"**; o trabalho humano 
 ## Próximos passos derivados
 
 ```text
-1. redigir decisão bounded de precisão do vocabulário ContentFormat (F2a+F2b) → operador ratifica
-2. B13 P6-P7 já pode citar a decisão pendente; P7 não fecha antes da ratificação (§13 blocking law)
-3. B13 P8 inclui anexar arquivo-fonte na criação (adjudicado) + regra de publicação visível
+1. FEITO — decisão bounded redigida, revisada pelo operador e RATIFICADA (2026-08-26):
+   docs/decisions/content-format-vocabulary.md; precisões aplicadas em wire/content-integrity/
+   journeys; roteada em docs/index.md + registro; censo 89 inalterado
+2. B13 P6-P7 desbloqueado (nenhum finding bloqueante aberto)
+3. B13 P8 inclui anexar arquivo-fonte na criação (adjudicado) + questão UX aberta do PDF
