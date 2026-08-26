@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>MetalDocs — B12 Document Governance Administration — P8 R2 CANDIDATE</title>
+  <title>MetalDocs — B12 Document Governance Administration — P8 R4 CANDIDATE</title>
   <style>
 :root {
   --bg: #ececec;
@@ -600,6 +600,8 @@ input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
   border-bottom: 1px solid #ddd;
 }
 .template-row:last-child { border-bottom: 0; }
+.template-open { border: 0; background: none; padding: 0; text-align: left; cursor: pointer; font: inherit; color: inherit; }
+.template-open:hover b, .template-open:focus-visible b { text-decoration: underline; }
 .template-row b { display: block; }
 .template-row small { display: block; color: #5f5f5f; }
 
@@ -632,15 +634,15 @@ input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
   <div class="review">
     <header class="review-head">
       <div>
-        <div class="kicker">T11 · B12 · Document Governance Administration · P8 · R2</div>
+        <div class="kicker">T11 · B12 · Document Governance Administration · P8 · R4</div>
         <h1>Governança documental — Functional Low-Fi</h1>
         <div>Tipos de documento · Modelos</div>
       </div>
-      <div class="status">R2 CANDIDATE · AGUARDANDO OPERADOR</div>
+      <div class="status">R4 CANDIDATE · AGUARDANDO OPERADOR</div>
     </header>
 
     <p class="note">
-      <strong>Escopo R2:</strong> terceira seção do Admin Center (journeys §22) sobre as operações 34–43 e 50–51.
+      <strong>Escopo R4:</strong> terceira seção do Admin Center (journeys §22) sobre as operações 34–43 e 50–51.
       Base, rota de governança e modelos elegíveis são três verdades If-Match separadas (journeys §24) e gravam separadamente.
       Deadlines de step seguem <code>due_in_days</code> opcional (dias corridos inteiros positivos). B12-F1 (imutabilidade de
       code/scope ilegível antes da escrita) permanece aberto para adjudicação do operador: este candidato apresenta o caminho
@@ -975,6 +977,28 @@ input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
       <button class="secondary" type="button" data-close="dlg-role">Cancelar</button>
       <button id="role-confirm" class="primary" type="button">Confirmar alteração</button>
       <button id="role-reload" class="row-action" type="button" hidden>Reler versão atual</button>
+    </div>
+  </dialog>
+
+  <!-- ================= DIALOG: detalhe do modelo (projeção §23 + fronteiras B03/B07) ================= -->
+  <dialog id="dlg-template" aria-labelledby="dlg-template-title">
+    <div class="dialog-head"><span id="dlg-template-title">Detalhe do modelo</span><button class="row-action" type="button" data-close="dlg-template">Fechar</button></div>
+    <div class="dialog-body">
+      <p class="help">
+        O modelo é um <strong>documento comum</strong>: revisões, aprovação e fluxo acontecem na tela do próprio documento.
+        Aqui a projeção é a configuração permitida (journeys §23) — sem conteúdo, revisões ou histórico.
+        Abrir o documento depende das <em>suas</em> permissões de leitura, não de template_use.manage.
+      </p>
+      <div class="review-box"><dl id="template-facts"></dl></div>
+      <div class="actions">
+        <button id="template-open-doc" class="primary" type="button">Abrir documento ↗</button>
+        <button id="template-open-history" class="row-action" type="button">Histórico do documento ↗</button>
+        <button id="template-role-action" class="row-action" type="button"></button>
+      </div>
+      <div id="dlg-template-state" class="state-line" role="status" aria-live="polite"></div>
+    </div>
+    <div class="dialog-foot">
+      <button class="secondary" type="button" data-close="dlg-template">Fechar</button>
     </div>
   </dialog>
 
@@ -1971,7 +1995,7 @@ input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
         return target ? "<button type='button' class='chip' data-open-type='" + typeId + "'>" + target.code + " ↗</button>" : "";
       }).join("") || "<span class='meta'>nenhum tipo elegível</span>";
       row.innerHTML =
-        "<div><b>" + tpl.code + "</b><small>" + (tpl.hasEffective ? (tpl.title || "") : "sem revisão efetiva") + "</small></div>" +
+        "<div><button type='button' class='template-open' data-open-template='" + tpl.docId + "' aria-label='Abrir detalhe do modelo " + tpl.code + "'><b>" + tpl.code + " ↗</b><small>" + (tpl.hasEffective ? (tpl.title || "") : "sem revisão efetiva") + "</small></button></div>" +
         "<div><span class='pill'>" + (tpl.isTemplate ? "PAPEL DE MODELO" : "SEM PAPEL DE MODELO") + "</span><small>" +
         (tpl.hasEffective ? "revisão efetiva presente" : "não aparecerá como opção de criação") + "</small></div>" +
         "<div><small>Elegível para (edite no tipo dono):</small><div class='chips'>" + eligibleChips + "</div></div>";
@@ -1991,6 +2015,9 @@ input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
         renderAll();
       });
     });
+    list.querySelectorAll("[data-open-template]").forEach((button) => {
+      button.addEventListener("click", () => openTemplateDetail(button.getAttribute("data-open-template")));
+    });
     $("#templates-page-label").textContent = "página " + (state.pages.templates + 1) + (page.hasMore ? " · há continuação" : " · fim") + templateFilterIdentityLabel(state.templatesFilters);
     $("#templates-prev").disabled = state.pages.templates === 0;
     $("#templates-next").disabled = !page.hasMore;
@@ -2006,6 +2033,34 @@ input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
     state.pages.templates += delta;
     setState($("#templates-state"), "", null);
     renderTemplatesList();
+  }
+
+  function openTemplateDetail(docId) {
+    const tpl = templateOf(docId);
+    state.templateDetail = docId;
+    $("#dlg-template-title").textContent = "Modelo " + tpl.code;
+    const eligible = tpl.eligibleTypeIds.map((typeId) => {
+      const target = typeOf(typeId);
+      return target ? target.code : typeId;
+    });
+    $("#template-facts").innerHTML =
+      "<dt>Documento</dt><dd>" + tpl.code + " <span class='meta'>(" + tpl.docId + ")</span></dd>" +
+      "<dt>Título efetivo</dt><dd>" + (tpl.hasEffective ? (tpl.title || "—") : "— (sem revisão efetiva; título só existe quando uma revisão é efetiva)") + "</dd>" +
+      "<dt>Papel de modelo</dt><dd>" + (tpl.isTemplate ? "sim" : "não") + "</dd>" +
+      "<dt>Revisão efetiva</dt><dd>" + (tpl.hasEffective ? "presente — utilizável na criação quando elegível" : "ausente — não aparece como opção de criação") + "</dd>" +
+      "<dt>Elegível para</dt><dd>" + (eligible.length ? eligible.join(", ") + " <span class='meta'>(" + eligible.length + " tipo" + (eligible.length > 1 ? "s" : "") + ")</span>" : "nenhum tipo") + "</dd>";
+    $("#template-role-action").textContent = tpl.isTemplate ? "Remover papel de modelo" : "Atribuir papel de modelo";
+    setState($("#dlg-template-state"), "", null);
+    $("#dlg-template").showModal();
+  }
+
+  function templateBoundary(kind) {
+    const tpl = templateOf(state.templateDetail);
+    setState($("#dlg-template-state"),
+      kind === "history"
+        ? "→ continua em B07 (Histórico do Documento " + tpl.code + "): revisões, submissões e decisões vivem lá, sob document.read_history. Fora do escopo B12."
+        : "→ continua em B03 (Documento Oficial " + tpl.code + "): versão oficial, revisão aberta e fluxo de aprovação vivem lá, sob as permissões de leitura do usuário. Fora do escopo B12.",
+      "success");
   }
 
   function openRole(docId) {
@@ -2139,6 +2194,12 @@ input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 
   $("#run-preview").addEventListener("click", runPreview);
 
+  $("#template-open-doc").addEventListener("click", () => templateBoundary("official"));
+  $("#template-open-history").addEventListener("click", () => templateBoundary("history"));
+  $("#template-role-action").addEventListener("click", () => {
+    $("#dlg-template").close();
+    openRole(state.templateDetail);
+  });
   document.querySelectorAll("[data-close]").forEach((button) => {
     button.addEventListener("click", () => $("#" + button.getAttribute("data-close")).close());
   });

@@ -137,3 +137,24 @@ templates por Área            REJECTED — templates não são recurso de Área
 ```
 
 **Adjudicação do operador (2026-08-26): RATIFICADO.** O reopen de leitura do op43 é autoridade bounded em `docs/decisions/template-configuration-read.md`; "template geral" permanece fato derivado (sem conceito/flag novo). O P8 R3 refaz a lente Modelos com recorte por tipo elegível + busca `q` + filtros de papel/efetividade, todos server-side sobre fixtures determinísticas.
+
+## 7. Walkthrough R3 — detalhe do modelo (R3-W1)
+
+Finding do operador: a linha do modelo não abria detalhe; a expectativa é ver "informações, revisão etc.", já que o modelo é um documento comum com aprovação e fluxo próprios.
+
+Teste contra autoridade consolidada:
+
+```text
+modelo = Documento comum          journeys (template create/lifecycle) — revisão/aprovação/fluxo
+                                  já pertencem ao Documento, planejados em B03 (Oficial) e B07 (Histórico), LOCKED
+projeção admin permitida          journeys §23 — só metadados de seleção (id, code, título efetivo,
+                                  papel, indicador de efetiva/elegibilidade); sem bytes/conteúdo/histórico
+autorização                       document.read_effective / document.read_history nas telas do documento;
+                                  template_use.manage NÃO concede leitura (co-location não funde permissão)
+```
+
+**Disposição (operador, 2026-08-26): PRESENT-IN-AUTHORITY via navegação cross-block — sem reopen.** Revisões/aprovação inline na lente admin exigiriam reabrir a fronteira de disclosure do §23 e foram descartadas pelo operador.
+
+R4: linha do modelo clicável → diálogo de detalhe com a projeção §23 completa + terminadores de fronteira "Abrir documento → continua em B03" e "Histórico → continua em B07" (método §14.3) + ação de papel. O texto do diálogo explica que revisão/aprovação vivem na tela do documento e que abri-la depende das permissões de leitura do usuário.
+
+Status: **R4 CANDIDATE — aguardando nova operação do operador.**
