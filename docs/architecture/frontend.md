@@ -603,7 +603,10 @@ Every cursor-paginated (`PAGED`) collection surface:
 render exactly the returned page in the server's returned order
 + show whether continuation exists (server-owned cursor / has_more only)
 + continuation uses the returned cursor; first-page filters are never repeated on continuation
-+ a failed continuation preserves the current page and offers explicit retry
++ a transient/retryable continuation failure preserves the current page and offers explicit
+  retry; an authorization/disclosure failure on continuation (the cursor contract rechecks
+  AuthZ on every page) follows its owning Problem behavior instead — protected content is
+  replaced by the denial presentation, never left visible behind a retry
 + no invented total, offset, reverse-cursor assumption or hidden complete-universe claim
 + server-side filter/search executes before pagination; changing any filter starts a new
   first-page identity
