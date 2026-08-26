@@ -19,7 +19,10 @@ T11 checkpoint        B01-B11 ACCEPTED / INTEGRATED
 B11-F1                ACCESS ASSIGNMENT READ PRECISION / OPERATOR-RATIFIED / INTEGRATED
 B11                   LOCKED / P8-P10 COMPLETE / INTEGRATED
 B12                   LOCKED / P8-P10 COMPLETE / INTEGRATED
-FP2 / P11             COMPLETE / OPERATOR-ACCEPTED 2026-08-26 / INTEGRATION PENDING
+FP2 / P11             COMPLETE / OPERATOR-ACCEPTED / INTEGRATED
+FP2-F1                CREATION COVERAGE GAP / OPERATOR-DISPOSED → B13 OPEN
+FP2-F2                CONTENT-FORMAT SCOPE / UPSTREAM FINDING OPEN
+B13                   OPEN / P6-P7 NEXT
 T12                   NOT OPEN
 IMPLEMENTATION         BLOCKED
 ```
@@ -38,7 +41,7 @@ Independent review uses the bounded ClaudeCode/FABLE posture and Git dialogue pr
 
 ```text
 FP0  Frontend Foundation                         CLOSED / 89 operations / 11 routes REBASELINED
-FP1  Block-by-block Product Experience           COMPLETE / B01-B12 LOCKED + INTEGRATED
+FP1  Block-by-block Product Experience           COMPLETE + BOUNDED REOPEN — B13 OPEN (FP2-F1)
 FP2  Integrated Low-Fidelity Product / P11       COMPLETE / OPERATOR-ACCEPTED
 FP3  Whole-Product Adversarial Review / P12      NOT OPEN
 FP4  Visual Handoff + Readiness / P13-P14        NOT OPEN
@@ -60,6 +63,7 @@ B09   Audit                                       LOCKED / P8-P10 COMPLETE
 B10   Organization Administration                 LOCKED / P8-P10 COMPLETE / INTEGRATED
 B11   Access Administration                       LOCKED / P8-P10 COMPLETE / INTEGRATED
 B12   Document Governance Administration          LOCKED / P8-P10 COMPLETE / INTEGRATED
+B13   Document Creation                            OPEN / P6-P7 NEXT (FP2-F1 bounded inventory rebaseline)
 ```
 
 B01–B11 exact frontend Evidence remains recoverable through their durable locators; Evidence identity/details do not belong in this roadmap.
@@ -103,13 +107,18 @@ B11 pattern-graduation obligation: **CLOSED 2026-08-26.** The collection / idemp
 ## Exact next action
 
 ```text
-1. Integrate the coherent FP2/P11 acceptance increment (Evidence preserved at
-   evidence/t11-p11-r1-accept-20260826, routed by decisions/t11-p11-acceptance-evidence.md);
-   merge only with explicit operator authorization.
-2. The next stage decision is operator-owned: open FP3/P12 (whole-product adversarial
-   walkthrough of the accepted assembled product) through an explicit roadmap update.
-3. FP3/P12, FP4/P13-P14, T12 and Product implementation remain BLOCKED until later roadmap
-   authority opens them.
+1. FP2/P11 is INTEGRATED (#182). Post-P11 coherence alignment is OPEN (operator-initiated):
+   docs/work/current/t11-fp-coherence-alignment.md registers FP2-F1 and FP2-F2.
+2. FP2-F2 (content-format scope): operator Evidence contradicts the closed
+   ContentFormat=docx|pdf authority and no surviving decision exists post-reset.
+   Draft the bounded Product reopen from the operator's scope adjudication;
+   only the operator ratifies it. B13 P7 must not close before FP2-F2 is
+   ratified / rejected / deferred (blocking law, Frontend Method §13).
+3. Run B13 Document Creation P6-P7 (references may consult pre-reset legacy flow as
+   provenance through the technical-baseline gate) and iterate functional P8;
+   only the operator may LOCK. Then close P9/P10 and integrate.
+4. FP3/P12 opens only after B13 and FP2-F2 close (operator sequencing decision).
+5. FP4/P13-P14, T12 and Product implementation remain BLOCKED.
 ```
 
 ## Hard stops
