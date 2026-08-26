@@ -136,4 +136,4 @@ templates por Área            REJECTED — templates não são recurso de Área
                               Evidence antigo referia-se a tipos/uso, não a escopo de Área
 ```
 
-O P8 da lente Modelos não fecha antes de o operador **ratificar / rejeitar / deferir** B12-F2. As demais superfícies do R2 estão aprovadas e não dependem disso.
+**Adjudicação do operador (2026-08-26): RATIFICADO.** O reopen de leitura do op43 é autoridade bounded em `docs/decisions/template-configuration-read.md`; "template geral" permanece fato derivado (sem conceito/flag novo). O P8 R3 refaz a lente Modelos com recorte por tipo elegível + busca `q` + filtros de papel/efetividade, todos server-side sobre fixtures determinísticas.

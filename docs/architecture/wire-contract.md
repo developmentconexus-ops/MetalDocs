@@ -12,7 +12,8 @@ summary: Preserves the operator-ratified T8-E 78-operation executable-wire snaps
 > **Current refinement notice:** this file preserves the ratified T8-E **78-operation snapshot**. The sole current numeric application census is `../decisions/api-operation-census.md`, currently 89 after later T11 bounded reopens. Current non-consolidated wire refinements are owned by:
 > - `../decisions/discussion-notifications-launch.md` — operations 79–86;
 > - `../decisions/audit-investigation-read.md` — operation 78 refinement + operations 87–89;
-> - `../decisions/access-assignment-read.md` — operation 31 read/query refinement.
+> - `../decisions/access-assignment-read.md` — operation 31 read/query refinement;
+> - `../decisions/template-configuration-read.md` — operation 43 read/query refinement.
 >
 > A targeted row/section superseded by a bounded decision carries `REFINED → <decision>`. The marker points to current meaning; this snapshot keeps its original proof/census context.
 
@@ -724,7 +725,7 @@ TemplateConfigurationItem { document:DocumentReference, template_role:boolean, h
 TemplateConfigurationPage { items:TemplateConfigurationItem[], page:Page }
 ```
 
-`TemplateConfigurationItem.current_effective_title` is present iff `has_effective_revision=true`; `eligible_document_type_ids` is unique and UUID-ascending.
+`TemplateConfigurationItem.current_effective_title` is present iff `has_effective_revision=true`; `eligible_document_type_ids` is unique and UUID-ascending. Current operation-43 first-page query/filter behavior is **REFINED → `../decisions/template-configuration-read.md`**; the item/page shapes above remain current.
 
 Create explicitly supplies initial governance/representation because T8-D requires current values and no accepted default exists. Eligible-template set starts empty. Base replacement rejects normalized code/numbering-scope change after first committed Document with409.
 
@@ -1170,7 +1171,7 @@ All path `*_id` parameters are required `Uuid`. `PAGED` means §2.7. JSON reques
 |40|`getDocumentTypeEligibleTemplates`|`GET /api/v1/document-types/{document_type_id}/eligible-templates`|`SAFE_READ`|`200 EligibleTemplatesView`|`JSON_ETAG`|document.code,document_id|`A + N`|
 |41|`replaceDocumentTypeEligibleTemplates`|`PUT /api/v1/document-types/{document_type_id}/eligible-templates`|`ReplaceEligibleTemplatesRequest` / `IF_MATCH_MUTATION`|`200 EligibleTemplatesView`|`JSON_ETAG_MUTATION`|none|`U + J + N + P + S`|
 |42|`getDocumentTypeNumberingPreview`|`GET /api/v1/document-types/{document_type_id}/numbering-preview`|`SAFE_READ`|`200 NumberingPreviewView`|`JSON_NO_STORE`|optional area_id|`A + N + validation.failed`|
-|43|`listTemplateConfigurations`|`GET /api/v1/document-governance/templates`|`SAFE_READ`|`200 TemplateConfigurationPage`|`JSON_NO_STORE`|`PAGED`; document.code,document_id|`A`|
+|43|`listTemplateConfigurations`|`GET /api/v1/document-governance/templates`|`SAFE_READ`|`200 TemplateConfigurationPage`|`JSON_NO_STORE`|`PAGED`; document.code,document_id; **REFINED → `../decisions/template-configuration-read.md`**|`A`|
 
 ## 6.2 Operations 44→77
 

@@ -325,6 +325,10 @@ p { text-wrap: pretty; }
 .pager { padding-top: 10px; }
 .pager span { color: #4f4f4f; font-size: 11px; text-align: center; }
 
+.filter-bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; margin-bottom: 8px; }
+.filter-bar label { display: flex; flex-direction: column; gap: 4px; font-size: 11px; color: #4f4f4f; }
+.filter-bar input, .filter-bar select { min-width: 140px; }
+
 .state-line {
   min-height: 18px;
   margin-top: 8px;
@@ -813,6 +817,30 @@ input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
                   Sem bytes, conteúdo, histórico ou autorização geral de leitura (journeys §23).
                   Elegibilidade é gravada na seção do <em>tipo</em> dono (op41); aqui é leitura + navegação.
                 </p>
+                <form id="templates-filters" class="filter-bar" aria-label="Filtros de modelos (server-side, antes da paginação)">
+                  <label>Busca
+                    <input id="tpl-q" type="search" placeholder="code ou título efetivo" autocomplete="off">
+                  </label>
+                  <label>Tipo elegível
+                    <select id="tpl-type"><option value="">todos</option></select>
+                  </label>
+                  <label>Papel de modelo
+                    <select id="tpl-role">
+                      <option value="">todos</option>
+                      <option value="true">com papel</option>
+                      <option value="false">sem papel</option>
+                    </select>
+                  </label>
+                  <label>Revisão efetiva
+                    <select id="tpl-effective">
+                      <option value="">todas</option>
+                      <option value="true">com efetiva</option>
+                      <option value="false">sem efetiva</option>
+                    </select>
+                  </label>
+                  <button id="tpl-clear" type="button" class="row-action">Limpar filtros</button>
+                </form>
+                <p class="help">Filtros e busca executam no <strong>servidor, antes da paginação</strong> (op43 refinado — <code>q</code>, <code>eligible_document_type_id</code>, <code>template_role</code>, <code>has_effective_revision</code>). Mudar qualquer filtro inicia uma nova identidade de primeira página; a busca considera code e título <em>efetivo</em> apenas.</p>
                 <div id="templates-list" class="grant-list" role="list"></div>
                 <div class="pager">
                   <button id="templates-prev" type="button">← Página anterior</button>
@@ -1043,10 +1071,15 @@ input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
   const BASE_TEMPLATES = [
     { docId: "doc-101", code: "FRM-001", isTemplate: true, hasEffective: true, title: "Modelo de ata de reunião", eligibleTypeIds: ["dt-003"] },
     { docId: "doc-102", code: "FRM-002", isTemplate: true, hasEffective: true, title: "Modelo de checklist de inspeção", eligibleTypeIds: ["dt-003", "dt-006"] },
-    { docId: "doc-103", code: "PO-QLD-004", isTemplate: true, hasEffective: false, title: null, eligibleTypeIds: ["dt-001"] },
+    { docId: "doc-103", code: "PO-QLD-004", isTemplate: true, hasEffective: false, title: null, draftTitle: "Modelo de procedimento de calibração", eligibleTypeIds: ["dt-001"] },
     { docId: "doc-104", code: "MAN-002", isTemplate: false, hasEffective: true, title: "Manual de integração", eligibleTypeIds: [] },
     { docId: "doc-105", code: "IT-COM-009", isTemplate: true, hasEffective: true, title: "Modelo de roteiro comercial", eligibleTypeIds: ["dt-002"] },
-    { docId: "doc-106", code: "POL-003", isTemplate: false, hasEffective: true, title: "Política de segurança da informação", eligibleTypeIds: [] }
+    { docId: "doc-106", code: "POL-003", isTemplate: false, hasEffective: true, title: "Política de segurança da informação", eligibleTypeIds: [] },
+    { docId: "doc-107", code: "FRM-010", isTemplate: true, hasEffective: true, title: "Modelo de relatório de auditoria", eligibleTypeIds: ["dt-003"] },
+    { docId: "doc-108", code: "FRM-011", isTemplate: true, hasEffective: true, title: "Modelo de registro de treinamento", eligibleTypeIds: ["dt-003", "dt-006"] },
+    { docId: "doc-109", code: "FRM-012", isTemplate: true, hasEffective: false, title: null, eligibleTypeIds: ["dt-003"] },
+    { docId: "doc-110", code: "IT-COM-014", isTemplate: true, hasEffective: true, title: "Modelo de proposta comercial", eligibleTypeIds: ["dt-002"] },
+    { docId: "doc-111", code: "PO-QLD-021", isTemplate: true, hasEffective: true, title: "Modelo de plano de qualidade", eligibleTypeIds: ["dt-001", "dt-003"] }
   ];
 
   let types = [];
@@ -1070,6 +1103,7 @@ input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
     typeId: "dt-001",
     typeMissing: false,
     pages: { types: 0, templates: 0, eligiblePicker: 0, selector: 0 },
+    templatesFilters: { q: "", typeId: "", role: "", effective: "" },
     previewAreaId: "",
     create: {
       key: null,
@@ -1138,6 +1172,8 @@ input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
     state.typeId = "dt-001";
     state.typeMissing = false;
     state.pages = { types: 0, templates: 0, eligiblePicker: 0, selector: 0 };
+    state.templatesFilters = { q: "", typeId: "", role: "", effective: "" };
+    syncTemplateFilterControls();
     state.previewAreaId = "";
     $("#gov-denied").hidden = true;
     $("#gov-content").classList.remove("is-denied");
@@ -1862,11 +1898,70 @@ input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 
   /* ---------------- templates lens (op43 / op51) ---------------- */
 
+  // Simulated server behavior for the refined op43: conjunctive filters + q
+  // (code + EFFECTIVE title only) applied BEFORE seek pagination.
+  function serverQueryTemplates(filters) {
+    const q = (filters.q || "").trim().toLowerCase();
+    return [...templates]
+      .filter((tpl) => {
+        if (filters.typeId && !tpl.eligibleTypeIds.includes(filters.typeId)) return false;
+        if (filters.role !== "" && String(tpl.isTemplate) !== filters.role) return false;
+        if (filters.effective !== "" && String(tpl.hasEffective) !== filters.effective) return false;
+        if (q) {
+          const codeHit = tpl.code.toLowerCase().includes(q);
+          const titleHit = tpl.hasEffective && (tpl.title || "").toLowerCase().includes(q);
+          if (!codeHit && !titleHit) return false; // draft-only titles never match
+        }
+        return true;
+      })
+      .sort((a, b) => a.code.localeCompare(b.code) || a.docId.localeCompare(b.docId));
+  }
+
+  function templateFilterIdentityLabel(filters) {
+    const parts = [];
+    if (filters.q.trim()) parts.push("q=“" + filters.q.trim() + "”");
+    if (filters.typeId) { const t = typeOf(filters.typeId); parts.push("tipo=" + (t ? t.code : filters.typeId)); }
+    if (filters.role !== "") parts.push(filters.role === "true" ? "com papel" : "sem papel");
+    if (filters.effective !== "") parts.push(filters.effective === "true" ? "com efetiva" : "sem efetiva");
+    return parts.length ? " · filtros: " + parts.join(", ") : "";
+  }
+
+  function syncTemplateFilterControls() {
+    const f = state.templatesFilters;
+    if ($("#tpl-q").value !== f.q) $("#tpl-q").value = f.q;
+    const typeSel = $("#tpl-type");
+    typeSel.innerHTML = "<option value=''>todos</option>" +
+      [...types].sort((a, b) => a.code.localeCompare(b.code))
+        .map((t) => "<option value='" + t.id + "'>" + t.code + "</option>").join("");
+    typeSel.value = f.typeId && typeOf(f.typeId) ? f.typeId : "";
+    $("#tpl-role").value = f.role;
+    $("#tpl-effective").value = f.effective;
+  }
+
+  function applyTemplateFilters() {
+    state.templatesFilters = {
+      q: $("#tpl-q").value,
+      typeId: $("#tpl-type").value,
+      role: $("#tpl-role").value,
+      effective: $("#tpl-effective").value
+    };
+    state.pages.templates = 0; // any filter change starts a NEW first-page identity
+    setState($("#templates-state"), "", null);
+    renderTemplatesList();
+  }
+
   function renderTemplatesList() {
-    const ordered = [...templates].sort((a, b) => a.code.localeCompare(b.code));
+    syncTemplateFilterControls();
+    const ordered = serverQueryTemplates(state.templatesFilters);
     const page = pageOf(ordered, state.pages.templates, PAGE_SIZE);
     const list = $("#templates-list");
     list.innerHTML = "";
+    if (!page.items.length) {
+      const empty = document.createElement("p");
+      empty.className = "meta";
+      empty.textContent = "Página vazia: nenhuma configuração de modelo divulgável corresponde à identidade de filtro atual. (Resultado ordinário do servidor, não erro.)";
+      list.appendChild(empty);
+    }
     page.items.forEach((tpl) => {
       const row = document.createElement("div");
       row.className = "template-row";
@@ -1896,7 +1991,7 @@ input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
         renderAll();
       });
     });
-    $("#templates-page-label").textContent = "página " + (state.pages.templates + 1) + (page.hasMore ? " · há continuação" : " · fim");
+    $("#templates-page-label").textContent = "página " + (state.pages.templates + 1) + (page.hasMore ? " · há continuação" : " · fim") + templateFilterIdentityLabel(state.templatesFilters);
     $("#templates-prev").disabled = state.pages.templates === 0;
     $("#templates-next").disabled = !page.hasMore;
   }
@@ -2006,6 +2101,17 @@ input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
   $("#types-next").addEventListener("click", () => goTypesPage(1));
   $("#templates-prev").addEventListener("click", () => goTemplatesPage(-1));
   $("#templates-next").addEventListener("click", () => goTemplatesPage(1));
+  $("#templates-filters").addEventListener("submit", (event) => { event.preventDefault(); applyTemplateFilters(); });
+  $("#tpl-q").addEventListener("input", applyTemplateFilters);
+  $("#tpl-type").addEventListener("change", applyTemplateFilters);
+  $("#tpl-role").addEventListener("change", applyTemplateFilters);
+  $("#tpl-effective").addEventListener("change", applyTemplateFilters);
+  $("#tpl-clear").addEventListener("click", () => {
+    state.templatesFilters = { q: "", typeId: "", role: "", effective: "" };
+    state.pages.templates = 0;
+    setState($("#templates-state"), "", null);
+    renderTemplatesList();
+  });
   $("#eligible-picker-prev").addEventListener("click", () => goEligiblePage(-1));
   $("#eligible-picker-next").addEventListener("click", () => goEligiblePage(1));
   $("#selector-prev").addEventListener("click", () => goSelectorPage(-1));

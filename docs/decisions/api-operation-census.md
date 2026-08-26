@@ -83,6 +83,17 @@ The T11 B11 Access Administration bounded reopen refines existing operation 31 o
 
 No B11 operation is added or removed. Mutation operations 28, 29, 32 and 33 remain unchanged.
 
+The T11 B12 Document Governance Administration bounded reopen refines existing operation 43 only:
+
+```text
+43 GET /api/v1/document-governance/templates
+   operationId: listTemplateConfigurations
+   REFINED — server-side q search + eligible-type / template-role /
+             effective-revision filters before pagination
+```
+
+No B12 operation is added or removed; the reopen is query-only.
+
 ## Count proof
 
 ```text
@@ -91,6 +102,7 @@ bounded read-symmetry precision             +2
 T11 Discussion/Mention/Notifications reopen +8
 T11 Audit investigation bounded reopen      +3
 T11 B11 op31 read precision                  +0
+T11 B12 op43 read precision                  +0
                                             ---
 current application census                  89
 ```
@@ -125,6 +137,8 @@ The T11 Discussion creation reuses the current global durable Idempotency-Key la
 `docs/decisions/audit-investigation-read.md` is the bounded current authority for the op78 structured-query/inspection refinement and operations 87–89.
 
 `docs/decisions/access-assignment-read.md` is the bounded current authority for the op31 Access Assignment read/query refinement. It does not create operation 90, a new semantic owner or an effective-access engine.
+
+`docs/decisions/template-configuration-read.md` is the bounded current authority for the op43 template-configuration read/query refinement. It does not create operation 90, a "general template" concept or Area-scoped templates.
 
 Together these bounded decisions supersede only the conflicting current-tense Product/T6/T8-E/T8-F/T8-H/T9 statements on their exact subjects.
 
@@ -161,4 +175,4 @@ All unchanged journey and wire laws remain owned by `docs/product/journeys.md` a
 
 Any operation **90 or later** requires unchanged semantic normalization already permitted by current authority or a new explicit bounded Product/T6 reopen. Framework convenience, screen shape or implementation preference is not authority to add an operation.
 
-T8-E executable realization must prove exactly **89** application operations and the current 11/13/4 supporting censuses, with operation 31 realized according to `access-assignment-read.md`.
+T8-E executable realization must prove exactly **89** application operations and the current 11/13/4 supporting censuses, with operation 31 realized according to `access-assignment-read.md` and operation 43 realized according to `template-configuration-read.md`.
