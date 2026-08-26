@@ -180,4 +180,18 @@ a Launch+ capability (Distribution / Periodic Review) acquires a restricted-audi
 a real estate of sensitive documents is blocked from onboarding by this limitation
 ```
 
-Until then, preserve the seam and implement no dormant capability.
+## 11. Trigger status
+
+```text
+2026-08-26  TRIGGER §10.1 FIRED BY OPERATOR
+            named consumer: Comercial Area — documents legible only to vendedores,
+            others only to gerência, others only to diretoria, all inside one Area
+            → the need is ORDINARY, not exceptional; the "keep it outside MetalDocs"
+              fallback of §8 is not viable for this estate
+```
+
+Firing the trigger does **not** by itself change scope. Promotion from future seam to
+Launch scope is a Product/T6 bounded reopen and requires explicit operator ratification.
+It is registered as `SEC-07` in `forward-obligations.md`.
+
+Until that reopen is ratified, preserve the seam and implement no dormant capability.

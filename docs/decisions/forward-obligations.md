@@ -95,10 +95,10 @@ ASY-02 is therefore no longer a forward DEFERRED obligation and is excluded from
 - **FUT-03 — DEFERRED** — Retention/Hold/Disposition stay separate from document lifecycle/provider storage; expiry does not imply delete.
 - **MIG-08 — DEFERRED** — Governed Subject Export may derive future manifests/digests from semantic descriptors without provider identity becoming product truth.
 - **MIG-09 — DEFERRED** — External Repository IMPORT/PUBLISH remains future and reuses exact-content copy/admission seams without making external object IDs MetalDocs identity.
-- **SEC-05 — DEFERRED** — In-Area document confidentiality is decided as a future seam in `document-confidentiality-seam.md`: a governed ConfidentialityClass plus clearance grants, never a per-document ACL and never Area used as a secrecy mechanism. Launch implements no dormant capability.
 - **SEC-04 — DEFERRED** — Pooled/shared multi-customer tenancy is not Launch; stable Company identity preserves the seam.
 - **SEC-05 — DEFERRED** — Customer-company lifecycle/portability deletion/export is not Launch.
 - **SEC-06 — DEFERRED** — Generic eDiscovery/PKI/TSA/HSM/signature/quarantine platform absent a concrete requirement.
+- **SEC-07 — DEFERRED / PROMOTION TRIGGER FIRED 2026-08-26** — In-Area document confidentiality is decided in `document-confidentiality-seam.md`: a governed ConfidentialityClass plus clearance grants, never a per-document ACL and never Area used as a secrecy mechanism. The operator has named a concrete consumer (Comercial: vendedores / gerência / diretoria within one Area), firing reopen trigger §10.1. Disposition change to Launch scope requires an explicit operator-ratified Product/T6 bounded reopen; until that reopen is ratified, Launch implements no dormant capability.
 
 ## Count proof
 
