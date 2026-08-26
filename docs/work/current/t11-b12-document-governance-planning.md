@@ -81,3 +81,5 @@ Nenhum outro requisito material carece de autoridade. **Nenhum finding bloqueant
 Interações materiais operáveis: lentes; master-detail; criação (op35) com conflito 409 de code duplicado e recuperação de resultado ambíguo (P10-S5); edição base/governança/elegíveis com 412 stale (journeys §24); editor de steps com reordenação por teclado (sem drag), validações locais (≥1 step, dias inteiros positivos); preview de numeração com seleção de Área e `validation.failed`; lente Modelos com toggle de papel via op51; travessia de cursor visível (P10-S3); 403/404 disclosure-safe (P10-S6); responsivo/teclado (P10-S7).
 
 Fora de escopo (fronteiras explícitas): conteúdo/histórico de documento (B03/B07), casos de governança (B06), Organização (B10), Acesso (B11).
+
+Artefato R1: `t11-b12-document-governance-p8.html` — HTML único auto-contido (CSS/JS inline), operável direto no navegador. Evidence temporário; nunca entra em candidato de merge/`main`.
