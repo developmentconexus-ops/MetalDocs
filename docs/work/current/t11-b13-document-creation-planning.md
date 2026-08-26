@@ -188,3 +188,62 @@ negativos (2)                403 substitui a superfície; 404 não divulgante
 Zero erros de console.
 
 Status: **R2 CANDIDATE — aguardando operação do operador.** Decisão pendente: **B13-Q1** (hipótese A vs B), comparável no próprio wireframe.
+
+## 6. Validação de cobertura pedida pelo operador (2026-08-26)
+
+### 6.1 B13-F1 — violação de fixture-truthfulness no R2 (achado próprio, MATERIAL)
+
+Ao validar "todas as informações necessárias estão na página", conferi a projeção exata do op44:
+
+```text
+DocumentTypeReference { document_type_id, code, name }
+AreaReference         { area_id, code, name }
+TemplateCreationOption { document:DocumentReference, effective_revision:RevisionReference }
+DocumentReference     { document_id, code }        // título pertence à Revisão
+RevisionReference     { revision:RevisionIdentity, title }
+```
+
+O R2 exibia, na lista de tipos, `numeração por tipo + Área` e `exige PDF oficial`, e na lista de modelos, `fonte Excel (.xlsx)`. **Nenhum desses campos existe na projeção.** Isso viola a lei de realização já graduada em `architecture/frontend.md` §19.3 (fixture nunca simula verdade que o contrato não fornece) — a mesma lei que este programa acabou de absorver. Corrigido no R3.
+
+### 6.2 B13-F2 — hipótese A do B13-Q1 não é realizável com a autoridade atual (UPSTREAM FINDING)
+
+Consequência direta de 6.1: para **restringir na criação** (hipótese A) o cliente precisaria saber (a) que o tipo exige PDF oficial e (b) qual o formato-fonte de cada modelo. `op44` não projeta nem um nem outro.
+
+```text
+hipótese A   exige precisão de leitura no op44:
+             + representation policy no tipo projetado
+             + content_format em TemplateCreationOption
+             classificação: UPSTREAM FINDING (leitura), espelhando op31/op43
+hipótese B   realizável hoje sem nenhuma mudança: o servidor rejeita no gate com
+             problema nomeado (content-format-vocabulary.md §6 já garante a lei semântica)
+```
+
+O R3 passa a operar **B como padrão realizável**, e mantém A operável apenas sob um controle de fixture que declara explicitamente que simula leitura ainda não ratificada. O operador decide: ratificar a precisão de leitura (habilita A) ou aceitar B.
+
+### 6.3 Visibilidade / audiência do documento — Global Maximum
+
+Evidence do operador: o legado permitia escolher, por documento, quem veria — Área, empresa toda, externo, pessoas específicas.
+
+Mapeamento contra a autoridade atual (`architecture/authorization-and-audit.md` §2/§9, `domain-model.md`, T3):
+
+| Opção do legado | Autoridade atual | Disposição |
+|---|---|---|
+| Da Área | O Documento pertence a uma Área; a leitura exige `document.read_effective` **naquela Área**. A escolha da Área **é** a decisão de audiência | PRESENT-IN-AUTHORITY (por outro mecanismo) |
+| Empresa toda | Concessões de escopo Company leem todas as Áreas | PRESENT-IN-AUTHORITY (administrado em B11) |
+| Pessoas específicas | Exigiria ACL por documento. T3: sujeito = `User\|Group`, escopo = `Company\|Area`; §2 lista `materialized ACL` como **sem autoridade semântica persistida** | **CONTRADIZ A AUTORIDADE** — só entraria por reopen material de Produto |
+| Documento externo | Ambíguo: leitor externo (não existe identidade externa no Launch — uma empresa, usuários autenticados) ou documento de origem externa (classificação, não acesso). `External Repository` é Future | **AGUARDA DESAMBIGUAÇÃO DO OPERADOR** |
+
+**Global Maximum.** O caminho tentador — um seletor de audiência por documento — criaria uma segunda autoridade de autorização em conflito com T3, permitiria que autores contornassem o acesso administrado centralmente (regressão de governança num sistema de documento controlado), exigiria operação nova (censo proíbe op90+ sem reopen) e romperia `no materialized ACL`. Custo alto, ganho negativo.
+
+A necessidade humana real provada é **informacional**, não de capacidade: *o autor escolhe a Área sem saber que essa é a decisão de quem poderá ler*. A menor correção sustentável:
+
+```text
+declarar a consequência na própria tela de criação, com verdade já disponível:
+  "Quem poderá ler quando efetivo: quem tiver permissão de leitura na Área X
+   ou em toda a Empresa. O acesso é administrado em Acesso, não escolhido aqui."
+zero operação nova · zero conceito novo · zero widening de disclosure
+```
+
+Se o operador provar que o autor precisa da **lista concreta** de leitores, isso vira upstream finding próprio (leitura disclosure-safe de audiência), com custo real: expor atribuições de acesso a não-administradores. Não é assumido aqui.
+
+Implementado no R3: seção "Quem poderá ler" derivada da Área escolhida, mais o pop-up canônico de resultado da criação pedido pelo operador.
