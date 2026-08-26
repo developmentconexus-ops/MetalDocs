@@ -247,3 +247,38 @@ zero operação nova · zero conceito novo · zero widening de disclosure
 Se o operador provar que o autor precisa da **lista concreta** de leitores, isso vira upstream finding próprio (leitura disclosure-safe de audiência), com custo real: expor atribuições de acesso a não-administradores. Não é assumido aqui.
 
 Implementado no R3: seção "Quem poderá ler" derivada da Área escolhida, mais o pop-up canônico de resultado da criação pedido pelo operador.
+
+### 6.4 Auditoria de completude da tela (pedido do operador)
+
+Confronto entre `CreateDocumentRequest` + a jornada aceita e o que a tela apresenta:
+
+```text
+document_type_id            presente (lista op44)
+area_id                     presente (lista op44)
+title                       presente (metadado da revisão, explicado)
+template_document_id?       presente (modo "a partir de modelo", lista op44)
+responsible_owner_user_id?  presente, condicionado a owner.manage (op44 §2.7)
+arquivo-fonte               presente por composição (ops 59→60→58), com estado intermediário honesto
+code                        AUSENTE por autoridade — alocado pelo servidor; a tela declara isso
+audiência/leitores          NÃO É CAMPO — é consequência da Área; agora declarada explicitamente
+numbering scope             não projetado por op44 → não exibido (B13-F1)
+representation policy       não projetado por op44 → não exibido (B13-F1)
+formato do modelo           não projetado por op44 → não exibido (B13-F1)
+rota de governança          op38 é superfície de document_type.manage; um autor comum não a lê →
+                            deliberadamente ausente, sem inventar leitura
+```
+
+Nenhum campo material do comando aceito falta na tela. Os ausentes são ausências **de autoridade**, declaradas em vez de simuladas.
+
+### 6.5 Prova do R3 (Chromium headless) — 17/17
+
+```text
+fidelidade de fixture     linhas de tipo e de modelo sem campos não projetados          PASS (4)
+leitura simulada          revela campos com rótulo explícito, habilita A, desligar volta a B  PASS (4)
+audiência                 pede Área primeiro; declara consequência + administração central PASS (2)
+pop-up de resultado       diálogo canônico com código, REV000, audiência, fronteira B04  PASS (4)
+regressões                replay ambíguo 1→1, honestidade da falha parcial, 403           PASS (3)
+```
+
+Zero erros de console.
+

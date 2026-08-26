@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>MetalDocs — B13 Document Creation — P8 R2 CANDIDATE</title>
+  <title>MetalDocs — B13 Document Creation — P8 R3 CANDIDATE</title>
   <style>
 
 :root {
@@ -654,15 +654,15 @@ input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
   <div class="review">
     <header class="review-head">
       <div>
-        <div class="kicker">T11 · B13 · Document Creation · P8 · R2</div>
+        <div class="kicker">T11 · B13 · Document Creation · P8 · R3</div>
         <h1>Criação de Documento — Functional Low-Fi</h1>
         <div>Tipo · Área · Modo de partida · Título · Responsável</div>
       </div>
-      <div class="status">R2 CANDIDATE · AGUARDANDO OPERADOR</div>
+      <div class="status">R3 CANDIDATE · AGUARDANDO OPERADOR</div>
     </header>
 
     <p class="note">
-      <strong>Escopo R2:</strong> rota de criação sobre as operações 44 e 46, com anexo de arquivo-fonte composto (ops 59→60→58).
+      <strong>Escopo R3:</strong> rota de criação sobre as operações 44 e 46, com anexo de arquivo-fonte composto (ops 59→60→58).
       O disclosure é dirigido pelo servidor (wire §2.7): modelos só existem depois do tipo escolhido; candidatos a responsável
       só quando a autoridade os fornece. Formatos seguem <code>content-format-vocabulary.md</code> (ratificada).
       <strong>B13-Q1</strong> permanece aberto e operável abaixo.
@@ -684,6 +684,7 @@ input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
         <button id="fx-struct" type="button" aria-pressed="false">Arquivo → estrutura inválida</button>
         <button id="fx-403" type="button">/documents/new → 403</button>
         <button id="fx-404" type="button" aria-pressed="false">Tipo pedido → 404</button>
+        <button id="fx-simulate-read" type="button" aria-pressed="false">Simular leitura NÃO ratificada (habilita hipótese A)</button>
       </div>
       <div id="fixture-log" class="fixture-log" role="status" aria-live="polite">Fixture base restaurada. Criações: 0.</div>
     </section>
@@ -738,8 +739,8 @@ input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 
           <div class="hypo">
             <span class="pill">B13-Q1 · questão aberta</span>
-            <button id="hypo-a" class="row-action" type="button" aria-pressed="true">A · restringir na criação</button>
-            <button id="hypo-b" class="row-action" type="button" aria-pressed="false">B · falhar em gate posterior</button>
+            <button id="hypo-b" class="row-action" type="button" aria-pressed="true">B · falhar em gate posterior (realizável hoje)</button>
+            <button id="hypo-a" class="row-action" type="button" aria-pressed="false" disabled>A · restringir na criação (exige leitura não ratificada)</button>
             <span id="hypo-desc" class="help" style="margin:0"></span>
           </div>
 
@@ -807,6 +808,11 @@ input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
                   <div id="meta-state" class="state-line" role="status" aria-live="polite"></div>
                 </section>
 
+                <section class="section" aria-labelledby="audience-head">
+                  <div class="section-head"><h3 id="audience-head">Quem poderá ler <span class="pill">consequência da Área</span></h3></div>
+                  <div id="audience-region" class="read-only"></div>
+                </section>
+
                 <div class="actions">
                   <button id="create-submit" class="primary" type="button">Criar documento</button>
                   <button id="create-retry" class="primary" type="button" hidden>Repetir com a mesma chave</button>
@@ -820,7 +826,6 @@ input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
                   repita com a mesma Idempotency-Key para recuperar o resultado exato armazenado. Composição congelada durante a ambiguidade.
                 </div>
 
-                <div id="create-result" class="result-box" hidden></div>
               </div>
             </section>
           </div>
@@ -834,6 +839,20 @@ input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
       </main>
     </section>
   </div>
+
+  <!-- ================= DIALOG: resultado da criação (op46) ================= -->
+  <dialog id="dlg-created" aria-labelledby="dlg-created-title">
+    <div class="dialog-head"><span id="dlg-created-title">Documento criado</span><button class="row-action" type="button" data-close="dlg-created">Fechar</button></div>
+    <div class="dialog-body">
+      <div class="review-box"><dl id="created-facts"></dl></div>
+      <div id="created-attachment" class="state-line" role="status" aria-live="polite"></div>
+    </div>
+    <div class="dialog-foot">
+      <button class="secondary" type="button" data-close="dlg-created">Fechar</button>
+      <button id="created-again" class="row-action" type="button">Criar outro documento</button>
+      <button id="open-work" class="primary" type="button">Abrir documento para edição ↗</button>
+    </div>
+  </dialog>
 
   <!-- ================= DIALOG: seleção de arquivo-fonte (fixture determinístico) ================= -->
   <dialog id="dlg-file" aria-labelledby="dlg-file-title">
@@ -902,8 +921,8 @@ input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
     { name: "registro-lote.csv",         fmt: "csv",  size: 8192 }
   ];
 
-  const flags = { noOwner: false, conflict: false, ambiguous: false, uploadFail: false, upload410: false, malware: false, struct: false, notFound: false };
-  let hypothesis = "A";
+  const flags = { simulateRead: false, noOwner: false, conflict: false, ambiguous: false, uploadFail: false, upload410: false, malware: false, struct: false, notFound: false };
+  let hypothesis = "B";
   let creations = 0;
   let idempotencyKey = null;
   const state = { typeId: null, areaId: null, mode: null, tplId: null, file: null, ownerId: null, pendingAmbiguous: false, created: false };
@@ -924,7 +943,14 @@ input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
   function setState(node, text, kind) { node.textContent = text || ""; node.className = "state-line" + (kind ? " " + kind : ""); }
   function pickerState(node, text, kind) { node.textContent = text || ""; node.className = "picker-state state-line" + (kind ? " " + kind : ""); }
   function bytes(n) { return n >= 1048576 ? (n / 1048576).toFixed(1) + " MB" : Math.round(n / 1024) + " KB"; }
-  function convertibleOnly() { const t = typeOf(state.typeId); return hypothesis === "A" && !!t && t.rep === "require_official_rendition"; }
+  /* Hypothesis A can only restrict if the client knows the type's representation policy and the
+     template's source format. op44 projects neither (B13-F2), so A is gated behind an explicit
+     fixture that declares it simulates an unratified read. */
+  function convertibleOnly() {
+    const t = typeOf(state.typeId);
+    return flags.simulateRead && hypothesis === "A" && !!t && t.rep === "require_official_rendition";
+  }
+  function readIsSimulated() { return flags.simulateRead; }
 
   /* single-choice groups: radio semantics, idempotent selection, arrow navigation */
   function wireRadioGroup(container) {
@@ -952,10 +978,14 @@ input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
   function renderTypes() {
     const box = $("#types"); box.innerHTML = "";
     serverOptions().types.forEach((t) => {
-      const button = el("button", "list-button",
-        "<span><strong>" + t.code + " · " + t.name + "</strong><span class='meta'>" +
-        (t.scope === "document_type_area" ? "numeração por tipo + Área" : "numeração por tipo") + " · " +
-        (t.rep === "require_official_rendition" ? "exige PDF oficial" : "publica somente a fonte") + "</span></span>");
+      /* op44 projects DocumentTypeReference { document_type_id, code, name } only. Numbering scope
+         and representation policy are NOT in the read model — never invented here (frontend.md §19.3). */
+      const consequence = readIsSimulated()
+        ? "<span class='meta'>" + (t.scope === "document_type_area" ? "numeração por tipo + Área" : "numeração por tipo") + " · " +
+          (t.rep === "require_official_rendition" ? "exige PDF oficial" : "publica somente a fonte") +
+          " · simulado por leitura NÃO ratificada</span>"
+        : "";
+      const button = el("button", "list-button", "<span><strong>" + t.code + " · " + t.name + "</strong>" + consequence + "</span>");
       button.type = "button";
       button.setAttribute("role", "radio");
       button.setAttribute("aria-checked", String(state.typeId === t.id));
@@ -1028,7 +1058,7 @@ input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 
     if (convertibleOnly()) {
       const convertible = Object.keys(FORMATS).filter((f) => FORMATS[f].conv).map((f) => FORMATS[f].label).join(", ");
-      setState(note, "Este tipo exige PDF oficial, portanto só admite fontes conversíveis (" + convertible + "). Fontes não conversíveis ficam indisponíveis nesta seleção.", "warn");
+      setState(note, "Este tipo exige PDF oficial, portanto só admite fontes conversíveis (" + convertible + "). Restrição simulada: a leitura que a tornaria possível ainda não é autoridade ratificada (B13-F2).", "warn");
     }
 
     $("#tpl-region").hidden = state.mode !== "template";
@@ -1046,9 +1076,13 @@ input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
     }
     list.forEach((tpl) => {
       const blocked = convertibleOnly() && !FORMATS[tpl.fmt].conv;
+      /* op44 TemplateCreationOption projects { document:{document_id,code}, effective_revision:{revision,title} }.
+         Source format is NOT projected — shown only when the unratified read is simulated. */
+      const fmtNote = readIsSimulated()
+        ? " · fonte " + FORMATS[tpl.fmt].label + (blocked ? " · indisponível: não conversível para PDF oficial" : "")
+        : "";
       const button = el("button", "list-button",
-        "<span><strong>" + tpl.code + " — " + tpl.title + "</strong><span class='meta'>revisão efetiva " + tpl.rev +
-        " · fonte " + FORMATS[tpl.fmt].label + (blocked ? " · indisponível: não conversível para PDF oficial" : "") + "</span></span>");
+        "<span><strong>" + tpl.code + " — " + tpl.title + "</strong><span class='meta'>revisão efetiva " + tpl.rev + fmtNote + "</span></span>");
       button.type = "button"; button.disabled = blocked;
       button.setAttribute("role", "radio");
       button.setAttribute("aria-checked", String(state.tplId === tpl.docId));
@@ -1062,7 +1096,8 @@ input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 
   function renderAccepted() {
     const keys = Object.keys(FORMATS).filter((f) => !convertibleOnly() || FORMATS[f].conv);
-    $("#accepted").textContent = "Aceitos: " + keys.map((f) => FORMATS[f].label).join(" · ");
+    const base = "Aceitos: " + keys.map((f) => FORMATS[f].label).join(" · ");
+    $("#accepted").textContent = convertibleOnly() ? base + " (restrito por leitura simulada)" : base;
   }
 
   function renderOwner() {
@@ -1085,6 +1120,20 @@ input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
     region.appendChild(el("div", "field-hint", "Candidatos fornecidos pelo servidor porque você tem document.owner.manage neste escopo (wire §2.7)."));
   }
 
+  function renderAudience() {
+    const region = $("#audience-region");
+    const area = areaOf(state.areaId);
+    if (!area) {
+      region.innerHTML = "<strong>Escolha a Área para saber quem poderá ler.</strong><span class='meta'>A Área do Documento é o que delimita a audiência: não existe seleção de leitores por documento.</span>";
+      return;
+    }
+    region.innerHTML =
+      "<strong>Quando este documento estiver EFETIVO, poderá ser lido por quem tiver permissão de leitura na Área " +
+      area.code + " · " + area.name + ", ou em toda a Empresa.</strong>" +
+      "<span class='meta'>O acesso é administrado centralmente em Acesso (B11) por Função e Escopo — nunca escolhido documento a documento. " +
+      "Trocar a Área muda a audiência. Esta tela não concede nem restringe acesso.</span>";
+  }
+
   function renderSubmit() {
     const titleFilled = $("#title").value.trim().length > 0;
     const modeReady = state.mode === "blank" || (state.mode === "template" && state.tplId) || (state.mode === "upload" && state.file);
@@ -1100,7 +1149,7 @@ input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
     $("#submit-hint").textContent = state.created ? "" : (missing.length ? "Falta: " + missing.join(", ") + "." : "Pronto para criar.");
   }
 
-  function renderAll() { renderTypes(); renderAreas(); renderModes(); renderOwner(); renderSubmit(); }
+  function renderAll() { renderTypes(); renderAreas(); renderModes(); renderOwner(); renderAudience(); renderSubmit(); }
 
   /* ---------------- source file selection (ops 59/60 admission) ---------------- */
   function revalidateFile() {
@@ -1191,41 +1240,39 @@ input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
       seeded = "<dt>Semeado por</dt><dd>" + tpl.code + " — " + tpl.title + " (" + tpl.rev + " efetiva no momento da criação)</dd>";
     }
 
-    let attachment = "";
+    let attachmentText = "", attachmentKind = null;
     if (state.mode === "upload") {
       if (flags.upload410) {
         flags.upload410 = false; $("#fx-upload-410").setAttribute("aria-pressed", "false");
-        attachment = "<dt>Arquivo</dt><dd>410 · state.upload_expired — a alocação expirou. O arquivo local foi preservado: peça nova alocação e repita o envio. Nenhuma alocação antiga é ressuscitada.</dd>";
+        attachmentText = "410 · state.upload_expired — a alocação expirou. O arquivo local foi preservado: peça nova alocação e repita o envio. Nenhuma alocação antiga é ressuscitada.";
+        attachmentKind = "error";
       } else if (flags.uploadFail) {
         flags.uploadFail = false; $("#fx-upload-fail").setAttribute("aria-pressed", "false");
-        attachment = "<dt>Arquivo</dt><dd>Falha ao anexar após a criação. <strong>O documento existe</strong> como REV000 vazio: nada foi perdido e nada foi revertido. Continue o envio na tela do documento (B04). Repetir a criação produziria um segundo documento, por isso não é oferecido.</dd>";
+        attachmentText = "Falha ao anexar após a criação. O documento existe como REV000 vazio: nada foi perdido e nada foi revertido. Continue o envio na tela do documento (B04). Repetir a criação produziria um segundo documento, por isso não é oferecido.";
+        attachmentKind = "error";
       } else {
-        attachment = "<dt>Arquivo</dt><dd>" + state.file.name + " anexado à REV000 · formato " + FORMATS[state.file.fmt].label + " derivado pelo servidor</dd>";
+        attachmentText = state.file.name + " anexado à REV000 · formato " + FORMATS[state.file.fmt].label + " derivado pelo servidor.";
+        attachmentKind = "success";
       }
     }
 
     const ownerSelect = $("#owner");
     const ownerName = ownerSelect ? USERS.find((u) => u.id === ownerSelect.value).name : USERS[0].name;
 
-    $("#create-result").hidden = false;
-    $("#create-result").innerHTML =
-      "<strong>Documento criado.</strong>" +
-      "<div class='review-box'><dl>" +
+    $("#created-facts").innerHTML =
       "<dt>Código</dt><dd><strong>" + code + "</strong> <span class='pill'>alocado pelo servidor</span></dd>" +
       "<dt>Revisão</dt><dd>REV000 · DRAFT · ainda não oficial</dd>" +
       "<dt>Tipo / Área</dt><dd>" + type.code + " · " + area.code + "</dd>" +
       "<dt>Título</dt><dd>" + $("#title").value.trim() + "</dd>" +
       "<dt>Responsável</dt><dd>" + ownerName + "</dd>" +
-      seeded + attachment +
-      "<dt>Idempotency-Key</dt><dd><code>" + idempotencyKey + "</code></dd>" +
-      "</dl></div>" +
-      "<div class='actions'><button class='primary' type='button' id='open-work'>Abrir documento para edição ↗</button></div>";
-    setState($("#create-state"), "201 · createDocument — mutação semântica 1 → 1.", "success");
+      "<dt>Quem poderá ler</dt><dd>quem tiver leitura na Área " + area.code + " ou em toda a Empresa</dd>" +
+      seeded +
+      "<dt>Idempotency-Key</dt><dd><code>" + idempotencyKey + "</code></dd>";
+    setState($("#created-attachment"), attachmentText, attachmentKind);
+    $("#dlg-created").showModal();
+    setState($("#create-state"), "201 · createDocument — mutação semântica 1 → 1. Resultado exato no diálogo.", "success");
     $("#create-again").hidden = false;
     log("op46 criou " + code + ".");
-    $("#open-work").addEventListener("click", () => {
-      setState($("#create-state"), "→ continua em B04 (Documento em Edição): conteúdo, autosave e submissão vivem lá. Fora do escopo B13.", "success");
-    });
     renderSubmit();
   }
 
@@ -1242,7 +1289,7 @@ input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
     state.file = null; state.ownerId = null; state.pendingAmbiguous = false; state.created = false;
     idempotencyKey = null;
     $("#title").value = "";
-    $("#create-result").hidden = true;
+    if ($("#dlg-created").open) { $("#dlg-created").close(); }
     $("#create-ambiguous").hidden = true;
     $("#create-retry").hidden = true;
     $("#create-again").hidden = true;
@@ -1251,13 +1298,19 @@ input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
     renderAll();
   }
 
+  function setHypothesisForced(next) { hypothesis = next; applyHypothesis(); }
   function setHypothesis(next) {
+    if (next === "A" && !flags.simulateRead) { return; }
     hypothesis = next;
+    applyHypothesis();
+  }
+  function applyHypothesis() {
+    const next = hypothesis;
     $("#hypo-a").setAttribute("aria-pressed", String(next === "A"));
     $("#hypo-b").setAttribute("aria-pressed", String(next === "B"));
     $("#hypo-desc").textContent = next === "A"
-      ? "A: o tipo que exige PDF oficial só oferece fontes conversíveis — o autor descobre antes de enviar bytes."
-      : "B: qualquer fonte é aceita no rascunho; a incompatibilidade aparece como falha nomeada no gate de submissão.";
+      ? "A: o tipo que exige PDF oficial só oferece fontes conversíveis — depende de leitura NÃO ratificada (B13-F2)."
+      : "B: qualquer fonte é aceita no rascunho; a incompatibilidade aparece como falha nomeada no gate de submissão. Realizável com a autoridade atual.";
     revalidateFile();
     renderAll();
   }
@@ -1268,6 +1321,11 @@ input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
   $("#create-submit").addEventListener("click", createDocument);
   $("#create-retry").addEventListener("click", retryCreate);
   $("#create-again").addEventListener("click", resetForm);
+  $("#created-again").addEventListener("click", () => { $("#dlg-created").close(); resetForm(); });
+  $("#open-work").addEventListener("click", () => {
+    $("#dlg-created").close();
+    setState($("#create-state"), "→ continua em B04 (Documento em Edição): conteúdo, autosave e submissão vivem lá. Fora do escopo B13.", "success");
+  });
   $("#hypo-a").addEventListener("click", () => setHypothesis("A"));
   $("#hypo-b").addEventListener("click", () => setHypothesis("B"));
   $("#global-nav-toggle").addEventListener("click", () => {
@@ -1278,6 +1336,15 @@ input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
   });
   document.querySelectorAll("[data-close]").forEach((button) => {
     button.addEventListener("click", () => $("#" + button.getAttribute("data-close")).close());
+  });
+
+  $("#fx-simulate-read").addEventListener("click", () => {
+    flags.simulateRead = !flags.simulateRead;
+    $("#fx-simulate-read").setAttribute("aria-pressed", String(flags.simulateRead));
+    $("#hypo-a").disabled = !flags.simulateRead;
+    if (!flags.simulateRead && hypothesis === "A") { setHypothesisForced("B"); }
+    log(flags.simulateRead ? "Leitura NÃO ratificada simulada: hipótese A disponível para comparação." : "Leitura simulada desligada: apenas a hipótese B é realizável.");
+    renderAll();
   });
 
   const toggles = {
@@ -1306,6 +1373,9 @@ input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
   $("#fx-reset").addEventListener("click", () => {
     Object.keys(flags).forEach((k) => { flags[k] = false; });
     Object.keys(toggles).forEach((s) => $(s).setAttribute("aria-pressed", "false"));
+    $("#fx-simulate-read").setAttribute("aria-pressed", "false");
+    $("#hypo-a").disabled = true;
+    setHypothesisForced("B");
     creations = 0;
     $("#create-denied").hidden = true;
     $("#create-content").classList.remove("is-denied");
@@ -1313,7 +1383,7 @@ input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
     log("Fixture base restaurada.");
   });
 
-  setHypothesis("A");
+  setHypothesisForced("B");
   resetForm();
 })();
 
