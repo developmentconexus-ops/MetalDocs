@@ -19,7 +19,7 @@ T11 checkpoint        B01-B11 ACCEPTED / INTEGRATED
 B11-F1                ACCESS ASSIGNMENT READ PRECISION / OPERATOR-RATIFIED / INTEGRATED
 B11                   LOCKED / P8-P10 COMPLETE / INTEGRATED
 B12                   LOCKED / P8-P10 COMPLETE / INTEGRATED
-FP2 / P11             NOT OPEN
+FP2 / P11             COMPLETE / OPERATOR-ACCEPTED 2026-08-26 / INTEGRATION PENDING
 T12                   NOT OPEN
 IMPLEMENTATION         BLOCKED
 ```
@@ -39,7 +39,7 @@ Independent review uses the bounded ClaudeCode/FABLE posture and Git dialogue pr
 ```text
 FP0  Frontend Foundation                         CLOSED / 89 operations / 11 routes REBASELINED
 FP1  Block-by-block Product Experience           COMPLETE / B01-B12 LOCKED + INTEGRATED
-FP2  Integrated Low-Fidelity Product / P11       NOT OPEN
+FP2  Integrated Low-Fidelity Product / P11       COMPLETE / OPERATOR-ACCEPTED
 FP3  Whole-Product Adversarial Review / P12      NOT OPEN
 FP4  Visual Handoff + Readiness / P13-P14        NOT OPEN
 ```
@@ -103,12 +103,13 @@ B11 pattern-graduation obligation: **CLOSED 2026-08-26.** The collection / idemp
 ## Exact next action
 
 ```text
-1. FP1 is complete: B01–B12 LOCKED / INTEGRATED and the pre-FP2 pattern-graduation
-   obligation is CLOSED.
-2. The next stage decision is operator-owned: open FP2/P11 (assemble the already-LOCKED
-   blocks into the integrated low-fidelity product) through an explicit roadmap update.
-3. FP2/P11, T12 and Product implementation remain BLOCKED until later roadmap authority
-   opens them.
+1. Integrate the coherent FP2/P11 acceptance increment (Evidence preserved at
+   evidence/t11-p11-r1-accept-20260826, routed by decisions/t11-p11-acceptance-evidence.md);
+   merge only with explicit operator authorization.
+2. The next stage decision is operator-owned: open FP3/P12 (whole-product adversarial
+   walkthrough of the accepted assembled product) through an explicit roadmap update.
+3. FP3/P12, FP4/P13-P14, T12 and Product implementation remain BLOCKED until later roadmap
+   authority opens them.
 ```
 
 ## Hard stops
@@ -116,7 +117,7 @@ B11 pattern-graduation obligation: **CLOSED 2026-08-26.** The collection / idemp
 ```text
 no Product code/schema/OpenAPI/runtime/deploy implementation
 no T12 work
-no FP2/P11 work
+no FP3/P12, FP4/P13-P14 work
 no B01-B11 reopen without material Evidence
 no rewrite of Engineering Method or Frontend Method
 no force-push/shared-history rewrite

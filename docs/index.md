@@ -60,7 +60,7 @@ Large authority files are not default whole-file reads. Search the exact concept
 | Current decision dispositions | [Decision register](decisions/index.md) | Open only the owning decision named by the relevant row | Review chronology |
 | Preserved / reopen / deferred obligations | [Forward obligations](decisions/forward-obligations.md) | Owning semantic authority when closing/refining an obligation | Old decision-registry corpus |
 | Repository reset / unmerged provenance | [Repository reset](decisions/repository-reset.md) | Exact archive/Evidence ref only when byte-level provenance is required | Unmerged branches broadly |
-| Frontend LOCK/P8 Evidence recovery for later P11 | [B01–B09 locator](decisions/t11-b01-b09-lock-evidence.md) + [B10 locator](decisions/t11-b10-lock-evidence.md) + [B11 locator](decisions/t11-b11-lock-evidence.md) + [B12 locator](decisions/t11-b12-lock-evidence.md) | Exact ref/blob named by the locator | Historical Git broadly, intermediate wireframe candidates |
+| Frontend LOCK/P8 Evidence recovery for later P11 | [B01–B09 locator](decisions/t11-b01-b09-lock-evidence.md) + [B10 locator](decisions/t11-b10-lock-evidence.md) + [B11 locator](decisions/t11-b11-lock-evidence.md) + [B12 locator](decisions/t11-b12-lock-evidence.md) + [P11 acceptance locator](decisions/t11-p11-acceptance-evidence.md) | Exact ref/blob named by the locator | Historical Git broadly, intermediate wireframe candidates |
 
 ## Navigation law
 
