@@ -114,11 +114,12 @@ txt / csv     byte-size bounded by DOC_RAW_MAX_BYTES; no parsing, no formula eva
 Delivery hardening for the widened set (`wire-contract §2.9`):
 
 ```text
-Content-Disposition attachment for every format whose bytes a browser would otherwise
-render in the application origin (txt, csv, png, jpeg, and any later scriptable format);
-docx/xlsx/pptx/pdf keep their existing disposition behavior
+Content-Disposition attachment for txt, csv and any later scriptable format;
+docx/xlsx/pptx/pdf/png/jpeg keep inline disposition
 X-Content-Type-Options nosniff and no-transform remain mandatory for every format
 ```
+
+**Amendment 2026-08-26 (operator-ratified).** The first draft applied `attachment` to png and jpeg as well. That was over-broad: application-origin rendering risk comes from scriptable payloads (SVG, HTML) which are **not** vocabulary values; raster images execute nothing and are safe inline under an exact `Content-Type` plus `nosniff`. Forcing a download for a scanned certificate or an inspection photo cost experience without buying security. Scriptable formats remain excluded from the vocabulary entirely; if one is ever admitted, it carries `attachment` and its own isolation decision.
 
 Adding a later value is an ordinary bounded vocabulary decision (detector support + Content-Type + viewer/converter disposition); it is never implicit.
 
@@ -140,6 +141,29 @@ Document is then governed through download/edit-externally/upload rather than in
 This is accepted, not a defect: Template is an ordinary governed Document role (`contract §4`),
 and restricting it to DOCX would import the editing-mechanism constraint back into Product scope —
 the exact contradiction §1 corrects.
+
+## 5A. Viewing mode per format (amendment 2026-08-26, operator-ratified)
+
+The first version of this decision widened admission and download without deciding **how each format is viewed**, leaving `frontend.md` §12 (a DOCX/PDF-shaped table) without a row for the newly admitted formats. This section closes that gap; `frontend.md` §12 carries the realization table.
+
+```text
+docx              unchanged — editable in the DRAFT context, read-only elsewhere (CNT-14 adapter)
+pdf               unchanged — read-only in-app
+png / jpeg        rendered inline in-app for reading (exact Content-Type + nosniff); never editable
+txt / csv         download; never parsed, evaluated, re-encoded or rendered as a table by the app
+xlsx / pptx       download; NO in-app Office viewer is introduced
+```
+
+Governing law for every format without an in-app viewer:
+
+```text
+absence of a viewer removes NOTHING from governance
+identity, code, status, revision, effective/release dates, history, discussion, audit and access
+  behave identically and remain fully visible on the Document surface
+only the CONTENT is obtained by downloading the exact bytes
+```
+
+Explicitly not introduced: a third-party Office viewer or conversion-for-preview service (new provider, new failure domain, contrary to YAGNI and to the law that the adapter never owns semantic truth), client-side spreadsheet/presentation parsing, and any preview derived from bytes other than the exact governed ones.
 
 ## 6. Official rendition and converter availability
 

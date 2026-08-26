@@ -419,6 +419,10 @@ The frontend creates no durable `DocumentEntity`, ApprovalDTO, ArtifactViewModel
 | SourceOnly official DOCX | Release source | DOCX adapter read-only | none |
 | SourceOnly official PDF | Release source | read-only PDF | none |
 | RequireOfficialRendition(PDF) | OfficialRendition primary; Release source separately available | read-only PDF | none |
+| DRAFT PNG/JPEG | WorkingContent source | inline read-only image / replace | replacement bytes → upload/admit → DRAFT PATCH + If-Match |
+| DRAFT XLSX/PPTX/TXT/CSV | WorkingContent source | download / replace — no in-app viewer | replacement bytes → upload/admit → DRAFT PATCH + If-Match |
+| SourceOnly official PNG/JPEG | Release source | inline read-only image | none |
+| SourceOnly official XLSX/PPTX/TXT/CSV | Release source | download — no in-app viewer | none |
 | Governance | immutable Submission source | read-only decision content | governance never mutates content |
 
 DOCX adapter law:
@@ -443,7 +447,9 @@ complete DOCX bytes
 → authoritative DocumentWorkView + new ETag
 ```
 
-No second editor, EditorSession, lease, CRDT baseline, viewer-generated OfficialRendition or provider callback authority is introduced. Concrete editor/provider freeze remains subject to the already-ratified fidelity/security evidence and later runtime realization.
+A format without an in-app viewer loses no governance: identity, status, revision, dates, history, discussion, audit and access render identically; only the content is downloaded (`../decisions/content-format-vocabulary.md` §5A).
+
+No second editor, EditorSession, lease, CRDT baseline, viewer-generated OfficialRendition, third-party Office viewer, conversion-for-preview service or provider callback authority is introduced. Concrete editor/provider freeze remains subject to the already-ratified fidelity/security evidence and later runtime realization.
 
 ## 13. Feature/package topology
 

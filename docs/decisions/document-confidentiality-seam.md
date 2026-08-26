@@ -7,7 +7,8 @@ summary: Bounded future seam for in-Area document confidentiality through a gove
 
 # Document Confidentiality future seam
 
-> **Status:** CANDIDATE / AWAITING OPERATOR RATIFICATION
+> **Status:** OPERATOR-RATIFIED / CURRENT BOUNDED FUTURE-SEAM AUTHORITY
+> **Ratified:** 2026-08-26
 > **Origin:** T11 FP2-F3 — operator finding after P11 ("documento da Produção legível só por gerente e diretoria")
 > **Method:** Engineering Method v1.0.0 + Frontend Method v2.3 §3.10A / §26 (category 7)
 > **Implementation:** BLOCKED.
