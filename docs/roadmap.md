@@ -18,7 +18,7 @@ T11                   OPEN / ACTIVE
 T11 checkpoint        B01-B11 ACCEPTED / INTEGRATED
 B11-F1                ACCESS ASSIGNMENT READ PRECISION / OPERATOR-RATIFIED / INTEGRATED
 B11                   LOCKED / P8-P10 COMPLETE / INTEGRATED
-B12                   OPEN / P6-P7 NEXT
+B12                   LOCKED / P8-P10 COMPLETE / INTEGRATION PENDING
 FP2 / P11             NOT OPEN
 T12                   NOT OPEN
 IMPLEMENTATION         BLOCKED
@@ -59,7 +59,7 @@ B08   Notifications Full Inbox                    LOCKED / P8-P10 COMPLETE
 B09   Audit                                       LOCKED / P8-P10 COMPLETE
 B10   Organization Administration                 LOCKED / P8-P10 COMPLETE / INTEGRATED
 B11   Access Administration                       LOCKED / P8-P10 COMPLETE / INTEGRATED
-B12   Document Governance Administration          OPEN / P6-P7 NEXT
+B12   Document Governance Administration          LOCKED / P8-P10 COMPLETE / INTEGRATION PENDING
 ```
 
 B01–B11 exact frontend Evidence remains recoverable through their durable locators; Evidence identity/details do not belong in this roadmap.
@@ -82,6 +82,23 @@ application operations                                89 / operation 90 absent
 
 Exact Evidence is routed by `docs/decisions/t11-b11-lock-evidence.md`. Temporary `docs/work/**` is absent from `main`.
 
+## B12 acceptance result
+
+```text
+operator P8 LOCK                                      R4 / 2026-08-26
+P9 material regions / controls                        22 / 22 TRACED
+P9 B12 primary operations                             12 / 12 BOUND (ops 34–43, 50–51)
+supporting reads                                      ops 6,16,22
+B12-F1 (code/scope immutability read)                 REJECTED by operator — try-and-fail
+B12-F2 (op43 read precision)                          RATIFIED → decisions/template-configuration-read.md
+unresolved material findings                          0
+application operations                                89 unchanged
+integration                                           PENDING operator merge authorization
+```
+
+Evidence locator `docs/decisions/t11-b12-lock-evidence.md` is created at integration; until then the exact
+Evidence lives on the acceptance branch `claude/repo-context-technical-design-69t84i`.
+
 Open B11 pattern-graduation obligation:
 
 ```text
@@ -96,13 +113,14 @@ The durable rule must be derived from the proved B11 P10 Evidence (`docs/decisio
 ## Exact next action
 
 ```text
-1. Create one B12 Document Governance Administration acceptance increment from current `main`.
-2. Recover only the B12 authority pack through AGENTS → roadmap → Engineering + Frontend methods → docs/index.
-3. Run conditional P6 reference study only where a consequential UX ambiguity is real.
-4. Produce P7 layout hypotheses and resolve any blocking upstream finding before functional P8.
-5. Iterate one browser-operable low-fidelity P8; only the operator may LOCK it.
-6. After LOCK, close exact P9/P10 and integrate the coherent B12 increment.
-7. FP2/P11, T12 and Product implementation remain BLOCKED until later roadmap authority opens them.
+1. Preserve the exact B12 P8 R4 LOCK Evidence (P8 HTML + planning + P9/P10 records) under one
+   immutable evidence ref and add docs/decisions/t11-b12-lock-evidence.md as its durable locator.
+2. Remove temporary docs/work/** from the acceptance candidate and mark the B12 increment Ready.
+3. Merge the coherent B12 increment only with explicit operator authorization; then B12 = INTEGRATED.
+4. Close the open B11 pattern-graduation obligation (absorb the collection/idempotency/
+   fixture-truthfulness realization law into docs/architecture/frontend.md), now backed by
+   two-block Evidence (B11 + B12), before FP2/P11 opens.
+5. FP2/P11, T12 and Product implementation remain BLOCKED until later roadmap authority opens them.
 ```
 
 ## Hard stops
