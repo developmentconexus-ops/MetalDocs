@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>MetalDocs — B12 Document Governance Administration — P8 R1 CANDIDATE</title>
+  <title>MetalDocs — B12 Document Governance Administration — P8 R2 CANDIDATE</title>
   <style>
 :root {
   --bg: #ececec;
@@ -628,15 +628,15 @@ input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
   <div class="review">
     <header class="review-head">
       <div>
-        <div class="kicker">T11 · B12 · Document Governance Administration · P8 · R1</div>
+        <div class="kicker">T11 · B12 · Document Governance Administration · P8 · R2</div>
         <h1>Governança documental — Functional Low-Fi</h1>
         <div>Tipos de documento · Modelos</div>
       </div>
-      <div class="status">R1 CANDIDATE · AGUARDANDO OPERADOR</div>
+      <div class="status">R2 CANDIDATE · AGUARDANDO OPERADOR</div>
     </header>
 
     <p class="note">
-      <strong>Escopo R1:</strong> terceira seção do Admin Center (journeys §22) sobre as operações 34–43 e 50–51.
+      <strong>Escopo R2:</strong> terceira seção do Admin Center (journeys §22) sobre as operações 34–43 e 50–51.
       Base, rota de governança e modelos elegíveis são três verdades If-Match separadas (journeys §24) e gravam separadamente.
       Deadlines de step seguem <code>due_in_days</code> opcional (dias corridos inteiros positivos). B12-F1 (imutabilidade de
       code/scope ilegível antes da escrita) permanece aberto para adjudicação do operador: este candidato apresenta o caminho
@@ -763,6 +763,15 @@ input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
                       <div id="govpol-state" class="state-line" role="status" aria-live="polite"></div>
                     </section>
 
+                    <section class="section" aria-labelledby="rep-head">
+                      <div class="section-head">
+                        <h3 id="rep-head">Publicação oficial <span class="pill">gravada com a governança · op39 mesmo If-Match</span></h3>
+                        <button id="edit-representation" class="row-action" type="button">Editar publicação</button>
+                      </div>
+                      <p>Define <strong>o que os leitores veem</strong> quando um documento deste tipo se torna oficial: o próprio arquivo Word enviado, ou um PDF oficial gerado pelo sistema antes de o documento valer.</p>
+                      <div id="rep-view"></div>
+                    </section>
+
                     <section class="section" aria-labelledby="elig-head">
                       <div class="section-head">
                         <h3 id="elig-head">Modelos elegíveis <span class="pill">op40 ETag · op41 If-Match</span></h3>
@@ -794,6 +803,11 @@ input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
             <section class="panel" aria-label="Configuração de modelos">
               <div class="panel-head">Modelos <span class="pill">op43 · página do servidor · projeção limitada</span></div>
               <div class="panel-body">
+                <p class="help">
+                  <strong>O que é um modelo:</strong> um documento comum do acervo marcado com <em>papel de modelo</em>. Ele serve de ponto de partida
+                  ao criar novos documentos — o autor começa a partir do conteúdo efetivo do modelo em vez de uma página em branco.
+                  Para aparecer na criação, o modelo precisa de revisão efetiva <em>e</em> de estar elegível para o tipo de documento.
+                </p>
                 <p class="help">
                   Projeção de configuração apenas: code, papel de modelo, indicador de revisão efetiva, título efetivo condicional e tipos elegíveis.
                   Sem bytes, conteúdo, histórico ou autorização geral de leitura (journeys §23).
@@ -885,9 +899,9 @@ input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 
   <!-- ================= DIALOG: editar governança (op39) ================= -->
   <dialog id="dlg-governance" aria-labelledby="dlg-governance-title">
-    <div class="dialog-head"><span id="dlg-governance-title">Editar rota de governança</span><button class="row-action" type="button" data-close="dlg-governance">Fechar</button></div>
+    <div class="dialog-head"><span id="dlg-governance-title">Editar governança e publicação oficial</span><button class="row-action" type="button" data-close="dlg-governance">Fechar</button></div>
     <div class="dialog-body">
-      <p class="help">PUT integral com If-Match (op39). Attempts existentes preservam o snapshot da rota; somente attempts futuros usam a nova configuração.</p>
+      <p class="help">PUT integral com If-Match (op39): rota e publicação oficial são uma única verdade de versão e gravam juntas. Attempts existentes preservam o snapshot da rota; somente attempts futuros usam a nova configuração.</p>
       <div id="gov-editor"></div>
       <div id="dlg-governance-state" class="state-line" role="status" aria-live="polite"></div>
     </div>
@@ -1201,6 +1215,7 @@ input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
       "<dt>ETag</dt><dd><code>W/\"base-" + etags["base:" + item.id] + "\"</code></dd>";
 
     renderGovView(item);
+    renderRepView(item);
     renderEligibleView(item);
     renderPreviewControls(item);
   }
@@ -1208,21 +1223,23 @@ input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
   function renderGovView(item) {
     const view = $("#govpol-view");
     if (item.governance.mode === "no_human_approval") {
-      view.innerHTML = "<div class='read-only'><strong>Sem aprovação humana.</strong> SUBMIT segue direto para o gate de representação; nenhum step existe nesta política.</div>" +
-        representationLine(item);
+      view.innerHTML = "<div class='read-only'><strong>Sem aprovação humana.</strong> SUBMIT segue direto para o gate de publicação; nenhum step existe nesta política.</div>";
       return;
     }
     const rows = item.governance.steps.map((step, index) =>
       "<li><strong>" + (index + 1) + ". " + step.label + "</strong><span class='meta'> — " + selectorLabel(step) + " · " +
       (step.dueDays ? "prazo: " + step.dueDays + " dia(s) corrido(s) após ativação" : "sem prazo configurado") + "</span></li>"
     ).join("");
-    view.innerHTML = "<ol class='route-order'>" + rows + "</ol>" + representationLine(item) +
+    view.innerHTML = "<ol class='route-order'>" + rows + "</ol>" +
       "<div class='read-only'>ETag governança: <code>W/\"gov-" + etags["gov:" + item.id] + "\"</code>. Attempts existentes preservam o snapshot da rota vigente na criação.</div>";
   }
 
-  function representationLine(item) {
-    return "<div class='state-line'>Representação oficial: <strong>" +
-      (item.representation === "source_only" ? "somente fonte (DOCX exato)" : "exige Official Rendition (PDF)") + "</strong></div>";
+  function renderRepView(item) {
+    const view = $("#rep-view");
+    if (!view) { return; }
+    view.innerHTML = item.representation === "source_only"
+      ? "<div class='read-only'><strong>Somente fonte.</strong> O documento oficial é o próprio arquivo Word (DOCX) aprovado, byte a byte. Nenhum PDF é gerado.</div>"
+      : "<div class='read-only'><strong>Exigir PDF oficial.</strong> Antes de o documento valer, o sistema gera a renderização oficial em PDF; os leitores veem esse PDF como versão oficial.</div>";
   }
 
   function renderEligibleView(item) {
@@ -1282,15 +1299,20 @@ input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
     const stepsWrap = document.createElement("div");
     container.appendChild(stepsWrap);
 
+    const repHead = document.createElement("div");
+    repHead.className = "gov-steps-head";
+    repHead.innerHTML = "<h4>Publicação oficial</h4><span class='meta'>o que os leitores veem quando o documento vale — gravada junto com a rota (mesma versão If-Match)</span>";
+    container.appendChild(repHead);
+
     const repBox = document.createElement("div");
     repBox.className = "mode-choice";
     repBox.setAttribute("role", "radiogroup");
-    repBox.setAttribute("aria-label", "Representação oficial");
+    repBox.setAttribute("aria-label", "Publicação oficial");
     repBox.innerHTML =
       "<label><input type='radio' name='" + options.name + "-rep' value='source_only'" + (gov.representation === "source_only" ? " checked" : "") + ">" +
-      "<span><strong>Somente fonte</strong><small>o efetivo é o DOCX exato submetido.</small></span></label>" +
+      "<span><strong>Somente fonte</strong><small>o oficial é o próprio arquivo Word (DOCX) aprovado; nenhum PDF é gerado.</small></span></label>" +
       "<label><input type='radio' name='" + options.name + "-rep' value='require_official_rendition'" + (gov.representation === "require_official_rendition" ? " checked" : "") + ">" +
-      "<span><strong>Exigir Official Rendition (PDF)</strong><small>a efetivação exige a renderização oficial em PDF.</small></span></label>";
+      "<span><strong>Exigir PDF oficial</strong><small>antes de valer, o sistema gera o PDF oficial; leitores veem o PDF como versão oficial.</small></span></label>";
     container.appendChild(repBox);
 
     modeBox.addEventListener("change", (event) => {
@@ -1998,6 +2020,7 @@ input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
   $("#base-reload").addEventListener("click", reloadBase);
 
   $("#edit-governance").addEventListener("click", openGovernance);
+  $("#edit-representation").addEventListener("click", openGovernance);
   $("#governance-save").addEventListener("click", saveGovernance);
   $("#governance-reload").addEventListener("click", reloadGovernance);
 

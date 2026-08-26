@@ -72,7 +72,8 @@ Journeys §7: `DocumentType code + numbering scope` tornam-se imutáveis após o
 
 - Necessidade humana: o admin saber **antes** de editar que code/scope estão congelados.
 - Autoridade atual: a tentativa de escrita falha com problema de estado (`S`) do op37 — recuperável, não destrutivo, zero mutação.
-- Classificação proposta: **NÃO-BLOQUEANTE para P8** — o P8 apresenta honestamente o caminho de falha de estado e não simula um flag inexistente. Fica registrado para **adjudicação do operador** durante o walkthrough: `UPSTREAM FINDING` (precisão de leitura, p.ex. indicador in-use em `DocumentTypeView`) vs `REJECTED` (tentar-e-falhar é aceitável) vs `DEFERRED`.
+- Classificação proposta: **NÃO-BLOQUEANTE para P8** — o P8 apresenta honestamente o caminho de falha de estado e não simula um flag inexistente.
+- **Adjudicação do operador (2026-08-26): `REJECTED` — tentar-e-falhar basta.** O 409 é recuperável, não destrutivo e zero-mutação; editar code/scope de tipo já em uso é raro. Nenhum reopen upstream; o P8 mantém o caminho honesto de falha de estado.
 
 Nenhum outro requisito material carece de autoridade. **Nenhum finding bloqueante aberto → P8 pode iniciar.**
 
@@ -82,4 +83,15 @@ Interações materiais operáveis: lentes; master-detail; criação (op35) com c
 
 Fora de escopo (fronteiras explícitas): conteúdo/histórico de documento (B03/B07), casos de governança (B06), Organização (B10), Acesso (B11).
 
-Artefato R1: `t11-b12-document-governance-p8.html` — HTML único auto-contido (CSS/JS inline), operável direto no navegador. Evidence temporário; nunca entra em candidato de merge/`main`.
+Artefato: `t11-b12-document-governance-p8.html` — HTML único auto-contido (CSS/JS inline), operável direto no navegador. Evidence temporário; nunca entra em candidato de merge/`main`.
+
+## 5. Walkthrough R1 → revisão R2
+
+Operador operou o R1 (2026-08-26). Resultado: estrutura aprovada em geral; dois findings de P8 (interação/clareza, categoria 1 do §26 — nenhum upstream):
+
+- **R1-W1 — representação confusa dentro da rota:** `source_only`/PDF não era compreensível junto dos steps. R2: seção própria "Publicação oficial" no detalhe do tipo (leitura + botão de edição) e subseção rotulada no editor, com explicação em linguagem humana ("o que os leitores veem quando o documento vale"). Honestidade preservada: representação e rota permanecem **um único domínio If-Match (op38/39)** e gravam juntas; a separação é apenas de apresentação.
+- **R1-W2 — "Modelos" sem definição:** a lente não explicava o que é um modelo. R2: explicação em linguagem humana no topo da lente (documento do acervo com papel de modelo; ponto de partida na criação; utilizável quando tem revisão efetiva e elegibilidade no tipo).
+
+Layout/estética foram notados como mutáveis — P8 não congela paleta/tipografia (§14.4); ficam para P13.
+
+Status: **R2 CANDIDATE — aguardando nova operação do operador.**
