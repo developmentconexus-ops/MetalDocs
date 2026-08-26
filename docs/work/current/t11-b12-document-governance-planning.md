@@ -94,4 +94,46 @@ Operador operou o R1 (2026-08-26). Resultado: estrutura aprovada em geral; dois 
 
 Layout/estética foram notados como mutáveis — P8 não congela paleta/tipografia (§14.4); ficam para P13.
 
-Status: **R2 CANDIDATE — aguardando nova operação do operador.**
+Status R2: aprovado pelo operador **exceto a lente Modelos** (finding abaixo).
+
+## 6. Walkthrough R2 — lente Modelos (P6/P7 dedicado)
+
+### 6.1 Evidence do operador
+
+Repositório antigo (Evidence de referência, não autoridade): área de templates navegável, distinguindo **templates gerais** vs **templates específicos de um tipo de documento** (ex.: template só para PO). No R2 a lente é uma lista plana paginada; o operador não reconhece o trabalho ("estou vinculando template a tipo?") e questiona a organização em escala (muitos templates × muitos tipos), pedindo padrão de plataforma madura.
+
+### 6.2 P6 — referências (classe: galeria/administração de templates)
+
+Padrão dominante em plataformas maduras (Confluence template gallery, SharePoint content types + templates, Google Workspace template gallery, suites de documento controlado): a coleção de templates é **organizada pela categoria de uso** (aqui: tipo de documento), com **busca por nome** e distinção visível entre template de uso amplo e template restrito. Navegação plana por código só funciona em acervos pequenos.
+
+```text
+SOURCE OBSERVATION  galerias agrupam por categoria/tipo + busca por nome
+INFERENCE           o job do admin é "ver os templates de um tipo" e "achar um template pelo nome"
+PRODUCT DECISION    a lente Modelos deve permitir recorte por tipo elegível + busca, servidos pelo servidor
+```
+
+### 6.3 P7 — hipóteses da lente Modelos
+
+- **H1 (leading):** lente Modelos com **recorte por tipo de documento** ("todos os tipos" | tipo específico | "sem elegibilidade"), **busca por code/título efetivo** e filtro por papel/revisão efetiva — tudo **server-side** sobre op43. Generalidade apresentada como fato derivado: "elegível em N tipos" (chips), sem novo conceito de Produto.
+- **H2 (rejeitada):** manter lista plana e organizar no cliente — desonesta: o cliente só vê a página corrente do cursor; agrupar/filtrar client-side mascara o conjunto real (proibido: fixture como verdade).
+- **H3 (rejeitada):** navegar templates somente via conjunto elegível de cada tipo (op40) — cobre a direção tipo→templates mas perde o job transversal (achar template pelo nome, ver templates sem elegibilidade nenhuma, administrar papel).
+
+### 6.4 B12-F2 — UPSTREAM FINDING (bloqueante para a lente Modelos)
+
+```text
+necessidade humana provada    admin encontra/organiza templates por tipo e por nome em escala
+autoridade atual              op43 = PAGED, ordem document.code, SEM filtro/busca server-side
+classificação                 INSUFICIENTE → UPSTREAM FINDING (método §25: não degradar a coleção
+                              ao que o endpoint atual suporta)
+menor reopen proposto         precisão de leitura do op43 (espelho do precedente B11-F1/op31):
+                              filtros server-side q (code/título efetivo),
+                              eligible_document_type_id, template_role, has_effective_revision.
+                              Nenhuma operação nova, nenhuma escrita nova, censo permanece 89.
+conceito "template geral"     REJECTED como semântica nova — generalidade permanece fato derivado
+                              da elegibilidade explícita por tipo (modelo de controle do Produto);
+                              a UI a apresenta, não a inventa
+templates por Área            REJECTED — templates não são recurso de Área na autoridade atual;
+                              Evidence antigo referia-se a tipos/uso, não a escopo de Área
+```
+
+O P8 da lente Modelos não fecha antes de o operador **ratificar / rejeitar / deferir** B12-F2. As demais superfícies do R2 estão aprovadas e não dependem disso.
