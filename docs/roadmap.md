@@ -38,7 +38,7 @@ Independent review uses the bounded ClaudeCode/FABLE posture and Git dialogue pr
 
 ```text
 FP0  Frontend Foundation                         CLOSED / 89 operations / 11 routes REBASELINED
-FP1  Block-by-block Product Experience           ACTIVE
+FP1  Block-by-block Product Experience           COMPLETE / B01-B12 LOCKED + INTEGRATED
 FP2  Integrated Low-Fidelity Product / P11       NOT OPEN
 FP3  Whole-Product Adversarial Review / P12      NOT OPEN
 FP4  Visual Handoff + Readiness / P13-P14        NOT OPEN

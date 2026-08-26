@@ -597,7 +597,7 @@ Graduated from repeated operator-LOCKED behavior proved by at least two independ
 
 ### 19.1 Honest bounded-collection law
 
-Every bounded server collection surface:
+Every cursor-paginated (`PAGED`) collection surface:
 
 ```text
 render exactly the returned page in the server's returned order
@@ -613,6 +613,8 @@ render exactly the returned page in the server's returned order
 
 Proved by B11 (op6/op22/op31 traversal and op31 server-side filter identity) and re-proved by B12 (op34/op43 traversal and the ratified op43 filter identity). Shared low-level rendering may exist at implementation time only while each operation's exact first-page/continuation law remains explicit; no universal pager abstraction is implied.
 
+Deliberately complete bounded reads (e.g. selection preflights such as `ProviderSubjectSearchView`, or the `document-creation/options` arrays) are not paginated collections: they render the complete returned set and must not invent continuation state or misrepresent the bounded response.
+
 ### 19.2 Idempotent-creation recovery law
 
 Every semantic `IDEMPOTENT_CREATE` command surface:
@@ -621,9 +623,13 @@ Every semantic `IDEMPOTENT_CREATE` command surface:
 one logical intention = one client-generated Idempotency-Key
 + the composed input is frozen while an outcome is ambiguous
 + an ambiguous transport outcome retries the SAME normalized command with the SAME key
-+ a committed retry recovers the exact stored result (same status/body/identity);
-  semantic mutation count stays 1 → 1
-+ a second intention is a new key; a silent duplicate command never occurs
++ within the wire contract's semantic replay window, a committed retry recovers the exact
+  stored result (same status/body/identity); semantic mutation count stays 1 → 1
++ once that window may have expired, the same UUID is no longer replay-authoritative
+  (`wire-contract.md` §2.5): recovery goes through read reconciliation, never another
+  blind create with the expired key
++ a second intention is a new key; a silent duplicate command never occurs inside the
+  replay-authoritative window
 + semantic conflicts (e.g. duplicate code) surface the server's named cause with zero mutation
 ```
 
@@ -635,8 +641,11 @@ Planning prototypes and, later, tests/storybook-class harnesses:
 
 ```text
 a fixture may only simulate truth the accepted contracts actually supply
-+ a state the current read models cannot express is presented through its honest failure/absence
-  path, never through an invented flag or precomputed client inference
++ a state the current read models cannot express is never simulated through an invented flag
+  or precomputed client inference; during planning, a materially needed missing truth is first
+  an upstream finding under the frontend method (§3.10A/§13) — only after the Product decision
+  owner adjudicates that accepted authority intentionally owns the failure/absence path
+  (as with B12-F1) does the honest failure/absence presentation become the accepted realization
 + prototype fixtures, simulated servers, fake cursors and mutation counters are Evidence
   mechanics only — they never become Product state, read-model authority or production code
 + production realizes LOCKED semantics through the accepted architecture; it does not port
