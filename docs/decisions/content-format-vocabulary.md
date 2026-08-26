@@ -83,6 +83,42 @@ create-once / no-overwrite, OPEN→READY admission and restore verification unch
 a format outside the vocabulary is rejected at admission with validation.failed
 ```
 
+### 4.1 Structural admission laws per format
+
+The existing closed structural laws are DOCX/PDF-shaped. Widening the vocabulary requires each
+format to carry its own explicit structural law; no format is admitted with weaker protection.
+
+```text
+xlsx / pptx   valid top-level OOXML/OPC ZIP with the format's own main part
+              (SpreadsheetML workbook / PresentationML presentation)
+              INHERIT UNCHANGED from the DOCX law: duplicate canonical part names rejected,
+              absolute/parent-traversal paths rejected, symlink entries rejected,
+              no recursive expansion of embedded archives (archive depth exactly one),
+              streamed expansion enforcing the cumulative expanded-byte + entry-count ceilings
+              (DOCX_EXPANDED_MAX_BYTES / DOCX_MAX_ZIP_ENTRIES become the OOXML ceilings,
+               renamed by mechanism decision without changing their values)
+              encrypted/password-protected packages rejected
+              MACRO-ENABLED packages rejected — xlsm/pptm/docm are NOT vocabulary values
+
+pdf           unchanged: structurally parseable; encrypted/password-protected rejected
+
+png / jpeg    valid decodable image container; declared dimensions and decoded pixel budget
+              bounded before decode (decompression-bomb defense); embedded thumbnails/metadata
+              never recursively expanded
+
+txt / csv     byte-size bounded by DOC_RAW_MAX_BYTES; no parsing, no formula evaluation,
+              no encoding transformation — exact bytes are preserved verbatim
+```
+
+Delivery hardening for the widened set (`wire-contract §2.9`):
+
+```text
+Content-Disposition attachment for every format whose bytes a browser would otherwise
+render in the application origin (txt, csv, png, jpeg, and any later scriptable format);
+docx/xlsx/pptx/pdf keep their existing disposition behavior
+X-Content-Type-Options nosniff and no-transform remain mandatory for every format
+```
+
 Adding a later value is an ordinary bounded vocabulary decision (detector support + Content-Type + viewer/converter disposition); it is never implicit.
 
 ## 5. Editing versus governing
