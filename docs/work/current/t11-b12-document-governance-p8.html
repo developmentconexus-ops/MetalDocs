@@ -828,11 +828,11 @@ input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
       <div class="form-grid">
         <label for="create-code">Code</label>
         <div>
-          <input id="create-code" type="text" maxlength="12" autocomplete="off">
+          <input id="create-code" type="text" maxlength="32" autocomplete="off">
           <div class="field-hint">Normalizado: trim, maiúsculas ASCII alfanuméricas; “-” proibido (o Produto é dono do separador). Único na Company.</div>
         </div>
         <label for="create-name">Nome</label>
-        <input id="create-name" type="text" maxlength="80" autocomplete="off">
+        <input id="create-name" type="text" maxlength="256" autocomplete="off">
         <label for="create-scope">Numeração</label>
         <select id="create-scope">
           <option value="document_type">Por tipo (ex.: PO-001)</option>
@@ -863,9 +863,9 @@ input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
       <p class="help">PUT integral com If-Match sobre o ETag lido (op37). Stale → 412, zero mutação, releia e reaplique.</p>
       <div class="form-grid">
         <label for="base-code">Code</label>
-        <input id="base-code" type="text" maxlength="12" autocomplete="off">
+        <input id="base-code" type="text" maxlength="32" autocomplete="off">
         <label for="base-name">Nome</label>
-        <input id="base-name" type="text" maxlength="80" autocomplete="off">
+        <input id="base-name" type="text" maxlength="256" autocomplete="off">
         <label for="base-scope">Numeração</label>
         <select id="base-scope">
           <option value="document_type">Por tipo</option>
