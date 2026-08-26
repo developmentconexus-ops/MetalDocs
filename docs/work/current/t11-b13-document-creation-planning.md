@@ -137,3 +137,30 @@ O P8 R1 apresenta **A** como hipótese líder (custo de erro menor, coerente com
 Interações materiais: seleção progressiva tipo→área com re-leitura de op44; três modos de partida; galeria de modelos condicionada ao tipo; seletor de responsável condicionado a escopo/permissão; upload com progresso, rejeição de formato/estrutura/malware nomeadas, expiração de upload (410) e recuperação; criação idempotente com 409/ambíguo/replay; falha parcial pós-criação apresentada honestamente; 403/404 disclosure-safe; responsivo/teclado.
 
 Fora de escopo: edição de conteúdo (B04), governança/aprovação (B06), administração de tipos/modelos (B12), descoberta (B02).
+
+## 5. P8 R1 — artefato e prova
+
+Artefato: `t11-b13-document-creation-p8.html` — HTML único auto-contido (CSS/JS inline).
+
+Correção estrutural durante a construção (achado próprio, não do operador): tipo, área, modo de partida e modelo eram botões de alternância — clicar de novo **desmarcava** a escolha obrigatória, semântica errada para grupo de escolha única e fraca para leitor de tela. Convertidos para `role="radiogroup"`/`role="radio"` com `aria-checked`, seleção idempotente, tabindex rotativo e navegação por setas (método §3.13/§24: acessibilidade é estrutural).
+
+Prova automatizada (Chromium headless), 13/13:
+
+```text
+semântica de rádio nos 4 grupos + reseleção idempotente + setas             PASS
+lista de aceitos reflete o tipo (source_only aceita xlsx)                    PASS
+malware → 422 validation.content_malicious nomeado                          PASS
+estrutura inválida → 422 content_invalid + exclusão de macro nomeada         PASS
+formato detectado pelo servidor a partir dos bytes                          PASS
+410 upload_expired preserva o arquivo local; sem ressurreição de upload      PASS
+falha parcial pós-criação: documento existe, sem rollback falso,             PASS
+  sem oferta de repetir que criaria segundo documento
+hipótese A exclui fonte não conversível em tipo que exige PDF                PASS
+hipótese B aceita e avisa sobre o gate posterior                            PASS
+voltar de B para A limpa o arquivo incompatível com explicação honesta       PASS
+terminador de fronteira → B04                                               PASS
+```
+
+Sondas anteriores (17/17) cobriram disclosure progressivo op44, condicionamento do responsável a `owner.manage`, criação com código alocado pelo servidor, replay ambíguo com a mesma Idempotency-Key, 403 disclosure-safe e 404 não-divulgante.
+
+Status: **R1 CANDIDATE — aguardando operação do operador.** Decisão pendente do operador: **B13-Q1** (hipótese A vs B), comparável no próprio wireframe.
