@@ -40,3 +40,7 @@ Prova automatizada (Chromium headless): 13/13 rotas renderizam o bloco, estado d
 ## 4. Fora de escopo P11
 
 Sem redesenho de blocos; sem P12 (adversarial), P13/P14; sem implementação. Findings de integração reabrem apenas o menor escopo afetado (método §17).
+
+## 5. Aceite do operador
+
+**ACCEPTED — R1, 2026-08-26.** O operador operou o produto integrado e aceitou o P11 R1. Costura S1 adjudicada **como está**: os terminadores de fronteira internos dos blocos permanecem os do Evidence LOCKED; a travessia cross-block é da navegação global do integrador. Nenhum finding de integração aberto. FP2/P11 completo; FP3/P12 permanece decisão de roadmap do operador.
