@@ -158,3 +158,7 @@ autorização                       document.read_effective / document.read_hist
 R4: linha do modelo clicável → diálogo de detalhe com a projeção §23 completa + terminadores de fronteira "Abrir documento → continua em B03" e "Histórico → continua em B07" (método §14.3) + ação de papel. O texto do diálogo explica que revisão/aprovação vivem na tela do documento e que abri-la depende das permissões de leitura do usuário.
 
 Status: **R4 CANDIDATE — aguardando nova operação do operador.**
+
+## 8. P8 LOCK
+
+**Operador LOCK (2026-08-26): P8 R4 LOCKED.** Estrutura de interação congelada conforme método §14.4/§14.6: duas lentes (Tipos de documento / Modelos), master-detail com três domínios If-Match separados por seção, seção própria "Publicação oficial" (mesma verdade op38/39), lente Modelos com filtros/busca server-side (op43 ratificado por `template-configuration-read.md`), detalhe do modelo com projeção §23 + terminadores de fronteira B03/B07. B12-F1 REJECTED, B12-F2 RATIFICADO — nenhum finding aberto. Segue P9/P10.
