@@ -22,7 +22,11 @@ B12                   LOCKED / P8-P10 COMPLETE / INTEGRATED
 FP2 / P11             COMPLETE / OPERATOR-ACCEPTED / INTEGRATED
 FP2-F1                CREATION COVERAGE GAP / OPERATOR-DISPOSED → B13 OPEN
 FP2-F2                CONTENT-FORMAT SCOPE / OPERATOR-RATIFIED → decisions/content-format-vocabulary.md
-B13                   OPEN / P6-P7 NEXT
+FP2-F3                DOCUMENT CONFIDENTIALITY / PROMOTED TO LAUNCH SCOPE
+                      BOUNDED PRODUCT/T6 REOPEN OPEN / OPERATOR-AUTHORIZED 2026-08-27
+                      → decisions/document-confidentiality-launch.md
+B02 B03 B10 B11 B12   BOUNDED REBASELINE PENDING (FP2-F3 delta only)
+B13                   OPEN / P6-P7 NEXT / ABSORBS FP2-F3 BEFORE LOCK
 T12                   NOT OPEN
 IMPLEMENTATION         BLOCKED
 ```
@@ -63,7 +67,7 @@ B09   Audit                                       LOCKED / P8-P10 COMPLETE
 B10   Organization Administration                 LOCKED / P8-P10 COMPLETE / INTEGRATED
 B11   Access Administration                       LOCKED / P8-P10 COMPLETE / INTEGRATED
 B12   Document Governance Administration          LOCKED / P8-P10 COMPLETE / INTEGRATED
-B13   Document Creation                            OPEN / P6-P7 NEXT (FP2-F1 bounded inventory rebaseline)
+B13   Document Creation                            OPEN / P6-P7 NEXT (FP2-F1 inventory + FP2-F3 confidentiality)
 ```
 
 B01–B11 exact frontend Evidence remains recoverable through their durable locators; Evidence identity/details do not belong in this roadmap.
@@ -107,17 +111,25 @@ B11 pattern-graduation obligation: **CLOSED 2026-08-26.** The collection / idemp
 ## Exact next action
 
 ```text
-1. FP2-F2 is RATIFIED and applied: docs/decisions/content-format-vocabulary.md owns the
-   widened ContentFormat vocabulary, per-format structural admission and converter-bound
-   official rendition. Census stays 89; no operation/concept/permission added.
-2. Run B13 Document Creation P6-P7 over the recovered authority pack (op44/op46 + the
-   ratified format decision). P7 carries one open UX question adjudicated by operator
-   walkthrough: where the non-convertible-source constraint surfaces (creation-time
-   restriction vs named failure at a later gate).
-3. Iterate one browser-operable low-fidelity P8 including source-file attachment at
-   creation; only the operator may LOCK it. Then close P9/P10 and integrate.
-4. FP3/P12 opens only after B13 closes (operator sequencing decision).
-5. FP4/P13-P14, T12 and Product implementation remain BLOCKED.
+1. FP2-F3 is OPEN and authorized: docs/decisions/document-confidentiality-launch.md is the
+   bounded Product/T6 reopen promoting in-Area document confidentiality into Launch V1.
+   The semantic model stays owned by document-confidentiality-seam.md and is NOT reopened;
+   only its future-only disposition is. The non-hierarchical class law is decided.
+2. Adjudicate FP2-F3 open questions Q1-Q5 by operator walkthrough (who classifies at
+   creation; class vocabulary scope; default-class representation; hidden-result honesty
+   in collection reads; whether governance routing confers read).
+3. Run B13 Document Creation P6-P7 over the recovered authority pack (op44/op46, the
+   ratified format decision, and the FP2-F3 delta). B13 must absorb confidentiality
+   BEFORE LOCK — the reopen was authorized precisely to avoid retrofitting it.
+4. Prove the FP2-F3 census/idempotency/ETag deltas against api-operation-census.md and
+   the T3 equation delta against authorization-and-audit.md, then update Product contract
+   §4/§6. Ratification is operator-only.
+5. Bounded rebaseline of B02/B03/B10/B11/B12 for the FP2-F3 delta only; proved regions
+   untouched. Then re-integrate FP2/P11.
+6. FP3/P12 opens only after B13 and the FP2-F3 rebaseline close.
+7. FP4/P13-P14, T12 and Product implementation remain BLOCKED.
+
+Launch scope remains 89 operations until FP2-F3 is ratified.
 ```
 
 ## Hard stops

@@ -7,7 +7,7 @@ summary: Bounded future seam for in-Area document confidentiality through a gove
 
 # Document Confidentiality future seam
 
-> **Status:** OPERATOR-RATIFIED / CURRENT BOUNDED FUTURE-SEAM AUTHORITY
+> **Status:** OPERATOR-RATIFIED / SEMANTIC MODEL CURRENT — FUTURE-SEAM DISPOSITION UNDER OPEN PROMOTION REOPEN (`document-confidentiality-launch.md`)
 > **Ratified:** 2026-08-26
 > **Origin:** T11 FP2-F3 — operator finding after P11 ("documento da Produção legível só por gerente e diretoria")
 > **Method:** Engineering Method v1.0.0 + Frontend Method v2.3 §3.10A / §26 (category 7)
@@ -194,4 +194,14 @@ Firing the trigger does **not** by itself change scope. Promotion from future se
 Launch scope is a Product/T6 bounded reopen and requires explicit operator ratification.
 It is registered as `SEC-07` in `forward-obligations.md`.
 
-Until that reopen is ratified, preserve the seam and implement no dormant capability.
+```text
+2026-08-27  PROMOTION REOPEN OPENED / OPERATOR-AUTHORIZED
+            → docs/decisions/document-confidentiality-launch.md
+            The operator authorized opening the Product/T6 bounded reopen BEFORE B13
+            LOCK, so the creation surface absorbs the capability instead of being
+            retrofitted. This page's semantic model, exclusions and proof obligations
+            are carried forward unchanged; only the FUTURE disposition is superseded.
+```
+
+Until that reopen is ratified, Launch scope stays at 89 operations and no confidentiality
+capability is implemented.
