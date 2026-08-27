@@ -125,39 +125,78 @@ Product/T6 reopen" is satisfied by **this** instrument once ratified — not bef
 New typed, additive facts only: class created / updated / archived, grant issued /
 revoked, document reclassified. No historical Audit meaning is rewritten (seam S4).
 
-## 4. Open questions for P6/P7 (not decided here)
+## 4. Adjudicated questions (OPERATOR-RATIFIED 2026-08-27)
+
+### Q1 — Who classifies at creation
 
 ```text
-Q1  WHO CLASSIFIES AT CREATION
-    (a) the author, restricted to classes they themselves hold clearance for — prevents
-        an author making a document unreadable to everyone including themselves
-    (b) access.manage only, with creation always defaulting to unrestricted
-    Reclassification after creation is access.manage in both hypotheses.
-
-Q2  SCOPE OF A CLASS VOCABULARY
-    Company-wide vocabulary, or classes declared per Area? Company-wide is simpler and
-    matches DocumentType; per-Area risks re-fragmenting the org chart (seam §7).
-
-Q3  DEFAULT-CLASS REPRESENTATION
-    Is "unrestricted" a materialized vocabulary row or the absence of a class? Affects
-    read projections and the honest-collection law.
-
-Q4  COLLECTION READS
-    Restricted documents must not leak through counts, cursors or gaps (proof §9.3).
-    Whether the frontend shows "N results hidden" at all is a UX adjudication.
-
-Q5  GOVERNANCE PARTICIPANTS
-    Does an approver routed to a restricted document need clearance, or does routing
-    itself confer read? Routing-confers-read is the likely answer but must be decided,
-    audited and stated — it is a genuine confidentiality hole if left implicit.
+DECIDED  the author classifies at creation, restricted to classes for which the author
+         personally holds a current clearance grant in that scope
+         reclassification after creation requires access.manage
 ```
+
+Rationale: an author must never be able to create a Document that the author themselves
+cannot read. The restriction is a server-side admission rule on op46, never a frontend
+filter — the frontend may only render the eligible set the server projects.
+
+### Q2 — Scope of the class vocabulary
+
+```text
+DECIDED  the ConfidentialityClass vocabulary is COMPANY-WIDE
+         classes are never declared per Area
+```
+
+Rationale: a per-Area vocabulary re-fragments the organizational chart along a security
+axis, which is the exact failure seam §7 falsifies for Areas themselves. A Company-wide
+vocabulary matches how DocumentType is already configured.
+
+### Q3 — Default-class representation
+
+```text
+DECIDED  "unrestricted" is a MATERIALIZED default class row, not the absence of a class
+         every Document carries exactly one class at all times, including the default
+```
+
+Rationale: uniform read projections, and Audit can answer "what class did this Document
+carry at instant T" from typed facts with no ambiguity between "unrestricted" and
+"unknown". Launch materializes exactly one such row per Company; the seam's "no
+vocabulary materialized" statement is superseded by this promotion.
+
+### Q4 — Hidden results in collection reads
+
+```text
+DECIDED  collection reads never disclose restricted existence in ANY form
+         no count, no "N results hidden", no cursor discontinuity, no page-size gap
+         a restricted Document is indistinguishable from a Document that does not exist
+```
+
+Rationale: a count is itself a disclosure. This binds to the existing honest bounded-
+collection law (`frontend.md` §19.1): filtering happens server-side before pagination,
+so page sizes stay truthful rather than being post-filtered client-side.
+
+### Q5 — Governance participants
+
+```text
+DECIDED  governance routing does NOT confer read
+         an actor routed into a Governance Step on a restricted Document must hold a
+         current clearance for that Document's class, exactly like any other reader
+```
+
+Rationale: if routing conferred read, adding an actor to a route would be an
+unaudited path around the entire confidentiality model.
+
+Accepted cost, stated rather than hidden: a Governance Route on a restricted Document
+requires cleared approvers. The product must fail this **loudly and early** — at
+submission, naming the uncleared actor — never silently at the moment the actor opens
+the Step. This is a named P7 blocking-law obligation for B06 and B13.
 
 ## 5. Blocks reopened (bounded rebaseline, Frontend Method §5.3)
 
 ```text
 B13  Document Creation      OPEN — absorbs the class field before LOCK. No rework:
                             this reopen was authorized BEFORE B13 P8 was locked.
-B02  Library / Discovery    class label + filter; hidden-result honesty
+B02  Library / Discovery    class label + filter; total non-disclosure per Q4
+B06  Governance Case        uncleared-approver refusal at submission per Q5
 B03  Document Official      class display + reclassify affordance
 B11  Access Administration  ConfidentialityGrant administration + multi-class issuance
 B10 / B12  Administration   class vocabulary administration (owner adjudicated at P6)
@@ -185,7 +224,7 @@ This instrument is OPEN. It becomes current authority only after:
 
 ```text
 P6 reference study + P7 blocking law for the reopened blocks
-Q1-Q5 adjudicated by the operator
+Q1-Q5 adjudicated by the operator                                    DONE 2026-08-27
 census / idempotency / ETag deltas proved against api-operation-census.md
 T3 equation delta accepted in authorization-and-audit.md
 Product contract §4 concept + §6 scope tier updated

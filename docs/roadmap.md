@@ -25,7 +25,8 @@ FP2-F2                CONTENT-FORMAT SCOPE / OPERATOR-RATIFIED → decisions/con
 FP2-F3                DOCUMENT CONFIDENTIALITY / PROMOTED TO LAUNCH SCOPE
                       BOUNDED PRODUCT/T6 REOPEN OPEN / OPERATOR-AUTHORIZED 2026-08-27
                       → decisions/document-confidentiality-launch.md
-B02 B03 B10 B11 B12   BOUNDED REBASELINE PENDING (FP2-F3 delta only)
+B02 B03 B06 B10       BOUNDED REBASELINE PENDING (FP2-F3 delta only)
+B11 B12               BOUNDED REBASELINE PENDING (FP2-F3 delta only)
 B13                   OPEN / P6-P7 NEXT / ABSORBS FP2-F3 BEFORE LOCK
 T12                   NOT OPEN
 IMPLEMENTATION         BLOCKED
@@ -115,9 +116,9 @@ B11 pattern-graduation obligation: **CLOSED 2026-08-26.** The collection / idemp
    bounded Product/T6 reopen promoting in-Area document confidentiality into Launch V1.
    The semantic model stays owned by document-confidentiality-seam.md and is NOT reopened;
    only its future-only disposition is. The non-hierarchical class law is decided.
-2. Adjudicate FP2-F3 open questions Q1-Q5 by operator walkthrough (who classifies at
-   creation; class vocabulary scope; default-class representation; hidden-result honesty
-   in collection reads; whether governance routing confers read).
+2. FP2-F3 Q1-Q5 are OPERATOR-RATIFIED (2026-08-27): author classifies at creation within
+   own clearance; Company-wide vocabulary; materialized default class; total
+   non-disclosure in collection reads; governance routing does NOT confer read.
 3. Run B13 Document Creation P6-P7 over the recovered authority pack (op44/op46, the
    ratified format decision, and the FP2-F3 delta). B13 must absorb confidentiality
    BEFORE LOCK — the reopen was authorized precisely to avoid retrofitting it.
