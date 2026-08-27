@@ -684,6 +684,7 @@ input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
         <button id="fx-struct" type="button" aria-pressed="false">Arquivo → estrutura inválida</button>
         <button id="fx-403" type="button">/documents/new → 403</button>
         <button id="fx-404" type="button" aria-pressed="false">Tipo pedido → 404</button>
+        <button id="fx-no-clearance" type="button" aria-pressed="false">Autor sem habilitações</button>
         <button id="fx-simulate-read" type="button" aria-pressed="false">Simular leitura NÃO ratificada (habilita hipótese A)</button>
       </div>
       <div id="fixture-log" class="fixture-log" role="status" aria-live="polite">Fixture base restaurada. Criações: 0.</div>
@@ -808,8 +809,16 @@ input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
                   <div id="meta-state" class="state-line" role="status" aria-live="polite"></div>
                 </section>
 
+                <section class="section" aria-labelledby="conf-head">
+                  <div class="section-head"><h3 id="conf-head">Confidencialidade <span class="pill">FP2-F3 · op46</span></h3></div>
+                  <p class="help">Classes vêm do servidor e são apenas aquelas para as quais <strong>você</strong> tem habilitação vigente (Q1) — ninguém pode criar um documento que nem ele próprio consegue ler. Classes são independentes: nenhuma engloba outra. Reclassificar depois exige <code>access.manage</code>.</p>
+                  <div id="classes" class="list" role="radiogroup" aria-label="Classe de confidencialidade"></div>
+                  <div id="class-state" class="state-line" role="status" aria-live="polite"></div>
+                  <div id="class-gov" class="boundary-note" hidden></div>
+                </section>
+
                 <section class="section" aria-labelledby="audience-head">
-                  <div class="section-head"><h3 id="audience-head">Quem poderá ler <span class="pill">consequência da Área</span></h3></div>
+                  <div class="section-head"><h3 id="audience-head">Quem poderá ler <span class="pill">Área + classe</span></h3></div>
                   <div id="audience-region" class="read-only"></div>
                 </section>
 
@@ -888,6 +897,20 @@ input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
     { id: "ar-003", code: "RH",  name: "Recursos Humanos" },
     { id: "ar-004", code: "MNT", name: "Manutenção" }
   ];
+  /* FP2-F3: Company-wide ConfidentialityClass vocabulary (Q2). "Sem restrição" is a
+     MATERIALIZED default row (Q3), never the absence of a class. Classes are additive and
+     NON-HIERARCHICAL: none implies or dominates another. */
+  const CLASSES = [
+    { id: "cc-000", name: "Sem restrição",        isDefault: true },
+    { id: "cc-001", name: "Comercial · Vendas",   isDefault: false },
+    { id: "cc-002", name: "Comercial · Gerência", isDefault: false },
+    { id: "cc-003", name: "Diretoria",            isDefault: false }
+  ];
+  /* Q1: the SERVER projects only the classes for which the author personally holds a
+     current clearance grant. The default class is always among them. The frontend never
+     computes this set and never filters a wider one. */
+  const MY_CLEARANCES = ["cc-000", "cc-001", "cc-002"];
+
   const TEMPLATES = [
     { docId: "doc-101", code: "FRM-001",     title: "Modelo de ata de reunião",         rev: "REV002", types: ["dt-003"], fmt: "docx" },
     { docId: "doc-102", code: "FRM-002",     title: "Modelo de checklist de inspeção",  rev: "REV001", types: ["dt-003", "dt-006"], fmt: "docx" },
@@ -921,19 +944,21 @@ input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
     { name: "registro-lote.csv",         fmt: "csv",  size: 8192 }
   ];
 
-  const flags = { simulateRead: false, noOwner: false, conflict: false, ambiguous: false, uploadFail: false, upload410: false, malware: false, struct: false, notFound: false };
+  const flags = { simulateRead: false, noOwner: false, conflict: false, ambiguous: false, uploadFail: false, upload410: false, malware: false, struct: false, notFound: false, noClearance: false };
   let hypothesis = "B";
   let creations = 0;
   let idempotencyKey = null;
-  const state = { typeId: null, areaId: null, mode: null, tplId: null, file: null, ownerId: null, pendingAmbiguous: false, created: false };
+  const state = { typeId: null, areaId: null, mode: null, tplId: null, file: null, ownerId: null, classId: "cc-000", pendingAmbiguous: false, created: false };
 
   const typeOf = (id) => TYPES.find((t) => t.id === id);
   const areaOf = (id) => AREAS.find((a) => a.id === id);
   const tplOf  = (id) => TEMPLATES.find((t) => t.docId === id);
+  const classOf = (id) => CLASSES.find((c) => c.id === id);
 
   /* ---------------- op44 simulated server (wire §2.7 progressive law) ---------------- */
   function serverOptions() {
-    const view = { areas: [...AREAS], types: [...TYPES], templates: [], ownerCandidates: null, defaultOwner: USERS[0] };
+    const view = { areas: [...AREAS], types: [...TYPES], templates: [], ownerCandidates: null, defaultOwner: USERS[0],
+      classes: CLASSES.filter((c) => c.isDefault || (!flags.noClearance && MY_CLEARANCES.includes(c.id))) };
     if (state.typeId) view.templates = TEMPLATES.filter((t) => t.types.includes(state.typeId)).sort((a, b) => a.code.localeCompare(b.code));
     if (state.areaId && !flags.noOwner) view.ownerCandidates = [...USERS];
     return view;
@@ -1120,18 +1145,67 @@ input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
     region.appendChild(el("div", "field-hint", "Candidatos fornecidos pelo servidor porque você tem document.owner.manage neste escopo (wire §2.7)."));
   }
 
+  function renderClasses() {
+    const box = $("#classes"); box.innerHTML = "";
+    const offered = serverOptions().classes;
+    if (!offered.some((c) => c.id === state.classId)) { state.classId = offered[0].id; }
+    offered.forEach((c) => {
+      const meta = c.isDefault
+        ? "<span class='meta'>Sem termo adicional: valem apenas as permissões de leitura da Área ou da Empresa.</span>"
+        : "<span class='meta'>Só lê quem tiver leitura na Área/Empresa <strong>E</strong> habilitação vigente para esta classe.</span>";
+      const button = el("button", "list-button", "<span><strong>" + c.name + "</strong>" + meta + "</span>");
+      button.type = "button";
+      button.setAttribute("role", "radio");
+      button.setAttribute("aria-checked", String(state.classId === c.id));
+      if (state.classId === c.id) { button.classList.add("active"); }
+      button.addEventListener("click", () => {
+        if (state.classId === c.id) { return; }
+        state.classId = c.id;
+        renderClasses(); renderAudience();
+      });
+      box.appendChild(button);
+    });
+    wireRadioGroup(box);
+    const hidden = CLASSES.length - offered.length;
+    setState($("#class-state"),
+      hidden > 0
+        ? "O servidor projetou " + offered.length + " de um vocabulário maior: as demais classes não são oferecidas porque você não tem habilitação para elas. A contagem total do vocabulário é conhecida aqui apenas por ser dado de configuração, nunca por dedução sobre documentos."
+        : "Todas as classes do vocabulário estão disponíveis para você.",
+      hidden > 0 ? "warn" : "");
+
+    /* Q5: routing does NOT confer read — a restricted document needs cleared approvers. */
+    const gov = $("#class-gov");
+    const chosen = classOf(state.classId);
+    if (chosen && !chosen.isDefault) {
+      gov.hidden = false;
+      gov.innerHTML = "<strong>Consequência na governança.</strong> Ser roteado para aprovar <em>não</em> concede leitura. " +
+        "Ao submeter este documento, qualquer aprovador da rota que não tenha habilitação para <strong>" + chosen.name + "</strong> " +
+        "será recusado ali, com o nome dito — nunca silenciosamente no momento em que ele abrir a etapa.";
+    } else {
+      gov.hidden = true; gov.innerHTML = "";
+    }
+  }
+
   function renderAudience() {
     const region = $("#audience-region");
     const area = areaOf(state.areaId);
+    const chosen = classOf(state.classId);
     if (!area) {
-      region.innerHTML = "<strong>Escolha a Área para saber quem poderá ler.</strong><span class='meta'>A Área do Documento é o que delimita a audiência: não existe seleção de leitores por documento.</span>";
+      region.innerHTML = "<strong>Escolha a Área para saber quem poderá ler.</strong><span class='meta'>A audiência é a Área somada à classe de confidencialidade. Não existe seleção de leitores documento a documento.</span>";
+      return;
+    }
+    const areaRule = "quem tiver permissão de leitura na Área " + area.code + " · " + area.name + ", ou em toda a Empresa";
+    if (chosen.isDefault) {
+      region.innerHTML =
+        "<strong>Quando EFETIVO, este documento poderá ser lido por " + areaRule + ".</strong>" +
+        "<span class='meta'>Classe <em>Sem restrição</em>: nenhum termo além da Área. O acesso é administrado centralmente em Acesso (B11) por Função e Escopo, nunca escolhido documento a documento. Trocar a Área muda a audiência; esta tela não concede nem restringe acesso.</span>";
       return;
     }
     region.innerHTML =
-      "<strong>Quando este documento estiver EFETIVO, poderá ser lido por quem tiver permissão de leitura na Área " +
-      area.code + " · " + area.name + ", ou em toda a Empresa.</strong>" +
-      "<span class='meta'>O acesso é administrado centralmente em Acesso (B11) por Função e Escopo — nunca escolhido documento a documento. " +
-      "Trocar a Área muda a audiência. Esta tela não concede nem restringe acesso.</span>";
+      "<strong>Quando EFETIVO, este documento poderá ser lido por " + areaRule + " <em>e</em> que tenha habilitação vigente para a classe " + chosen.name + ".</strong>" +
+      "<span class='meta'>As duas condições são conjuntivas: faltando qualquer uma, a leitura é negada. Retirar a habilitação de alguém retira a leitura imediatamente — não há cópia de permissão em cache. " +
+      "Para quem não tem habilitação, este documento não aparece em busca, listagem nem contagem: ele é indistinguível de um documento inexistente. " +
+      "Habilitações são concedidas em Acesso (B11) a pessoas ou grupos, nunca escolhidas aqui documento a documento.</span>";
   }
 
   function renderSubmit() {
@@ -1149,7 +1223,7 @@ input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
     $("#submit-hint").textContent = state.created ? "" : (missing.length ? "Falta: " + missing.join(", ") + "." : "Pronto para criar.");
   }
 
-  function renderAll() { renderTypes(); renderAreas(); renderModes(); renderOwner(); renderAudience(); renderSubmit(); }
+  function renderAll() { renderTypes(); renderAreas(); renderModes(); renderOwner(); renderClasses(); renderAudience(); renderSubmit(); }
 
   /* ---------------- source file selection (ops 59/60 admission) ---------------- */
   function revalidateFile() {
@@ -1265,7 +1339,9 @@ input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
       "<dt>Tipo / Área</dt><dd>" + type.code + " · " + area.code + "</dd>" +
       "<dt>Título</dt><dd>" + $("#title").value.trim() + "</dd>" +
       "<dt>Responsável</dt><dd>" + ownerName + "</dd>" +
-      "<dt>Quem poderá ler</dt><dd>quem tiver leitura na Área " + area.code + " ou em toda a Empresa</dd>" +
+      "<dt>Confidencialidade</dt><dd>" + classOf(state.classId).name + (classOf(state.classId).isDefault ? "" : " <span class='pill'>termo conjuntivo</span>") + "</dd>" +
+      "<dt>Quem poderá ler</dt><dd>quem tiver leitura na Área " + area.code + " ou em toda a Empresa" +
+        (classOf(state.classId).isDefault ? "" : " <strong>e</strong> habilitação para " + classOf(state.classId).name) + "</dd>" +
       seeded +
       "<dt>Idempotency-Key</dt><dd><code>" + idempotencyKey + "</code></dd>";
     setState($("#created-attachment"), attachmentText, attachmentKind);
@@ -1286,7 +1362,7 @@ input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 
   function resetForm() {
     state.typeId = null; state.areaId = null; state.mode = null; state.tplId = null;
-    state.file = null; state.ownerId = null; state.pendingAmbiguous = false; state.created = false;
+    state.file = null; state.ownerId = null; state.classId = "cc-000"; state.pendingAmbiguous = false; state.created = false;
     idempotencyKey = null;
     $("#title").value = "";
     if ($("#dlg-created").open) { $("#dlg-created").close(); }
@@ -1294,7 +1370,7 @@ input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
     $("#create-retry").hidden = true;
     $("#create-again").hidden = true;
     $("#file-picked").hidden = true;
-    ["#type-state", "#area-state", "#meta-state", "#upload-state", "#create-state", "#mode-note"].forEach((s) => setState($(s), "", null));
+    ["#type-state", "#area-state", "#meta-state", "#upload-state", "#create-state", "#mode-note", "#class-state"].forEach((s) => setState($(s), "", null));
     renderAll();
   }
 
@@ -1350,7 +1426,7 @@ input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
   const toggles = {
     "#fx-no-owner": "noOwner", "#fx-create-conflict": "conflict", "#fx-create-ambiguous": "ambiguous",
     "#fx-upload-fail": "uploadFail", "#fx-upload-410": "upload410", "#fx-malware": "malware",
-    "#fx-struct": "struct", "#fx-404": "notFound"
+    "#fx-struct": "struct", "#fx-404": "notFound", "#fx-no-clearance": "noClearance"
   };
   Object.entries(toggles).forEach(([selector, key]) => {
     $(selector).addEventListener("click", () => {

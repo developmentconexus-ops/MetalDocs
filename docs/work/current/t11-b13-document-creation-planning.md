@@ -282,3 +282,66 @@ regressões                replay ambíguo 1→1, honestidade da falha parcial, 
 
 Zero erros de console.
 
+
+---
+
+## 7. FP2-F3 — Confidencialidade dentro do B13 (P6/P7, 2026-08-27)
+
+Autoridade: `docs/decisions/document-confidentiality-launch.md` (reopen bounded aberto e
+autorizado pelo operador) + `document-confidentiality-seam.md` (modelo semântico, inalterado).
+
+### 7.1 P6 — referências (já levantadas, reutilizadas)
+
+```text
+Veeva Vault   Dynamic Access Control — metadado do documento dirige o grupo; sem ordem entre níveis
+Qualio        private tags ligadas a User Groups; mapeamento central; irrestrito por padrão
+M-Files       automatic permissions por propriedade/classe; ACL nomeada é secundária
+CONVERGÊNCIA  classificação governada, mapeada centralmente. Nunca seletor de pessoas por documento.
+              Nenhuma das três usa níveis ordenados → lei não-hierárquica (reopen §2.1).
+```
+
+### 7.2 P7 — leis bloqueantes que a tela precisa obedecer
+
+```text
+L1  o conjunto de classes é PROJETADO pelo servidor e contém apenas aquelas para as quais o
+    autor tem habilitação vigente (Q1). O frontend nunca calcula nem filtra um conjunto maior.
+L2  a classe default é uma linha materializada (Q3); todo documento tem exatamente uma classe.
+L3  a audiência é enunciada como REGRA CONJUNTIVA (Área/Empresa E habilitação), nunca como
+    enumeração de pessoas.
+L4  a tela declara a não-divulgação total (Q4): sem contagem, sem lacuna, sem "N ocultos".
+L5  a tela declara que roteamento NÃO concede leitura (Q5) e que a recusa acontece na submissão,
+    com o nome dito — nunca silenciosamente na abertura da etapa.
+L6  a classe nunca aparece no código alocado (lei de não-identidade, seam §5.3).
+L7  reclassificar não é oferecido aqui: exige access.manage e vive no B03.
+```
+
+### 7.3 R4 — realização
+
+Nova seção canônica **Confidencialidade** (`.list` + `role=radiogroup` + `.state-line` +
+`.boundary-note`), inserida antes de "Quem poderá ler". A seção de audiência foi reescrita
+para enunciar a regra conjuntiva, a revogação viva e a indistinguibilidade. O diálogo de
+resultado passa a carregar a classe e a consequência de leitura.
+
+Fixture nova: **Autor sem habilitações** → o servidor projeta somente a classe default.
+
+### 7.4 Prova (Chromium headless)
+
+```text
+suíte R3 (regressão)   17 / 17 PASS
+suíte R4 (FP2-F3)      16 / 16 PASS
+                       -----------
+total                  33 / 33 PASS
+```
+
+Regressão real encontrada e corrigida durante a prova: o ramo da classe default havia
+perdido a frase invariante "nunca escolhido documento a documento". Corrigido no HTML,
+não no teste.
+
+### 7.5 Pendências de operador
+
+```text
+B13 R4      operar e LOCK (só o operador trava)
+B13-Q1      hipótese A (restringir na criação) ou B (falhar em portão posterior)
+B13-F1      decidir se abre achado upstream pedindo que op44 projete escopo de numeração /
+            política de representação / formato do modelo
+```
