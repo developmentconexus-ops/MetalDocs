@@ -98,7 +98,7 @@ ASY-02 is therefore no longer a forward DEFERRED obligation and is excluded from
 - **SEC-04 — DEFERRED** — Pooled/shared multi-customer tenancy is not Launch; stable Company identity preserves the seam.
 - **SEC-05 — DEFERRED** — Customer-company lifecycle/portability deletion/export is not Launch.
 - **SEC-06 — DEFERRED** — Generic eDiscovery/PKI/TSA/HSM/signature/quarantine platform absent a concrete requirement.
-- **SEC-07 — REOPEN / OPEN** — In-Area document confidentiality. The operator named a concrete consumer (one Area holding documents legible only to vendedores, others only to gerência, others only to diretoria), firing seam trigger §10.1, and authorized promotion to Launch scope on 2026-08-27. The bounded Product/T6 reopen is open in `document-confidentiality-launch.md`; the semantic model, permanent exclusions and proof obligations remain owned by `document-confidentiality-seam.md`. Launch scope stays at 89 operations until that reopen is ratified.
+- **SEC-07 — REOPEN / OPEN** — In-Area document confidentiality. The operator named a concrete consumer (one Area holding documents legible only to vendedores, others only to gerência, others only to diretoria), firing seam trigger §10.1, and authorized promotion to Launch scope on 2026-08-27. The bounded Product/T6 reopen is open in `document-confidentiality-launch.md`; the semantic model, permanent exclusions and proof obligations remain owned by `document-confidentiality-seam.md`. The reopen is now a ratification candidate: its deltas are written into the owning authorities (census 97, T3 clearance term, contract §4/§6) and await operator merge authorization. The frontend rebaseline of B02/B03/B06/B10/B11/B12 remains outstanding.
 
 ## Count proof
 

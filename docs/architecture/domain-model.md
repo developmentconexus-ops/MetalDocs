@@ -39,9 +39,19 @@ GroupMembership
 product Role vocabulary
 product Permission vocabulary
 RoleAssignment
+ConfidentialityClass vocabulary
+ConfidentialityGrant
 ```
 
-Role/Permission semantics are product-owned, not customer-defined platform data. RoleAssignment is current grant truth over `User | Group` and `Company | Area` scopes. Exact current roles, permissions, bundles and check sites belong T3. No role is a domain-governance bypass.
+Role/Permission semantics are product-owned, not customer-defined platform data. RoleAssignment is current grant truth over `User | Group` and `Company | Area` scopes.
+
+`ConfidentialityClass` is a Company-configured vocabulary whose authorization semantics are
+product-owned, exactly like Role. Classes are additive and non-hierarchical. Exactly one
+distinguished default class per Company means "unrestricted"; every Document carries exactly
+one class at all times, so absence never has to be distinguished from "unknown".
+`ConfidentialityGrant` is current clearance truth over the same `User | Group` and
+`Company | Area` vocabularies. It is a second independent axis, never a Role and never a
+Permission. Exact current roles, permissions, bundles and check sites belong T3. No role is a domain-governance bypass.
 
 ### Controlled Documents
 
@@ -181,6 +191,8 @@ Native history must never be fabricated to normalize imported history. T7 choose
 ## 5. Explicitly absent from Launch T1
 
 ```text
+per-document ACL / access control entry
+external / guest / public-link access subject
 standalone Artifact semantic owner
 DocumentTypeCategory taxonomy
 generic Dictionary/System Value platform

@@ -153,7 +153,7 @@ Recommending it would create irreversible damage in a customer's estate. Hence S
 ```text
 capability delta            ZERO
 new module/table/permission NONE
-new operation               NONE — census remains 89
+new operation               NONE at seam time — superseded by the promotion reopen
 UI surface                  NONE; the creation surface exposes no confidentiality control
 ```
 
@@ -203,5 +203,6 @@ It is registered as `SEC-07` in `forward-obligations.md`.
             are carried forward unchanged; only the FUTURE disposition is superseded.
 ```
 
-Until that reopen is ratified, Launch scope stays at 89 operations and no confidentiality
-capability is implemented.
+§8 above is the seam-time Launch consequence and is **superseded by the promotion reopen**:
+the capability is now Launch scope. This page remains the owner of the semantic model, the
+permanent exclusions (§5.4), the Area falsification (§7) and the proof obligations (§9).
