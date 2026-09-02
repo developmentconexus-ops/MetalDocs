@@ -666,3 +666,25 @@ Proved by B11 (raw op6 eligibility truth, 201/204 reconciliation without client 
 A violation of any law above in later planning, review or implementation is a defect against accepted architecture, not a stylistic preference.
 
 Current integration, stage progression, implementation permission and exact next action are owned exclusively by `../roadmap.md`.
+
+### 19.4 Confidentiality non-disclosure law (FP2-F3)
+
+A restricted Document is not "hidden" by the frontend — the frontend never learns it exists.
+Three consequences bind every surface:
+
+```text
+NEVER COMPUTE     the frontend never evaluates clearance and never filters a wider server
+                  set. The assignable-class list on creation is the exact op44 projection.
+NEVER COUNT       no surface renders "N results hidden", a shortfall explanation, a page gap
+                  or any affordance derived from a difference between requested and returned
+                  rows. Server-side filtering happens BEFORE pagination (§19.1), so page
+                  sizes are truthful rather than post-filtered.
+ALWAYS STATE      where a class is chosen or displayed, the read consequence is stated as a
+                  RULE ("readers with permission in this Area or Company-wide AND clearance
+                  for this class"), never as an enumeration of people. There is no
+                  per-document people picker anywhere in the product.
+```
+
+A 404 on a restricted Document is an ordinary non-disclosure result and must be presented
+exactly like any other 404 — never as "you lack clearance", which would itself disclose
+existence.

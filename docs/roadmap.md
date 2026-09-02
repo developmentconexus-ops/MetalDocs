@@ -22,8 +22,8 @@ B12                   LOCKED / P8-P10 COMPLETE / INTEGRATED
 FP2 / P11             COMPLETE / OPERATOR-ACCEPTED / INTEGRATED
 FP2-F1                CREATION COVERAGE GAP / OPERATOR-DISPOSED → B13 OPEN
 FP2-F2                CONTENT-FORMAT SCOPE / OPERATOR-RATIFIED → decisions/content-format-vocabulary.md
-FP2-F3                DOCUMENT CONFIDENTIALITY / PROMOTED TO LAUNCH SCOPE
-                      BOUNDED PRODUCT/T6 REOPEN OPEN / OPERATOR-AUTHORIZED 2026-08-27
+FP2-F3                DOCUMENT CONFIDENTIALITY / LAUNCH SCOPE
+                      RATIFICATION CANDIDATE — authority deltas written; census 89 → 97
                       → decisions/document-confidentiality-launch.md
 B02 B03 B06 B10       BOUNDED REBASELINE PENDING (FP2-F3 delta only)
 B11 B12               BOUNDED REBASELINE PENDING (FP2-F3 delta only)
@@ -140,15 +140,16 @@ Exact Evidence is routed by `docs/decisions/t11-b13-lock-evidence.md`. Temporary
    own clearance; Company-wide vocabulary; materialized default class; total
    non-disclosure in collection reads; governance routing does NOT confer read.
 3. B13 is LOCKED at R4 and INTEGRATED (PR #183, operator-authorized 2026-09-02).
-4. Prove the FP2-F3 census/idempotency/ETag deltas against api-operation-census.md and
-   the T3 equation delta against authorization-and-audit.md, then update Product contract
-   §4/§6. Ratification is operator-only.
-5. Bounded rebaseline of B02/B03/B10/B11/B12 for the FP2-F3 delta only; proved regions
+4. FP2-F3 authority deltas are WRITTEN: census 97 / 13 idempotent creations / 14 ETag
+   domains, T3 clearance term, contract §4 concept + §6 Launch Core, domain-model,
+   wire ops 90-97, persistence, frontend §19.4, validation V3/GF1. Ratification is
+   operator-only and happens by authorizing the merge.
+5. Bounded rebaseline of B02/B03/B06/B10/B11/B12 for the FP2-F3 delta only; proved regions
    untouched. Then re-integrate FP2/P11.
 6. FP3/P12 opens only after B13 and the FP2-F3 rebaseline close.
 7. FP4/P13-P14, T12 and Product implementation remain BLOCKED.
 
-Launch scope remains 89 operations until FP2-F3 is ratified.
+The census authority now reads 97. Ratification is the operator's merge authorization; `main` carries 89 until then.
 ```
 
 ## Hard stops

@@ -129,6 +129,12 @@ session cookie replay after endSession fails authentication
 ProviderSubjectBinding replacement terminates all existing ApplicationSessions for that User
 OIDC network outage does not destroy an otherwise-valid existing ApplicationSession
 non-disclosable resource stays non-disclosable
+clearance is conjunctive: revoking a ConfidentialityGrant removes read on the next
+  evaluation, with no cache to invalidate
+a Document the actor lacks clearance for is indistinguishable from a nonexistent one —
+  no count, cursor, page gap, Search hit, notification or error message differs
+Group membership drift changes clearance live without rewriting historical Audit meaning
+Audit answers "who could read this Document at instant T" from typed facts alone
 ```
 
 Minimum evidence: E2 + E3 + E4; E5 for the selected OIDC profile.
@@ -313,6 +319,8 @@ Classify live first-party target packages bidirectionally and reject every unall
 ### V3 — Authentication, Authorization, disclosure and CSRF
 
 Prove one canonical ALLOW/default-DENY authority, current revocability, fail-closed domain predicates, no provider-claim Product authorization, fail-closed OIDC binding/session admission, disclosure safety and accepted CSRF enforcement.
+
+FP2-F3 additionally requires proof that: clearance is a conjunctive term with no materialized ACL or permission cache anywhere; a reclassified Document keeps code, identity, revision ordinals, effectivity and history; collection reads and Search never leak restricted existence; creation refuses a class the author does not personally hold; and a Governance Route resolving to an uncleared candidate is refused at submission, naming the actor, rather than failing when that actor opens the Step.
 
 ### V4 — Transaction + required Audit atomicity
 

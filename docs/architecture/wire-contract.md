@@ -560,6 +560,7 @@ Current `OAS_BRANCH` families are the explicit semantic unions in §3.1, `Submis
 UserReference { user_id:Uuid, display_name?:ShortText }
 AreaReference { area_id:Uuid, code:CodeToken, name:ShortText }
 DocumentTypeReference { document_type_id:Uuid, code:CodeToken, name:ShortText }
+ConfidentialityClassReference { class_id:Uuid, name:ShortText, is_default:bool }   // FP2-F3
 DocumentReference { document_id:Uuid, code:DocumentCode } // title belongs Revision
 RevisionIdentity { revision_id:Uuid, ordinal:RevisionOrdinal }
 RevisionReference { revision:RevisionIdentity, title:LongText }
@@ -575,6 +576,7 @@ RevisionState               draft | submitted | effective | superseded | obsolet
 OpenRevisionState           draft | submitted
 UserEligibilityState        enabled | disabled
 AreaLifecycleState          active | retired
+ConfidentialityClassState   active | archived                                   // FP2-F3
 NumberingScope              document_type | document_type_area
 GovernanceMode              no_human_approval | use_governance_route
 GovernanceSelectorKind      named_user | group
@@ -715,6 +717,53 @@ CreateRoleAssignmentResult { assignment_id:Uuid }
 ```
 
 No editable Role/Permission policy API.
+
+### Confidentiality — FP2-F3
+
+> **AUTHORITY → `../decisions/document-confidentiality-launch.md` (semantic model owned by `../decisions/document-confidentiality-seam.md`).** Administration is authorized by the existing `access.manage`; no permission is added.
+
+```text
+ConfidentialityClassView { class_id:Uuid, name:ShortText, is_default:bool, state:ConfidentialityClassState }
+ConfidentialityClassPage { items:ConfidentialityClassView[], page:Page }
+CreateConfidentialityClassRequest { name:ShortText }
+CreateConfidentialityClassResult { class_id:Uuid }
+UpdateConfidentialityClassRequest { name:ShortText }
+
+ConfidentialityGrantView { grant_id:Uuid, subject:RoleAssignmentSubject, class:ConfidentialityClassReference, scope:RoleAssignmentScope }
+ReplaceConfidentialityClassStateRequest { state:ConfidentialityClassState }
+ConfidentialityGrantPage { items:ConfidentialityGrantView[], page:Page }
+CreateConfidentialityGrantRequest { subject:RoleAssignmentSubject, class_id:Uuid, scope:RoleAssignmentScope }
+CreateConfidentialityGrantResult { grant_id:Uuid }
+
+SetDocumentConfidentialityRequest { class_id:Uuid }
+```
+
+`ConfidentialityGrant` deliberately reuses `RoleAssignmentSubject` and `RoleAssignmentScope`:
+clearance is a second axis over the **same** subject/scope vocabulary, not a new one.
+
+Binding wire laws:
+
+```text
+CLASS ORDER          classes are additive and NON-HIERARCHICAL; no ordinal, level, rank or
+                     precedence field exists in any schema. Read order is name ASC only.
+EXACTLY ONE          every Document carries exactly one class; the default class is a
+                     materialized row, so no schema ever encodes "no class".
+DEFAULT IMMOVABLE    the default class cannot be archived and its is_default flag is not
+                     transferable through op92; a Company has exactly one, always.
+CREATION ADMISSION   op46 admits confidentiality_class_id only when it is the default class
+                     or the AUTHENTICATED ACTOR personally holds a current grant for it.
+                     Omitted means the default class, never "unknown".
+op44 PROJECTION      DocumentCreationOptionsView projects the COMPLETE set of classes the
+                     actor may assign — never a wider set for the client to filter (§2.7).
+NON-DISCLOSURE       a Document whose class the actor lacks clearance for is filtered
+                     SERVER-SIDE BEFORE pagination on every collection, and returns 404 on
+                     direct access. No count, cursor, page gap, Search hit, notification or
+                     error message may distinguish it from a nonexistent Document.
+NON-IDENTITY         class never appears in Document.code, numbering scope or any identity
+                     field, and never becomes a numbering dimension.
+ARCHIVAL             archiving a class (op93) never reclassifies Documents and never widens
+                     read; Documents keep the archived class until explicitly reclassified.
+```
 
 ## 3.4 Document Governance
 
@@ -1184,10 +1233,10 @@ All path `*_id` parameters are required `Uuid`. `PAGED` means §2.7. JSON reques
 
 |#|operationId|Method + path|Request/profile|Success|Headers|Query/order|Problems|
 |---:|---|---|---|---|---|---|---|
-|44|`getDocumentCreationOptions`|`GET /api/v1/document-creation/options`|`SAFE_READ`|`200 DocumentCreationOptionsView`|`JSON_NO_STORE`|optional area_id,document_type_id; §2.7|`A + N`|
+|44|`getDocumentCreationOptions`|`GET /api/v1/document-creation/options`|`SAFE_READ`|`200 DocumentCreationOptionsView`|`JSON_NO_STORE`|optional area_id,document_type_id; §2.7; **REFINED → projects assignable confidentiality classes**|`A + N`|
 |45|`listDocuments`|`GET /api/v1/documents`|`SAFE_READ`|`200 DocumentPage`|`JSON_NO_STORE`|first page q,document_type_id,area_id,responsible_owner_user_id,status(default=`effective`),limit; §2.3/2.7|`A`|
-|46|`createDocument`|`POST /api/v1/documents`|`CreateDocumentRequest` / `IDEMPOTENT_CREATE`|`201 CreateDocumentResult`|`JSON_NO_STORE`|none|`U + J + I + S + X`|
-|47|`getDocument`|`GET /api/v1/documents/{document_id}`|`SAFE_READ`|`200 DocumentOfficialView`|`JSON_NO_STORE`|none|`B + N`|
+|46|`createDocument`|`POST /api/v1/documents`|`CreateDocumentRequest` / `IDEMPOTENT_CREATE`|`201 CreateDocumentResult`|`JSON_NO_STORE`|none; **REFINED → optional confidentiality_class_id, admitted against the actor's own clearances**|`U + J + I + S + X`|
+|47|`getDocument`|`GET /api/v1/documents/{document_id}`|`SAFE_READ`|`200 DocumentOfficialView`|`JSON_NO_STORE`|none; **REFINED → projects the current confidentiality class**|`B + N`|
 |48|`getDocumentResponsibleOwner`|`GET /api/v1/documents/{document_id}/responsible-owner`|`SAFE_READ`|`200 ResponsibleOwnerView`|`JSON_ETAG`|none|`A + N`|
 |49|`replaceDocumentResponsibleOwner`|`PUT /api/v1/documents/{document_id}/responsible-owner`|`ReplaceResponsibleOwnerRequest` / `IF_MATCH_MUTATION`|`200 ResponsibleOwnerView`|`JSON_ETAG_MUTATION`|none|`U + J + N + P + S`|
 |50|`getDocumentTemplateRole`|`GET /api/v1/documents/{document_id}/template-role`|`SAFE_READ`|`200 TemplateRoleView`|`JSON_ETAG`|none|`A + N`|
@@ -1220,6 +1269,25 @@ All path `*_id` parameters are required `Uuid`. `PAGED` means §2.7. JSON reques
 |77|`withdrawObsolescenceRequest`|`PUT /api/v1/obsolescence-requests/{request_id}/withdrawal`|no body / `UNSAFE_CSRF`|`201 ObsolescenceWithdrawalView` first; `200` exact repeat|`JSON_NO_STORE`|none|`U + N + S`|
 
 Row59 is fully expressible through existing T8-C after §2.10 consumer precision.
+
+## 6.2b Confidentiality — 90→97
+
+> **AUTHORITY → `../decisions/document-confidentiality-launch.md`.** Operations 44, 46 and 47 are refined in place, not duplicated.
+
+|#|operationId|Method + path|Request/profile|Success|Headers|Query/order|Problems|
+|---:|---|---|---|---|---|---|---|
+|90|`listConfidentialityClasses`|`GET /api/v1/confidentiality-classes`|`SAFE_READ`|`200 ConfidentialityClassPage`|`JSON_NO_STORE`|`PAGED`; name ASC,class_id ASC; optional state:ConfidentialityClassState|`A`|
+|91|`createConfidentialityClass`|`POST /api/v1/confidentiality-classes`|`CreateConfidentialityClassRequest` / `IDEMPOTENT_CREATE`|`201 CreateConfidentialityClassResult`|`JSON_NO_STORE`|none|`U + J + I + S`|
+|92|`updateConfidentialityClass`|`PATCH /api/v1/confidentiality-classes/{class_id}`|`UpdateConfidentialityClassRequest` / `IF_MATCH_MUTATION`|`200 ConfidentialityClassView`|`JSON_ETAG_MUTATION`|none|`U + J + N + P + S`|
+|93|`archiveConfidentialityClass`|`PUT /api/v1/confidentiality-classes/{class_id}/state`|`ReplaceConfidentialityClassStateRequest` / `IF_MATCH_MUTATION`|`200 ConfidentialityClassView`|`JSON_ETAG_MUTATION`|none|`U + J + N + P + S`|
+|94|`listConfidentialityGrants`|`GET /api/v1/confidentiality-grants`|`SAFE_READ`|`200 ConfidentialityGrantPage`|`JSON_NO_STORE`|`PAGED`; grant_id ASC; optional user_id,group_id,class_id,scope|`A`|
+|95|`createConfidentialityGrant`|`POST /api/v1/confidentiality-grants`|`CreateConfidentialityGrantRequest` / `IDEMPOTENT_CREATE`|`201 CreateConfidentialityGrantResult`|`JSON_NO_STORE`|none|`U + J + I + S`|
+|96|`revokeConfidentialityGrant`|`DELETE /api/v1/confidentiality-grants/{grant_id}`|no body / `UNSAFE_CSRF`|`204` first revoke|`NO_STORE`|absent->404|`U + N`|
+|97|`setDocumentConfidentiality`|`PUT /api/v1/documents/{document_id}/confidentiality`|`SetDocumentConfidentialityRequest` / `IF_MATCH_MUTATION`|`200 DocumentOfficialView`|`JSON_ETAG_MUTATION`|none|`U + J + N + P + S`|
+
+Operations 90–96 require `access.manage`; op97 requires `access.manage` in Company scope or
+the Document's Area. Revoking a grant (op96) takes effect on the next authorization
+evaluation — there is no cache to invalidate.
 
 ## 6.3 Audit — 78
 

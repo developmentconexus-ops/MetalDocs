@@ -7,7 +7,7 @@ summary: Bounded Product/T6 reopen promoting in-Area document confidentiality fr
 
 # Document Confidentiality — Launch bounded reopen
 
-> **Status:** OPEN / OPERATOR-AUTHORIZED 2026-08-27 / NOT YET RATIFIED
+> **Status:** RATIFICATION CANDIDATE / OPERATOR-AUTHORIZED 2026-08-27 / authority deltas written, awaiting operator merge authorization
 > **Supersedes on ratification:** `document-confidentiality-seam.md` (future-seam disposition only; its semantic model, exclusions and proof obligations are carried forward unchanged)
 > **Origin:** operator finding after FP2/P11; trigger §10.1 of the seam decision fired
 > **Method:** Engineering Method v1.0.0 + Frontend Method v2.3 §26 category 7 (missing Product capability) + §5.3 bounded rebaseline
@@ -71,7 +71,7 @@ RECOVERABLE       ordered convenience is expressible ON TOP of independent class
 Administration ergonomics — issuing several clearances to one Group in a single
 administrative act — are a **UX obligation on B11**, never a semantic hierarchy.
 
-## 3. Launch capability delta (proposed, to be proved at P6/P7)
+## 3. Launch capability delta (written into the owning authorities)
 
 ### 3.1 Concepts
 
@@ -90,7 +90,7 @@ access.manage    administers ConfidentialityGrants and the class vocabulary
 No new permission family. This is a hard constraint of the promotion, inherited from
 seam §5.2.
 
-### 3.3 Operations — census 89 → 97 (proposed)
+### 3.3 Operations — census 89 → 97
 
 ```text
  90 GET    /api/v1/confidentiality-classes            listConfidentialityClasses
@@ -223,12 +223,19 @@ default DENY                    clearance is conjunctive; removing it removes re
 This instrument is OPEN. It becomes current authority only after:
 
 ```text
-P6 reference study + P7 blocking law for the reopened blocks
-Q1-Q5 adjudicated by the operator                                    DONE 2026-08-27
-census / idempotency / ETag deltas proved against api-operation-census.md
-T3 equation delta accepted in authorization-and-audit.md
-Product contract §4 concept + §6 scope tier updated
-explicit operator ratification
+P6 reference study + P7 blocking law for the reopened blocks             DONE 2026-08-27
+Q1-Q5 adjudicated by the operator                                       DONE 2026-08-27
+B13 absorbs the capability before LOCK                                  DONE — R4, 33/33
+census / idempotency / ETag deltas in api-operation-census.md           DONE — 97 / 13 / 14
+T3 equation delta in authorization-and-audit.md                         DONE
+Product contract §4 concept + §6 Launch Core                            DONE
+domain-model / wire-contract / persistence / frontend / validation      DONE
+bounded rebaseline of B02/B03/B06/B10/B11/B12                           PENDING
+explicit operator ratification                                          PENDING — merge
 ```
 
-Until then Launch scope remains 89 operations and no confidentiality capability is built.
+Ratification is the operator's authorization to merge these deltas. Until that merge, `main`
+still carries the 89-operation census and no confidentiality capability.
+
+The frontend rebaseline of B02/B03/B06/B10/B11/B12 remains outstanding after ratification:
+the authority now says what must be true, and the wireframes must be brought to it.

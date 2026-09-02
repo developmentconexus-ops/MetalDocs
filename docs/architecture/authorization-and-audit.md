@@ -63,11 +63,19 @@ static Role → Permission bundle
 scope match
 +
 Controlled Documents relationship/state/governance predicates
++
+CLEARANCE (FP2-F3): the Document's ConfidentialityClass is the default class
+                    OR the actor holds a current ConfidentialityGrant for that
+                    class in Company scope or the Document's Area
 =
 ALLOW
 ```
 
 Otherwise default DENY.
+
+The clearance term is **conjunctive and live**, like every other term: revoking a grant or
+removing a Group membership removes read immediately, with no cache to invalidate. It is a
+read/knowledge gate — it never widens access and never grants a permission the actor lacks.
 
 No persisted semantic authority exists for:
 
@@ -125,6 +133,10 @@ governance.act
 
 audit.read
 ```
+
+Confidentiality (FP2-F3) adds **no permission**: the class vocabulary and
+`ConfidentialityGrant` administration both live under `access.manage`, and clearance is a
+term in the read equation rather than a permission of its own.
 
 No dormant Launch permission is created for Distribution, Periodic Review, Dossier, Evidence, Records/Hold/Disposition, Governed Export, repository connectors, Training/LMS, generic Change Control, fresh-auth/eSignature, reassign/overseer/quorum/SLA or Audit export.
 
@@ -243,6 +255,17 @@ Scope compatibility:
 | `viewer` | yes | yes |
 | `governance_viewer` | yes | yes |
 
+`ConfidentialityGrant` uses the same subject and scope vocabulary:
+
+```text
+ConfidentialityGrant { subject: User | Group, class: ConfidentialityClass, scope: Company | Area }
+```
+
+Classes are **additive and non-hierarchical**, exactly like Roles (§3): no class implies,
+dominates or inherits another, and no order over classes exists in product semantics. An
+actor who should read several classes holds several grants; issuing them together is an
+administration affordance, never a semantic hierarchy.
+
 `governance_admin` is Company-wide because it manages Organization/AuthZ/DocumentType configuration. `area_manager` is intentionally Area-operational. The other roles can be delegated company-wide or per Area.
 
 No product-level last-direct-admin rule is introduced without a concrete Launch failure requirement. Bootstrap/recovery remains an explicit non-serving operations concern, never an ordinary RBAC bypass.
@@ -314,16 +337,25 @@ A Permission grant is necessary but never sufficient.
 enabled User
 + document.read_effective in Company or matching Area
 + target Revision = current EFFECTIVE
++ clearance for the Document's ConfidentialityClass
 → allow
 ```
+
+A Document failing the clearance term is not merely unreadable: it must be
+**indistinguishable from a Document that does not exist**. No count, cursor, page gap,
+Search hit, notification or error message may disclose its existence.
 
 ### Historical read
 
 ```text
 enabled User
 + document.read_history in Company or matching Area
++ clearance for the Document's ConfidentialityClass
 → read authorized immutable Revision/Submission/governance history
 ```
+
+Clearance is evaluated against the Document's **current** class. Reclassification therefore
+changes who may read history going forward; it never rewrites what the history says.
 
 ### Working read/edit/submit/withdraw/revise
 
@@ -350,8 +382,14 @@ Ordinary `author` therefore does not receive blanket Area edit authority. `area_
 ```text
 document.create in Company or matching Area
 + active DocumentType / Area eligibility
++ the requested ConfidentialityClass is the default class OR the actor personally holds a
+  current ConfidentialityGrant for it in that scope
 → create Document + REV000
 ```
+
+The clearance restriction on creation is a **server-side admission rule**, never a frontend
+filter: an author must never be able to create a Document the author cannot read. Omitting a
+class means the default class, never "unknown".
 
 Ordinary author creation makes the actor the responsible owner by default unless an actor with `document.owner.manage` deliberately selects another eligible responsible User.
 
@@ -405,6 +443,16 @@ document.owner.manage
 → change current responsibility
 ```
 
+### Confidentiality classification
+
+```text
+set at creation      the author, restricted to their own current clearances
+change afterwards    access.manage in Company scope or the Document's Area
+```
+
+Reclassification changes neither identity, `Document.code`, revision ordinals, effectivity
+nor history. It emits a typed Audit fact.
+
 ### Governance action
 
 ```text
@@ -414,10 +462,18 @@ enabled User
 + exact active Step
 + User is in activated candidate snapshot
 + User is not Submission submitter / obsolescence initiator
++ clearance for the Document's ConfidentialityClass
 → allow ACCEPT / RETURN_FOR_CHANGES and exact-case feedback context
 ```
 
 Case participation permits inspection of the exact governed Submission/attempt context needed to decide. It does not create general working/history authority.
+
+**Routing never confers read (FP2-F3 Q5).** Being named in a Governance Route is not a
+substitute for clearance — otherwise adding an actor to a route would be an unaudited path
+around confidentiality entirely. A Submission whose route resolves to a candidate lacking
+clearance for the Document's class is **refused at submission, naming the actor**, never
+silently at the moment that actor opens the Step. The activated candidate snapshot is
+therefore always a set of cleared actors.
 
 ---
 
@@ -639,6 +695,24 @@ subject kind + User/Group id
 role code
 scope kind + Company/Area id
 ```
+
+### ConfidentialityGrant issue/revoke
+
+```text
+subject (User | Group) + class + scope + actor + instant
+```
+
+Typed and additive, so "who could read this Document at instant T" is answerable from Audit
+alone, without replaying a class order or a permission cache.
+
+### Document reclassification
+
+```text
+document + previous class + new class + actor + instant
+```
+
+Identity, `Document.code`, revision ordinals, effectivity and history are unchanged by the
+fact; only future read evaluation changes.
 
 ### GroupMembership add/remove
 

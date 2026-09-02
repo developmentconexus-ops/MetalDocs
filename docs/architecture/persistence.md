@@ -450,7 +450,8 @@ While Launch is structurally singleton this is seam structure, not a current mul
 
 ## 8. Authorization persistence
 
-`authz.role_assignments` is the only persisted Authorization authority:
+Authorization persists exactly two grant tables. `authz.role_assignments` carries permission
+grants:
 
 ```text
 id          UUID PRIMARY KEY
@@ -486,6 +487,43 @@ WHERE group_id IS NOT NULL
 No persistent Role/Permission/bundle/effective-permission tables exist.
 
 ---
+
+
+`authz.confidentiality_classes` and `authz.confidentiality_grants` carry the FP2-F3 clearance
+axis:
+
+```text
+authz.confidentiality_classes
+  id          UUID PRIMARY KEY
+  company_id  UUID NOT NULL
+  name        TEXT NOT NULL
+  is_default  BOOLEAN NOT NULL
+  state       TEXT NOT NULL          -- active | archived
+  created_at  TIMESTAMPTZ NOT NULL
+
+  UNIQUE (company_id, name)
+  exactly one row per company with is_default = true, enforced by a partial unique index
+  a row with is_default = true can never reach state = archived
+
+authz.confidentiality_grants
+  id          UUID PRIMARY KEY
+  company_id  UUID NOT NULL
+  user_id     UUID NULL
+  group_id    UUID NULL
+  class_id    UUID NOT NULL
+  area_id     UUID NULL              -- NULL = Company scope
+  created_at  TIMESTAMPTZ NOT NULL
+
+  exactly one of user_id / group_id is NOT NULL, mirroring role_assignments
+```
+
+`documents.confidentiality_class_id` is NOT NULL and defaults to the Company's default class,
+so "unclassified" is never a persisted state. It is an ordinary mutable column: reclassifying
+touches no identity, code, ordinal, effectivity or history row.
+
+No table materializes effective access. There is no ACL table, no per-document grant table,
+no expanded clearance cache. Every read evaluates the live grant tables, so revoking a grant
+or removing a Group membership takes effect on the next evaluation with nothing to invalidate.
 
 ## 9. DocumentType and numbering persistence
 

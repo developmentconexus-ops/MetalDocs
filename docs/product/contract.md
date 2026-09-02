@@ -147,6 +147,22 @@ The submitted source remains meaningful. A Document Type may be source-only or r
 
 A Template is an ordinary governed Document used to seed a new independent Document. There is no parallel TemplateVersion lifecycle.
 
+### Confidentiality Class
+
+A Confidentiality Class is a Company-configured label answering "who may know this Document
+exists and read it", carried by every Document — exactly one, always, with one distinguished
+default class meaning "no restriction beyond the Area and Company grants".
+
+Classes are **additive and non-hierarchical**: none implies, dominates or inherits another.
+Reading a Document requires the ordinary read permission in its scope **and** a clearance for
+its class; the two conditions are conjunctive. Clearances are granted centrally to Users or
+Groups, never chosen document by document — there is no per-document people picker, and the
+Area is never a secrecy mechanism.
+
+A class is not part of a Document's identity. It never enters the code, never becomes a
+numbering scope, and reclassification changes neither identity, code, revision ordinals,
+effectivity nor history.
+
 ---
 
 ## 5. End-to-end Launch journeys
@@ -301,6 +317,7 @@ Controlled Document + business Revision starting at REV000
 Revision-governed human-readable title
 DRAFT Working Content + autosave/concurrency
 Templates
+Confidentiality Classes + clearance grants
 immutable Submission
 NoHumanApproval or sequential governance route
 feedback / return / withdraw / resubmit
