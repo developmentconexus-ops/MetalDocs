@@ -19,7 +19,17 @@ T11 checkpoint        B01-B11 ACCEPTED / INTEGRATED
 B11-F1                ACCESS ASSIGNMENT READ PRECISION / OPERATOR-RATIFIED / INTEGRATED
 B11                   LOCKED / P8-P10 COMPLETE / INTEGRATED
 B12                   LOCKED / P8-P10 COMPLETE / INTEGRATED
-FP2 / P11             COMPLETE / OPERATOR-ACCEPTED 2026-08-26 / INTEGRATION PENDING
+FP2 / P11             COMPLETE / OPERATOR-ACCEPTED / INTEGRATED
+FP2-F1                CREATION COVERAGE GAP / OPERATOR-DISPOSED → B13 OPEN
+FP2-F2                CONTENT-FORMAT SCOPE / OPERATOR-RATIFIED → decisions/content-format-vocabulary.md
+FP2-F3                DOCUMENT CONFIDENTIALITY / PROMOTED TO LAUNCH SCOPE
+                      BOUNDED PRODUCT/T6 REOPEN OPEN / OPERATOR-AUTHORIZED 2026-08-27
+                      → decisions/document-confidentiality-launch.md
+B02 B03 B06 B10       BOUNDED REBASELINE PENDING (FP2-F3 delta only)
+B11 B12               BOUNDED REBASELINE PENDING (FP2-F3 delta only)
+B13                   LOCKED R4 / P8-P10 COMPLETE / FP2-F3 ABSORBED
+B13-Q1                RESOLVED — hypothesis B (A blocked by B13-F2)
+B13-F1                OPEN UPSTREAM FINDING (op44 projection) / NON-BLOCKING
 T12                   NOT OPEN
 IMPLEMENTATION         BLOCKED
 ```
@@ -38,7 +48,7 @@ Independent review uses the bounded ClaudeCode/FABLE posture and Git dialogue pr
 
 ```text
 FP0  Frontend Foundation                         CLOSED / 89 operations / 11 routes REBASELINED
-FP1  Block-by-block Product Experience           COMPLETE / B01-B12 LOCKED + INTEGRATED
+FP1  Block-by-block Product Experience           COMPLETE + BOUNDED REOPEN — B13 LOCKED; FP2-F3 rebaseline pending
 FP2  Integrated Low-Fidelity Product / P11       COMPLETE / OPERATOR-ACCEPTED
 FP3  Whole-Product Adversarial Review / P12      NOT OPEN
 FP4  Visual Handoff + Readiness / P13-P14        NOT OPEN
@@ -60,6 +70,7 @@ B09   Audit                                       LOCKED / P8-P10 COMPLETE
 B10   Organization Administration                 LOCKED / P8-P10 COMPLETE / INTEGRATED
 B11   Access Administration                       LOCKED / P8-P10 COMPLETE / INTEGRATED
 B12   Document Governance Administration          LOCKED / P8-P10 COMPLETE / INTEGRATED
+B13   Document Creation                            LOCKED / P8 R4-P10 COMPLETE (FP2-F1 + FP2-F3)
 ```
 
 B01–B11 exact frontend Evidence remains recoverable through their durable locators; Evidence identity/details do not belong in this roadmap.
@@ -100,16 +111,44 @@ Exact Evidence is routed by `docs/decisions/t11-b12-lock-evidence.md`. Temporary
 
 B11 pattern-graduation obligation: **CLOSED 2026-08-26.** The collection / idempotency / fixture-truthfulness realization laws are absorbed as durable class-level rules in `docs/architecture/frontend.md` §19, derived from the proved B11 + B12 P10 Evidence (`docs/decisions/t11-b11-lock-evidence.md` + `docs/decisions/t11-b12-lock-evidence.md`). No new checker/framework was introduced.
 
+## B13 acceptance result
+
+```text
+operator P8 LOCK                                      R4 / 2026-08-27
+P9 material regions                                   9 / 9 TRACED
+P9 B13 primary operations                             2 / 2 BOUND (op44, op46)
+supporting operations                                 ops 59 → 60 → 58 (source attachment)
+P10 headless proof                                    33 / 33 PASS
+B13-Q1                                                RESOLVED — hypothesis B (A blocked by B13-F2)
+B13-F1                                                OPEN UPSTREAM FINDING / NON-BLOCKING
+FP2-F3 confidentiality                                ABSORBED BEFORE LOCK
+unresolved material findings                          0
+application operations                                89 unchanged by B13
+```
+
+Exact Evidence is routed by `docs/decisions/t11-b13-lock-evidence.md`. Temporary `docs/work/**` is absent from `main`.
+
 ## Exact next action
 
 ```text
-1. Integrate the coherent FP2/P11 acceptance increment (Evidence preserved at
-   evidence/t11-p11-r1-accept-20260826, routed by decisions/t11-p11-acceptance-evidence.md);
-   merge only with explicit operator authorization.
-2. The next stage decision is operator-owned: open FP3/P12 (whole-product adversarial
-   walkthrough of the accepted assembled product) through an explicit roadmap update.
-3. FP3/P12, FP4/P13-P14, T12 and Product implementation remain BLOCKED until later roadmap
-   authority opens them.
+1. FP2-F3 is OPEN and authorized: docs/decisions/document-confidentiality-launch.md is the
+   bounded Product/T6 reopen promoting in-Area document confidentiality into Launch V1.
+   The semantic model stays owned by document-confidentiality-seam.md and is NOT reopened;
+   only its future-only disposition is. The non-hierarchical class law is decided.
+2. FP2-F3 Q1-Q5 are OPERATOR-RATIFIED (2026-08-27): author classifies at creation within
+   own clearance; Company-wide vocabulary; materialized default class; total
+   non-disclosure in collection reads; governance routing does NOT confer read.
+3. B13 is LOCKED at R4 with FP2-F3 absorbed; P9 (9/9 regions, ops 44/46 bound) and P10
+   (33/33 headless proof) are complete. Integration awaits explicit operator authorization.
+4. Prove the FP2-F3 census/idempotency/ETag deltas against api-operation-census.md and
+   the T3 equation delta against authorization-and-audit.md, then update Product contract
+   §4/§6. Ratification is operator-only.
+5. Bounded rebaseline of B02/B03/B10/B11/B12 for the FP2-F3 delta only; proved regions
+   untouched. Then re-integrate FP2/P11.
+6. FP3/P12 opens only after B13 and the FP2-F3 rebaseline close.
+7. FP4/P13-P14, T12 and Product implementation remain BLOCKED.
+
+Launch scope remains 89 operations until FP2-F3 is ratified.
 ```
 
 ## Hard stops

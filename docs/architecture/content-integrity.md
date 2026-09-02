@@ -83,7 +83,8 @@ Laws:
 ```text
 sha256        = SHA-256 of exact raw bytes
 size_bytes    = exact raw-byte length
-content_format= closed MetalDocs ContentFormat vocabulary
+content_format= closed MetalDocs ContentFormat vocabulary; current value set and per-format
+                structural admission laws REFINED -> ../decisions/content-format-vocabulary.md
 ```
 
 Not exact-content identity:
@@ -366,6 +367,8 @@ submitted source DOCX + required format PDF
   -> final admission revalidates exact READY content and Submission eligibility
   -> create OfficialRendition semantic fact
 ```
+
+A source in a vocabulary format with NO accepted converter cannot satisfy a `require_official_rendition` Document Type: the attempt is inadmissible and fails with a named validation problem, mutating nothing (`../decisions/content-format-vocabulary.md` §6).
 
 The first path is not a semantic downgrade: OfficialRendition still exists as the required immutable fact, but byte-for-byte PDF duplication/transformation is removed because it proves no additional property. Target proof must show same-PDF rendition preserves the exact Submission handle/descriptor and invokes neither `CopyToNewHandle` nor renderer/durable-intent machinery.
 

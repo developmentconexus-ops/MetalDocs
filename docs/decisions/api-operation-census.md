@@ -138,6 +138,8 @@ The T11 Discussion creation reuses the current global durable Idempotency-Key la
 
 `docs/decisions/access-assignment-read.md` is the bounded current authority for the op31 Access Assignment read/query refinement. It does not create operation 90, a new semantic owner or an effective-access engine.
 
+`docs/decisions/content-format-vocabulary.md` is the bounded current authority for the ContentFormat vocabulary, per-format structural admission and converter-bound official rendition. It adds no operation: the census stays at 89 and the 11/13/4 supporting censuses are unchanged.
+
 `docs/decisions/template-configuration-read.md` is the bounded current authority for the op43 template-configuration read/query refinement. It does not create operation 90, a "general template" concept or Area-scoped templates.
 
 Together these bounded decisions supersede only the conflicting current-tense Product/T6/T8-E/T8-F/T8-H/T9 statements on their exact subjects.

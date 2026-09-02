@@ -431,9 +431,16 @@ Semantic byte resources return authenticated application-origin `200` only.
 ```text
 Content-Type:
   docx application/vnd.openxmlformats-officedocument.wordprocessingml.document
+  xlsx application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+  pptx application/vnd.openxmlformats-officedocument.presentationml.presentation
   pdf  application/pdf
+  png  image/png
+  jpeg image/jpeg
+  txt  text/plain
+  csv  text/csv
 Content-Length exact raw byte count
 Content-Disposition inline; filename="<document_code>-REV<ordinal-min-width-3>.<ext>"
+  attachment (not inline) for txt, csv, png, jpeg — browser-renderable bytes never render in application origin
 Content-Digest sha-256=:<base64 exact SHA-256 bytes>:
 Cache-Control private,no-store,no-transform
 Accept-Ranges none
@@ -563,7 +570,7 @@ ContentSummary { sha256:Sha256Hex, size_bytes:ByteCount, content_format:ContentF
 Closed enums:
 
 ```text
-ContentFormat               docx | pdf
+ContentFormat               docx | xlsx | pptx | pdf | png | jpeg | txt | csv   // REFINED -> ../decisions/content-format-vocabulary.md
 RevisionState               draft | submitted | effective | superseded | obsolete | cancelled
 OpenRevisionState           draft | submitted
 UserEligibilityState        enabled | disabled
@@ -1243,9 +1250,9 @@ Current numeric census is not derived from this block; use `../decisions/api-ope
 The Launch candidate freezes exactly three resource ceilings:
 
 ```text
-DOC_RAW_MAX_BYTES        = 104857600  // 100 MiB; DOCX and PDF
-DOCX_EXPANDED_MAX_BYTES  = 268435456  // 256 MiB; streamed top-level OPC expansion
-DOCX_MAX_ZIP_ENTRIES     = 4096       // top-level ZIP entries
+DOC_RAW_MAX_BYTES        = 104857600  // 100 MiB; every ContentFormat vocabulary value
+DOCX_EXPANDED_MAX_BYTES  = 268435456  // 256 MiB; streamed top-level OPC expansion (all OOXML: docx/xlsx/pptx)
+DOCX_MAX_ZIP_ENTRIES     = 4096       // top-level ZIP entries (all OOXML: docx/xlsx/pptx)
 ```
 
 These are application admission limits, not claims about the theoretical maximum accepted by Microsoft Word, S3, a DAM, or another provider.
@@ -1311,6 +1318,13 @@ Closed structural laws:
 
 ```text
 DOCX = valid top-level OOXML/OPC ZIP with WordprocessingML main document
+XLSX = valid top-level OOXML/OPC ZIP with SpreadsheetML workbook main part
+PPTX = valid top-level OOXML/OPC ZIP with PresentationML presentation main part
+OOXML ZIP laws below apply identically to DOCX, XLSX and PPTX
+macro-enabled Office packages (docm/xlsm/pptm) rejected — not vocabulary values
+PNG/JPEG = valid decodable image container; declared dimensions and decoded pixel budget
+  bounded before decode; embedded thumbnails/metadata never recursively expanded
+TXT/CSV = raw bytes bounded by DOC_RAW_MAX_BYTES; never parsed, evaluated or re-encoded
 duplicate canonical ZIP part names rejected
 absolute/parent-traversal paths rejected
 symlink entry extraction rejected
