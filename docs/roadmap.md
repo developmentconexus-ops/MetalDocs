@@ -111,6 +111,23 @@ Exact Evidence is routed by `docs/decisions/t11-b12-lock-evidence.md`. Temporary
 
 B11 pattern-graduation obligation: **CLOSED 2026-08-26.** The collection / idempotency / fixture-truthfulness realization laws are absorbed as durable class-level rules in `docs/architecture/frontend.md` §19, derived from the proved B11 + B12 P10 Evidence (`docs/decisions/t11-b11-lock-evidence.md` + `docs/decisions/t11-b12-lock-evidence.md`). No new checker/framework was introduced.
 
+## B13 acceptance result
+
+```text
+operator P8 LOCK                                      R4 / 2026-08-27
+P9 material regions                                   9 / 9 TRACED
+P9 B13 primary operations                             2 / 2 BOUND (op44, op46)
+supporting operations                                 ops 59 → 60 → 58 (source attachment)
+P10 headless proof                                    33 / 33 PASS
+B13-Q1                                                RESOLVED — hypothesis B (A blocked by B13-F2)
+B13-F1                                                OPEN UPSTREAM FINDING / NON-BLOCKING
+FP2-F3 confidentiality                                ABSORBED BEFORE LOCK
+unresolved material findings                          0
+application operations                                89 unchanged by B13
+```
+
+Exact Evidence is routed by `docs/decisions/t11-b13-lock-evidence.md`. Temporary `docs/work/**` is absent from `main`.
+
 ## Exact next action
 
 ```text
