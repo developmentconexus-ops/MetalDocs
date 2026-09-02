@@ -345,3 +345,73 @@ B13-Q1      hipótese A (restringir na criação) ou B (falhar em portão poster
 B13-F1      decidir se abre achado upstream pedindo que op44 projete escopo de numeração /
             política de representação / formato do modelo
 ```
+
+---
+
+## 8. B13 LOCK + P9/P10 (2026-08-27)
+
+### 8.1 LOCK
+
+```text
+B13 P8 R4    OPERATOR-LOCKED 2026-08-27
+```
+
+### 8.2 B13-Q1 — resolvido por evidência, não por preferência
+
+```text
+hipótese B (falhar em portão posterior)   ADOTADA — é a única realizável
+hipótese A (restringir na criação)        BLOQUEADA por B13-F2: exige que op44 projete a
+                                          política de representação do tipo e o formato-fonte
+                                          do modelo. op44 não projeta nenhum dos dois.
+```
+
+O wireframe só permite operar A atrás do fixture explícito "simular leitura NÃO ratificada",
+justamente para não fingir que a autoridade existe. A promoção de A depende do achado
+upstream B13-F1; até lá, B é a lei.
+
+### 8.3 P9 — rastreio material
+
+```text
+regiões materiais                         9 / 9 TRACED
+  tipo · área · modo de partida · modelo · anexo · título+responsável ·
+  confidencialidade · audiência · resultado
+diálogos canônicos                        2 / 2  (dlg-created, dlg-file)
+painéis de recusa                         3 / 3  (access, gov, create)
+controles interativos                     24 rastreados
+
+operações primárias                       2 / 2 BOUND
+  op44 getDocumentCreationOptions   → tipo, área, modo, modelos, candidatos a responsável,
+                                      classes projetadas (FP2-F3)
+  op46 createDocument               → criação idempotente + classe de confidencialidade
+
+operações de apoio                        ops 59 → 60 → 58  (anexo do arquivo-fonte à REV000)
+census                                    89 inalterado no B13; o delta 89 → 97 pertence ao
+                                          reopen FP2-F3 e será provado na ratificação dele
+```
+
+### 8.4 P10 — leis de realização verificadas
+
+```text
+§19.1 coleção honesta          arrays de op44 são completos (não paginados); classes são
+                               projetadas pelo servidor e a projeção parcial é declarada
+§19.2 recuperação idempotente  ambiguidade só oferece repetição com a MESMA chave; 1 → 1 provado
+§19.3 fixture verdadeira       campos não projetados por op44 só aparecem sob fixture rotulada
+                               como leitura não ratificada
+seam §5.3 não-identidade       classe nunca entra no código alocado — provado (C14)
+Q4 não-divulgação              nenhuma contagem, lacuna ou "N ocultos" em qualquer superfície
+Q5 governança                  roteamento não concede leitura; recusa nomeada na submissão
+T3 / frontend                  a tela não avalia autorização: enuncia regra, nunca calcula acesso
+
+prova headless                 33 / 33 PASS  (17 regressão R3 + 16 FP2-F3 R4)
+achados materiais em aberto    0
+```
+
+### 8.5 Pendências que saem do B13
+
+```text
+B13-F1   achado upstream: pedir que op44 projete escopo de numeração, política de
+         representação e formato-fonte do modelo. Desbloqueia a hipótese A. NÃO é bloqueio
+         para o LOCK — B é realizável e honesta.
+FP2-F3   ratificação do reopen (censo 89 → 97, equação T3, contrato §4/§6) e rebaseline
+         bounded de B02/B03/B06/B10/B11/B12.
+```

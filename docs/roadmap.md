@@ -27,7 +27,9 @@ FP2-F3                DOCUMENT CONFIDENTIALITY / PROMOTED TO LAUNCH SCOPE
                       → decisions/document-confidentiality-launch.md
 B02 B03 B06 B10       BOUNDED REBASELINE PENDING (FP2-F3 delta only)
 B11 B12               BOUNDED REBASELINE PENDING (FP2-F3 delta only)
-B13                   OPEN / P6-P7 NEXT / ABSORBS FP2-F3 BEFORE LOCK
+B13                   LOCKED R4 / P8-P10 COMPLETE / FP2-F3 ABSORBED
+B13-Q1                RESOLVED — hypothesis B (A blocked by B13-F2)
+B13-F1                OPEN UPSTREAM FINDING (op44 projection) / NON-BLOCKING
 T12                   NOT OPEN
 IMPLEMENTATION         BLOCKED
 ```
@@ -46,7 +48,7 @@ Independent review uses the bounded ClaudeCode/FABLE posture and Git dialogue pr
 
 ```text
 FP0  Frontend Foundation                         CLOSED / 89 operations / 11 routes REBASELINED
-FP1  Block-by-block Product Experience           COMPLETE + BOUNDED REOPEN — B13 OPEN (FP2-F1)
+FP1  Block-by-block Product Experience           COMPLETE + BOUNDED REOPEN — B13 LOCKED; FP2-F3 rebaseline pending
 FP2  Integrated Low-Fidelity Product / P11       COMPLETE / OPERATOR-ACCEPTED
 FP3  Whole-Product Adversarial Review / P12      NOT OPEN
 FP4  Visual Handoff + Readiness / P13-P14        NOT OPEN
@@ -68,7 +70,7 @@ B09   Audit                                       LOCKED / P8-P10 COMPLETE
 B10   Organization Administration                 LOCKED / P8-P10 COMPLETE / INTEGRATED
 B11   Access Administration                       LOCKED / P8-P10 COMPLETE / INTEGRATED
 B12   Document Governance Administration          LOCKED / P8-P10 COMPLETE / INTEGRATED
-B13   Document Creation                            OPEN / P6-P7 NEXT (FP2-F1 inventory + FP2-F3 confidentiality)
+B13   Document Creation                            LOCKED / P8 R4-P10 COMPLETE (FP2-F1 + FP2-F3)
 ```
 
 B01–B11 exact frontend Evidence remains recoverable through their durable locators; Evidence identity/details do not belong in this roadmap.
@@ -119,9 +121,8 @@ B11 pattern-graduation obligation: **CLOSED 2026-08-26.** The collection / idemp
 2. FP2-F3 Q1-Q5 are OPERATOR-RATIFIED (2026-08-27): author classifies at creation within
    own clearance; Company-wide vocabulary; materialized default class; total
    non-disclosure in collection reads; governance routing does NOT confer read.
-3. Run B13 Document Creation P6-P7 over the recovered authority pack (op44/op46, the
-   ratified format decision, and the FP2-F3 delta). B13 must absorb confidentiality
-   BEFORE LOCK — the reopen was authorized precisely to avoid retrofitting it.
+3. B13 is LOCKED at R4 with FP2-F3 absorbed; P9 (9/9 regions, ops 44/46 bound) and P10
+   (33/33 headless proof) are complete. Integration awaits explicit operator authorization.
 4. Prove the FP2-F3 census/idempotency/ETag deltas against api-operation-census.md and
    the T3 equation delta against authorization-and-audit.md, then update Product contract
    §4/§6. Ratification is operator-only.
